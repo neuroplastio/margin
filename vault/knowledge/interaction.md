@@ -114,7 +114,9 @@ These have been raised but not judged. Each needs a felt leg and a review.
   being edited. Currently the editor replaces the whole thread box.
 - Rendering of anything beyond headings and paragraphs: lists, tables, code
   blocks, block quotes, images.
-- Scroll behaviour beyond keeping focus on screen — no explicit scroll keys yet.
+- Scroll behaviour beyond keeping focus on screen. No explicit scroll keys, no
+  wheel. Whether paging carries focus with the viewport is the live question —
+  see SCROLL-02 and SCROLL-03 on the board.
 - What the document-tree view looks like when reviewing a directory.
 - Whether marks and comments belong in the same gutter column.
 - Whether the export should also be writable to a file or piped, rather than

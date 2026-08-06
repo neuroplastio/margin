@@ -68,9 +68,29 @@ Last updated: 2026-08-07
   2026-08-07 (line locators, structure-preserving quotes); still wants a real
   agent to act on one.*
 
+## Backlog — M3 (navigation)
+
+Not blocked by Q-0001: these are about moving around one document, and are
+independent of whether the unit of review turns out to be a file or a tree.
+
+- **SCROLL-01** `[mech]` Decouple the scroll offset from focus. Today `clampScroll`
+  recomputes it from the focused block on every render, so any user-driven scroll
+  would snap straight back. Needs a real offset the user owns, with focus-follow
+  applying only when focus actually moved. Prerequisite for the other two.
+- **SCROLL-02** `[felt]` Page and half-page keys — `ctrl+d`/`ctrl+u`,
+  `ctrl+f`/`ctrl+b`, `pgup`/`pgdn`, `home`/`end`. The open decision is whether
+  they carry focus along with the viewport, the way vim's `ctrl+d` carries the
+  cursor, or scroll underneath a focus that stays put.
+- **SCROLL-03** `[felt]` Mouse wheel. Almost certainly scroll-only with focus
+  left where it is, since that is how a wheel behaves everywhere — but that makes
+  it deliberately inconsistent with SCROLL-02, which is worth deciding on purpose
+  rather than by accident. Also: a wheel over an open composer should probably
+  scroll the comment rather than the document.
+
 ## Blocked
 
-- Everything in M3 — blocked on **Q-0001** (file or tree as the unit of review).
+- The **multi-document** parts of M3 — blocked on **Q-0001** (file or tree as
+  the unit of review). The single-document navigation items above are not.
 - **THREAD-01**, **THREAD-03** — blocked on **Q-0002** (how resolution and
   deletion are represented in the thread file). Worth answering before STORE-01
   fixes that format.

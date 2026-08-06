@@ -73,7 +73,9 @@ threads it considers resolved.
 
 - [ ] Review a directory, not just a file
 - [ ] Navigation between documents, and a cross-document comment inbox
-- [ ] Scroll and jump keys beyond keep-focus-visible
+- [ ] A scroll offset the user owns, decoupled from focus-follow (SCROLL-01)
+- [ ] Page and half-page keys (SCROLL-02)
+- [ ] Mouse wheel (SCROLL-03)
 - [ ] Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`)
 - [ ] Review progress across the whole tree
 
