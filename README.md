@@ -7,9 +7,11 @@ Read the rendered document, leave comments anchored to blocks, mark what you've
 reviewed and what still needs attention, and hand the whole lot back to whatever
 wrote it.
 
-> **Status: early.** The interaction model works end to end against a seeded
-> document. The markdown parser, real file loading, and thread persistence are
-> not built yet. See [Roadmap](#roadmap).
+> **Status: early.** `margin FILE.md` opens a real document and the review loop
+> works end to end. Thread persistence is not built yet, so comments live only
+> for the session, and anchors are content-derived rather than stamped into the
+> source — meaning a thread does not yet survive an agent rewording its block.
+> See [Roadmap](#roadmap).
 
 ## Why
 
@@ -74,9 +76,13 @@ go install github.com/neuroplastio/margin/cmd/margin@latest
 ## Build
 
 ```
-make check     # build + test + vet
-make doctor    # prove this machine can run the composer tests
-make run
+margin FILE.md
+```
+
+```
+make check              # build + test + vet
+make doctor             # prove this machine can run the composer tests
+make run FILE=doc.md
 ```
 
 Requires Go 1.24+ and `nvim` 0.8+ on `PATH`. `./scripts/setup-env.sh` provisions
@@ -94,8 +100,10 @@ of the stripped one, for comparison.
 - [x] nvim-in-a-pane composer, with blur/resume drafts
 - [x] Block-anchored threads, replies, in-place editing
 - [x] Review marks with section roll-up
-- [ ] Real markdown parsing (goldmark, keeping source offsets per block)
-- [ ] Load real files and directories; stamp block ids into the source
+- [x] Real markdown parsing (goldmark, keeping source offsets per block)
+- [x] Load a real file from the command line
+- [ ] Render headings by level, and inline markup
+- [ ] Stamp block ids into the source, so threads survive a rewrite
 - [ ] Thread persistence as markdown under `.margin/`, readable and writable by
       an agent with no tooling
 - [ ] `--stdout` export, to pipe a review straight into an agent

@@ -7,8 +7,6 @@ check: build test vet
 
 build:
 	go build ./...
-
-$(BIN):
 	go build -o $(BIN) ./cmd/margin
 
 test:
@@ -32,8 +30,10 @@ doctor:
 fmt:
 	gofmt -l -w .
 
-run: $(BIN)
-	$(BIN)
+# make run FILE=path/to/doc.md
+FILE ?= README.md
+run: build
+	$(BIN) $(FILE)
 
 clean:
 	rm -rf bin

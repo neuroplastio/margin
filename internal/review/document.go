@@ -15,6 +15,9 @@ const (
 	blockHeading blockKind = iota
 	blockPara
 	blockThread
+	// blockRaw is any block type whose rendering has not been decided yet —
+	// lists, code fences, quotes, tables. Its source lines are shown verbatim.
+	blockRaw
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which
@@ -24,6 +27,13 @@ type block struct {
 	kind   blockKind
 	text   string
 	anchor string
+
+	// lines holds the verbatim source of a blockRaw, which must not be
+	// re-wrapped — indentation and line breaks are the content.
+	lines []string
+
+	level       int // heading level
+	start, stop int // byte range in the source document
 }
 
 type comment struct {
@@ -43,6 +53,13 @@ const (
 	markOK              // read and accepted
 	markFlag            // needs attention later
 )
+
+// commentable reports whether a block can carry a thread and a review mark.
+// Headings cannot: they govern their section rather than holding state of their
+// own, and threads are not review targets.
+func (b block) commentable() bool {
+	return b.kind == blockPara || b.kind == blockRaw
+}
 
 func (r reviewMark) glyph() string {
 	switch r {

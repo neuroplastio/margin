@@ -3,7 +3,7 @@
 Last updated: 2026-08-06
 
 **Active milestone:** M1 — Real documents
-**Awaiting review:** *(none)*
+**Awaiting review:** PARSE-02 — the first real-file baseline
 
 > `Awaiting review:` names the one felt leg the maintainer has not judged yet.
 > While it is set, only mechanical legs may be picked. Clear it when feedback
@@ -22,12 +22,13 @@ Last updated: 2026-08-06
 
 ## Backlog — M1
 
-- **PARSE-01** `[mech]` Parse markdown with goldmark into a block list, keeping
-  each block's byte offsets. Pure function, no UI. Table-driven tests over a
-  fixture document.
-- **PARSE-02** `[mech]` Replace the seeded document with the parsed one, wired to
-  a file path from `argv`. Headings and paragraphs only; other block types render
-  as plain text for now.
+- **RENDER-05** `[felt]` Heading hierarchy. Levels are parsed and carried on the
+  block but unused by the renderer, so `#` and `###` look identical. A terminal
+  has no font sizes, so this needs a real decision: indentation, rules, colour
+  weight, or a visible prefix.
+- **RENDER-06** `[felt]` Inline markup — `**bold**`, `` `code` ``, links —
+  currently shows as raw source, which is a large share of the reading-comfort
+  gap on a real document.
 - **RENDER-01** `[felt]` Render lists. One block type, then stop and ask.
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables.
@@ -55,4 +56,6 @@ Last updated: 2026-08-06
 
 ## Done
 
+- [x] **PARSE-01** goldmark into a block list with byte offsets — done 2026-08-06
+- [x] **PARSE-02** real files from argv; the seeded document is now a test fixture — done 2026-08-06
 - [x] **M0** Foundation — interaction model end to end — done 2026-08-06

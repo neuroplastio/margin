@@ -37,7 +37,7 @@ func isolateDrafts(t *testing.T) {
 func newTestModel(t *testing.T) *model {
 	t.Helper()
 	isolateDrafts(t)
-	m := newModel()
+	m := seedModel()
 	m.w, m.h = 100, 60
 	return m
 }

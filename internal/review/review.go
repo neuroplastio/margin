@@ -125,8 +125,17 @@ type model struct {
 	samples   []time.Duration
 }
 
-func newModel() *model {
+// seedModel builds a model over the document seeded in code. Tests use it so
+// they have known anchors to assert against.
+func seedModel() *model {
 	doc, threads := seedDoc()
+	return newModel(doc, threads)
+}
+
+func newModel(doc []block, threads map[string]*thread) *model {
+	if threads == nil {
+		threads = map[string]*thread{}
+	}
 	m := &model{
 		doc: doc, threads: threads,
 		marks:   map[string]reviewMark{},
@@ -232,7 +241,7 @@ func (m *model) ensureThread(anchor string) *thread {
 		return t
 	}
 	for _, b := range m.doc {
-		if b.anchor == anchor && b.kind == blockPara {
+		if b.anchor == anchor && b.commentable() {
 			t := &thread{anchor: anchor, quote: b.text}
 			m.threads[anchor] = t
 			m.rebuild()
@@ -252,7 +261,7 @@ func (m *model) sectionAnchors(i int) []string {
 	}
 	e := m.entries[i]
 	// A thread is not a review target; the block it hangs off is.
-	if e.b.kind == blockPara {
+	if e.b.commentable() {
 		if e.b.anchor == "" {
 			return nil
 		}
@@ -267,7 +276,7 @@ func (m *model) sectionAnchors(i int) []string {
 		if nb.kind == blockHeading {
 			break
 		}
-		if nb.kind == blockPara && nb.anchor != "" {
+		if nb.commentable() && nb.anchor != "" {
 			out = append(out, nb.anchor)
 		}
 	}
@@ -319,7 +328,7 @@ func (m *model) toggleMark(want reviewMark) {
 // reviewProgress counts paragraphs that have been looked at.
 func (m *model) reviewProgress() (done, flagged, total int) {
 	for _, b := range m.doc {
-		if b.kind != blockPara || b.anchor == "" {
+		if !b.commentable() || b.anchor == "" {
 			continue
 		}
 		total++
@@ -601,6 +610,7 @@ var (
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	flagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	rawStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("109"))
 )
 
 // gutter draws the focus bar and the review glyph in a fixed-width column, so
@@ -644,14 +654,23 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
 					headStyle.Render(e.b.text), "")
 
-		case e.b.kind == blockPara:
+		case e.b.kind == blockPara, e.b.kind == blockRaw:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
 				// Reviewed prose recedes so unreviewed text is what draws the eye.
 				body = reviewedTxt
 			}
-			for _, l := range wrap(e.b.text, w) {
+			// A blockRaw is shown verbatim: for a code fence or a list, the
+			// indentation and the line breaks are the content, so re-wrapping
+			// it to the measure would destroy it.
+			out := e.b.lines
+			if e.b.kind == blockPara {
+				out = wrap(e.b.text, w)
+			} else if mark != markOK {
+				body = rawStyle
+			}
+			for _, l := range out {
 				lines = append(lines,
 					m.gutter(focused && m.at.comment == commentNone, mark, false)+body.Render(l))
 			}
@@ -886,10 +905,13 @@ func reportLatency(samples []time.Duration) {
 		len(sorted), at(0.5), at(0.9), at(0.99), at(1))
 }
 
-// Run starts the review UI and reports what the session produced. The seeded
-// document stands in for a real one until the markdown parser lands.
-func Run() error {
-	m := newModel()
+// Run opens path for review and reports what the session produced.
+func Run(path string) error {
+	doc, err := loadDoc(path)
+	if err != nil {
+		return err
+	}
+	m := newModel(doc, nil)
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
 	if _, err := tea.NewProgram(m, tea.WithFPS(120)).Run(); err != nil {
@@ -898,7 +920,7 @@ func Run() error {
 	reportLatency(m.samples)
 
 	for _, b := range m.doc {
-		if b.kind != blockPara || b.anchor == "" {
+		if !b.commentable() || b.anchor == "" {
 			continue
 		}
 		if mk := m.marks[b.anchor]; mk != markNone {
