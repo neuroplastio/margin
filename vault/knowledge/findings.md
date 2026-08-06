@@ -111,3 +111,24 @@ The corollary is that **blur is not a separate mechanism**: the host sends
 `\x1b:MdreviewDraft\r` and the child exits 2, which is byte-for-byte what
 `esc esc` does. One persistence path, not two. Resist any change that gives blur
 its own code path.
+
+## F8 — Without nvim the test suite lies
+
+Roughly two thirds of the tests call `requireNvim(t)`, which is `t.Skip()`. On a
+machine with no nvim the suite still reports `ok`. A green run in an
+unprovisioned environment — a fresh container, a cloud agent, a new laptop —
+proves almost nothing about the composer.
+
+`make doctor` (`scripts/setup-env.sh --verify`) exists for this. It runs one
+composer test and demands an explicit `--- PASS`, treating `--- SKIP` as a
+failure.
+
+Provision with `scripts/setup-env.sh`. Two details that matter:
+
+- **Install the tarball, not the AppImage.** AppImages need FUSE, which
+  containers usually lack.
+- **Spell files.** The composer sets `spell = true`. With no spell file nvim
+  prompts to download one, and a modal prompt inside a ten-row pane would wedge
+  it. The official tarball ships `runtime/spell/en.utf-8.spl`, so this is handled
+  — but a hand-rolled minimal install can miss it. The `.sug` companion is
+  optional and only affects `z=` suggestion quality.

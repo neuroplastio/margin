@@ -75,11 +75,19 @@ go install github.com/neuroplastio/margin/cmd/margin@latest
 
 ```
 make check     # build + test + vet
+make doctor    # prove this machine can run the composer tests
 make run
 ```
 
-Requires Go 1.24+ and `nvim` on `PATH`. `MDREVIEW_NVIM_CONFIG=user` runs the
-composer with your own config instead of the stripped one, for comparison.
+Requires Go 1.24+ and `nvim` 0.8+ on `PATH`. `./scripts/setup-env.sh` provisions
+a fresh machine; it is idempotent and safe to re-run.
+
+Note that the composer tests **skip** rather than fail when nvim is absent, so a
+green suite on an unprovisioned machine is misleading — `make doctor` is what
+catches that.
+
+`MDREVIEW_NVIM_CONFIG=user` runs the composer with your own nvim config instead
+of the stripped one, for comparison.
 
 ## Roadmap
 
