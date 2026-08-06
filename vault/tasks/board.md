@@ -46,9 +46,10 @@ Last updated: 2026-08-06
   markdown with frontmatter. Read and write, round-trip tested.
 - **STORE-02** `[mech]` Load threads on open; `fsnotify` reload when an agent
   writes one while margin is running.
-- **EXPORT-01** `[mech]` `--stdout` export of the whole review.
-- **EXPORT-02** `[felt]` The export's actual wording and shape — judged by
-  pasting it at an agent and seeing whether it acts correctly.
+- **EXPORT-03** `[mech]` `--stdout` export, to pipe a review into an agent
+  without going through the clipboard.
+- **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
+  an agent and seeing whether it acts correctly.
 
 ## Blocked
 
@@ -56,6 +57,8 @@ Last updated: 2026-08-06
 
 ## Done
 
+- [x] **EXPORT-01/02** clipboard export with `Y`; headings commentable; `space`
+      cycles marks; `ctrl+enter` submits — done 2026-08-06
 - [x] **PARSE-01** goldmark into a block list with byte offsets — done 2026-08-06
 - [x] **PARSE-02** real files from argv; the seeded document is now a test fixture — done 2026-08-06
 - [x] **M0** Foundation — interaction model end to end — done 2026-08-06

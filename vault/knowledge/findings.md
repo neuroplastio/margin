@@ -108,7 +108,7 @@ The composer reports its outcome purely through the child's exit code: 0 submit,
 has used the same channel to abort commits for decades.
 
 The corollary is that **blur is not a separate mechanism**: the host sends
-`\x1b:MdreviewDraft\r` and the child exits 2, which is byte-for-byte what
+`\x1b:MarginDraft\r` and the child exits 2, which is byte-for-byte what
 `esc esc` does. One persistence path, not two. Resist any change that gives blur
 its own code path.
 

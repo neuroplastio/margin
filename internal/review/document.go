@@ -54,11 +54,28 @@ const (
 	markFlag            // needs attention later
 )
 
-// commentable reports whether a block can carry a thread and a review mark.
-// Headings cannot: they govern their section rather than holding state of their
-// own, and threads are not review targets.
+// commentable reports whether a block can carry a thread. Headings can: "this
+// whole section is wrong" is a real comment, and it belongs on the heading.
 func (b block) commentable() bool {
+	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw
+}
+
+// markable reports whether a block holds a review mark of its own. Headings do
+// not — they roll up their section, so the two can never disagree.
+func (b block) markable() bool {
 	return b.kind == blockPara || b.kind == blockRaw
+}
+
+// next returns the mark one step around the cycle: unmarked, reviewed, flagged.
+func (r reviewMark) next() reviewMark {
+	switch r {
+	case markNone:
+		return markOK
+	case markOK:
+		return markFlag
+	default:
+		return markNone
+	}
 }
 
 func (r reviewMark) glyph() string {
@@ -175,11 +192,11 @@ func truncate(s string, n int) string {
 // question, and one holding an unsubmitted draft.
 func seedDoc() ([]block, map[string]*thread) {
 	blocks := []block{
-		{kind: blockHeading, text: "## Retry policy"},
+		{kind: blockHeading, text: "## Retry policy", anchor: "^h1", level: 2},
 		{kind: blockPara, anchor: "^a1", text: "Each outbound call is retried up to three times with exponential backoff starting at 100ms. Retries are attempted on 5xx responses and on transport errors, but never on 4xx."},
 		{kind: blockPara, anchor: "^b2", text: "The retry budget is shared across all endpoints, so a single misbehaving upstream can starve every other caller in the process."},
 		{kind: blockPara, anchor: "^c3", text: "Backoff jitter is full-jitter, computed per attempt rather than per call, which keeps retry storms from synchronising across replicas."},
-		{kind: blockHeading, text: "## Circuit breaking"},
+		{kind: blockHeading, text: "## Circuit breaking", anchor: "^h2", level: 2},
 		{kind: blockPara, anchor: "^d4", text: "A breaker opens after five consecutive failures and half-opens after thirty seconds. Half-open admits a single probe request."},
 		{kind: blockPara, anchor: "^e5", text: "Breaker state is per-process and is not shared across replicas, so a failing upstream is discovered independently by each instance."},
 	}

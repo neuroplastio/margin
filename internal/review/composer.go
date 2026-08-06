@@ -119,11 +119,11 @@ end
 -- User commands give the host a deterministic way to dismiss the pane. Sending
 -- <Esc><Esc> would work too, but only from normal mode; a command survives
 -- whatever mode or pending state the editor happens to be in.
-vim.api.nvim_create_user_command('MdreviewSubmit', function() submit() end, { bang = true })
-vim.api.nvim_create_user_command('MdreviewDiscard', function() discard() end, { bang = true })
+vim.api.nvim_create_user_command('MarginSubmit', function() submit() end, { bang = true })
+vim.api.nvim_create_user_command('MarginDiscard', function() discard() end, { bang = true })
 -- The bang variant exists so ':q!' abbreviates cleanly: the abbreviation fires
 -- on 'q' and the '!' rides along, which is also the right meaning.
-vim.api.nvim_create_user_command('MdreviewDraft', function(o)
+vim.api.nvim_create_user_command('MarginDraft', function(o)
   if o.bang then discard() else draft() end
 end, { bang = true })
 
@@ -135,11 +135,11 @@ local function abbrev(from, to)
     "cnoreabbrev <expr> %s (getcmdtype() == ':' && getcmdline() ==# '%s') ? '%s' : '%s'",
     from, from, to, from))
 end
-abbrev('q', 'MdreviewDraft')
-abbrev('qa', 'MdreviewDraft')
-abbrev('wq', 'MdreviewSubmit')
-abbrev('x', 'MdreviewSubmit')
-abbrev('wqa', 'MdreviewSubmit')
+abbrev('q', 'MarginDraft')
+abbrev('qa', 'MarginDraft')
+abbrev('wq', 'MarginSubmit')
+abbrev('x', 'MarginSubmit')
+abbrev('wqa', 'MarginSubmit')
 
 local map = vim.keymap.set
 map({ 'n', 'i' }, '<C-s>', submit, { desc = 'submit comment' })
@@ -197,7 +197,7 @@ type composer struct {
 
 // newComposer spawns nvim on a scratch file holding seed and nothing else.
 func newComposer(gen int, anchor string, target int, seed string, w, h int) (*composer, error) {
-	tmpDir, err := os.MkdirTemp("", "mdreview-probe")
+	tmpDir, err := os.MkdirTemp("", "margin")
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func newComposer(gen int, anchor string, target int, seed string, w, h int) (*co
 		editor = "nvim"
 	}
 	args := []string{"--noplugin", "-i", "NONE", "-u", initPath, path}
-	if os.Getenv("MDREVIEW_NVIM_CONFIG") == "user" {
+	if os.Getenv("MARGIN_NVIM_CONFIG") == "user" {
 		// Escape hatch for comparing the stripped pane against the real config.
 		args = []string{path}
 	}
@@ -292,7 +292,7 @@ func (c *composer) mode() string {
 // does not need a second persistence path. The leading <Esc> leaves insert or
 // visual mode first; the ex command then runs regardless of pending state.
 func (c *composer) requestDraft() {
-	c.em.SendText("\x1b:MdreviewDraft\r")
+	c.em.SendText("\x1b:MarginDraft\r")
 }
 
 // sendMouse forwards a click to the child in pane-relative coordinates, so
@@ -330,6 +330,23 @@ func (c *composer) close() {
 // every shifted punctuation vanish. Hence: printable text goes as text, and
 // modified special keys get encoded here.
 func (c *composer) sendKey(k tea.Key) {
+	// ctrl+enter submits.
+	//
+	// This is the one place besides ctrl+\ where the host reads a key instead
+	// of forwarding it, and it is here only because it cannot work any other
+	// way: a plain terminal sends CR for both enter and ctrl+enter, so nvim
+	// cannot tell them apart. We only see the difference because Ghostty speaks
+	// the Kitty keyboard protocol — and the embedded emulator does not
+	// advertise that protocol to the child, so nvim could not receive the
+	// distinction even if we forwarded it.
+	//
+	// It resolves to the same ex command as every other submit gesture, so
+	// there is still exactly one submit path.
+	if k.Code == uv.KeyEnter && k.Mod&uv.ModCtrl != 0 {
+		c.em.SendText("\x1b:MarginSubmit\r")
+		return
+	}
+
 	// Printable characters, shifted or not, carry their literal in Text.
 	// This is the path that makes O, D, A, !, ? work.
 	if k.Text != "" && k.Mod&(uv.ModCtrl|uv.ModAlt|uv.ModMeta) == 0 {
@@ -378,7 +395,7 @@ func draftPath(anchor string, target int) (string, error) {
 		return "", err
 	}
 	sum := sha256.Sum256([]byte(anchor + "#" + strconv.Itoa(target)))
-	dir := filepath.Join(base, "mdreview-probe", "drafts")
+	dir := filepath.Join(base, "margin", "drafts")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

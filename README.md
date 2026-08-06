@@ -52,20 +52,22 @@ detectably orphaned rather than silently misplaced.
 | `j` / `k` | Move between blocks, and between comments in a focused thread |
 | `c` | New comment on the focused block (opens in insert mode) |
 | `e` | Edit the focused comment or draft (opens in normal mode) |
-| `r` | Mark reviewed — on a heading, the whole section |
-| `f` | Flag for later — on a heading, the whole section |
+| `space` | Cycle the mark: unmarked → reviewed → flagged |
+| `r` / `f` | Set reviewed / flagged directly |
+| `Y` | Copy the whole review to the clipboard |
 | `q` | Quit |
+
+On a heading, the mark keys apply to the whole section.
 
 Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 
 | Key | Does |
 | --- | --- |
-| `ctrl+s` / `ZZ` / `:wq` / `SPC c c` | Submit |
+| `ctrl+s` / `ctrl+enter` / `ZZ` / `:wq` / `SPC c c` | Submit |
 | `esc esc` / `:q` / `SPC c d` | Close, keeping a draft |
 | `:q!` / `SPC c k` | Discard |
 
-`ctrl+\` is the only key the host ever intercepts, and only so a wedged child
-can't trap you.
+`ctrl+\` and `ctrl+enter` are the only keys the host intercepts.
 
 ## Install
 
@@ -92,7 +94,7 @@ Note that the composer tests **skip** rather than fail when nvim is absent, so a
 green suite on an unprovisioned machine is misleading — `make doctor` is what
 catches that.
 
-`MDREVIEW_NVIM_CONFIG=user` runs the composer with your own nvim config instead
+`MARGIN_NVIM_CONFIG=user` runs the composer with your own nvim config instead
 of the stripped one, for comparison.
 
 ## Roadmap
@@ -102,6 +104,7 @@ of the stripped one, for comparison.
 - [x] Review marks with section roll-up
 - [x] Real markdown parsing (goldmark, keeping source offsets per block)
 - [x] Load a real file from the command line
+- [x] Export the review to the clipboard
 - [ ] Render headings by level, and inline markup
 - [ ] Stamp block ids into the source, so threads survive a rewrite
 - [ ] Thread persistence as markdown under `.margin/`, readable and writable by

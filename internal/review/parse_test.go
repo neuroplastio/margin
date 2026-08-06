@@ -203,24 +203,25 @@ func TestParsedDocumentDrivesTheModel(t *testing.T) {
 		t.Error("rendered output does not contain the document's first heading")
 	}
 
-	// Focus must reach a commentable block, and a comment must be able to
-	// attach to it.
-	var target int = -1
-	for i, e := range m.entries {
-		if e.b.commentable() {
-			target = i
-			break
+	// A thread must attach to any commentable block, headings included.
+	find := func(pred func(block) bool, what string) int {
+		for i, e := range m.entries {
+			if e.thread == nil && pred(e.b) {
+				return i
+			}
 		}
+		t.Fatalf("no %s block in a parsed document", what)
+		return -1
 	}
-	if target < 0 {
-		t.Fatal("no commentable block in a parsed document")
-	}
-	m.at = cursor{entry: target, comment: commentNone}
+
+	m.at = cursor{entry: find(block.commentable, "commentable"), comment: commentNone}
 	if th := m.ensureThread(m.anchorAt()); th == nil {
 		t.Fatalf("could not start a thread on a parsed block %q", m.anchorAt())
 	}
 
-	// And a mark must apply to it.
+	// A mark applies to a markable block — headings roll up their section
+	// instead of carrying one, so they are deliberately not a target here.
+	m.at = cursor{entry: find(block.markable, "markable"), comment: commentNone}
 	m.toggleMark(markOK)
 	if m.marks[m.anchorAt()] != markOK {
 		t.Errorf("marking a parsed block did not take: %v", m.marks[m.anchorAt()])

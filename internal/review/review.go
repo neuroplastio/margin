@@ -93,6 +93,7 @@ type cursor struct {
 }
 
 type model struct {
+	path    string
 	doc     []block
 	threads map[string]*thread
 	marks   map[string]reviewMark
@@ -133,11 +134,15 @@ func seedModel() *model {
 }
 
 func newModel(doc []block, threads map[string]*thread) *model {
+	return newModelAt("document.md", doc, threads)
+}
+
+func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	if threads == nil {
 		threads = map[string]*thread{}
 	}
 	m := &model{
-		doc: doc, threads: threads,
+		path: path, doc: doc, threads: threads,
 		marks:   map[string]reviewMark{},
 		at:      cursor{entry: 0, comment: commentNone},
 		paneTop: -1,
@@ -261,7 +266,7 @@ func (m *model) sectionAnchors(i int) []string {
 	}
 	e := m.entries[i]
 	// A thread is not a review target; the block it hangs off is.
-	if e.b.commentable() {
+	if e.b.markable() {
 		if e.b.anchor == "" {
 			return nil
 		}
@@ -276,7 +281,7 @@ func (m *model) sectionAnchors(i int) []string {
 		if nb.kind == blockHeading {
 			break
 		}
-		if nb.commentable() && nb.anchor != "" {
+		if nb.markable() && nb.anchor != "" {
 			out = append(out, nb.anchor)
 		}
 	}
@@ -325,10 +330,69 @@ func (m *model) toggleMark(want reviewMark) {
 	}
 }
 
+// cycleMark steps the focused block — or the whole section, on a heading —
+// around unmarked → reviewed → flagged. One key for the common case of moving
+// down a document deciding about each block in turn.
+func (m *model) cycleMark() {
+	anchors := m.sectionAnchors(m.at.entry)
+	if len(anchors) == 0 {
+		m.status = "nothing to mark here"
+		return
+	}
+	current, partial := rollUp(m.marksFor(anchors))
+	// A partially marked section resolves to its roll-up first, so one press
+	// makes it consistent rather than jumping somewhere unexpected.
+	want := current.next()
+	if partial {
+		want = current
+	}
+
+	for _, a := range anchors {
+		if want == markNone {
+			delete(m.marks, a)
+		} else {
+			m.marks[a] = want
+		}
+	}
+
+	what := "block"
+	if len(anchors) > 1 {
+		what = fmt.Sprintf("section (%d blocks)", len(anchors))
+	}
+	switch want {
+	case markOK:
+		m.status = "reviewed · " + what
+	case markFlag:
+		m.status = "flagged · " + what
+	default:
+		m.status = "cleared · " + what
+	}
+}
+
+// exportToClipboard renders the review and puts it on the clipboard.
+func (m *model) exportToClipboard() tea.Cmd {
+	out := exportReview(m.path, m.doc, m.threads, m.marks)
+
+	via, err := copyToClipboard(out)
+	switch {
+	case err != nil:
+		m.status = "clipboard: " + err.Error()
+	case via != "":
+		m.status = fmt.Sprintf("review copied (%s), %d lines", via, strings.Count(out, "\n")+1)
+	default:
+		// No helper installed, so OSC 52 is the only path — and whether it
+		// lands depends on the terminal allowing it. Say so rather than
+		// claiming success we cannot verify.
+		m.status = "review sent to clipboard via OSC 52 — check your terminal allows it"
+	}
+	// Issued regardless: OSC 52 is what works over SSH and on a bare tty.
+	return tea.SetClipboard(out)
+}
+
 // reviewProgress counts paragraphs that have been looked at.
 func (m *model) reviewProgress() (done, flagged, total int) {
 	for _, b := range m.doc {
-		if !b.commentable() || b.anchor == "" {
+		if !b.markable() || b.anchor == "" {
 			continue
 		}
 		total++
@@ -516,6 +580,10 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.toggleMark(markOK)
 	case "f":
 		m.toggleMark(markFlag)
+	case "space", " ":
+		m.cycleMark()
+	case "Y":
+		return m.exportToClipboard()
 	case "q", "ctrl+c":
 		m.quitting = true
 		return tea.Quit
@@ -822,7 +890,7 @@ func (m *model) View() tea.View {
 		if flagged > 0 {
 			progress += fmt.Sprintf(" · %s", flagStyle.Render(fmt.Sprintf("%d flagged", flagged)))
 		}
-		b.WriteString(dimStyle.Render("j/k move · c comment · e edit · r reviewed · f flag · q quit   ") +
+		b.WriteString(dimStyle.Render("j/k move · c comment · e edit · space mark · Y copy review · q quit   ") +
 			dimStyle.Render(progress))
 		if m.status != "" {
 			b.WriteString(dimStyle.Render("   " + m.status))
@@ -911,7 +979,7 @@ func Run(path string) error {
 	if err != nil {
 		return err
 	}
-	m := newModel(doc, nil)
+	m := newModelAt(path, doc, nil)
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
 	if _, err := tea.NewProgram(m, tea.WithFPS(120)).Run(); err != nil {

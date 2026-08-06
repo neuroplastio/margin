@@ -19,11 +19,19 @@ raise it in [`../questions/`](../questions/) and stop. Adding to this file is th
 | `g` / `G` | First / last block |
 | `c` | New comment on the focused block |
 | `e` | Edit the focused comment or draft |
-| `r` | Mark reviewed — on a heading, the whole section |
-| `f` | Flag for later — on a heading, the whole section |
+| `space` | Cycle the mark: unmarked → reviewed → flagged |
+| `r` / `f` | Set reviewed / flagged directly, toggling off on a re-press |
+| `Y` | Copy the whole review to the clipboard |
 | `q` | Quit |
 
-- `r` and `f` toggle: pressing the same mark again clears it.
+On a heading, the mark keys apply to the whole section.
+
+- `r` and `f` toggle: pressing the same mark again clears it. `space` is the
+  key for going down a document deciding about each block in turn.
+- A **partially** marked section resolves to its roll-up on the first `space`,
+  so one press makes it consistent rather than jumping somewhere unexpected.
+- **Headings can be commented on** — "this whole section is wrong" is a real
+  comment and belongs on the heading — but still carry no mark of their own.
 - `c` **always** starts a new comment. `e` **never** creates one. Conflating them
   is what made editing a seeded comment silently append a reply.
 - The mouse **only moves focus**. Opening an editor is always an explicit `c` or
@@ -57,7 +65,7 @@ raise it in [`../questions/`](../questions/) and stop. Adding to this file is th
 
 | Gesture | Outcome |
 | --- | --- |
-| `ctrl+s` · `ZZ` · `:wq` · `:x` · `SPC c c` | Submit |
+| `ctrl+s` · `ctrl+enter` · `ZZ` · `:wq` · `:x` · `SPC c c` | Submit |
 | `esc esc` · `:q` · `SPC c d` · losing focus | Keep as a draft |
 | `:q!` · `SPC c k` | Discard |
 
@@ -67,8 +75,23 @@ raise it in [`../questions/`](../questions/) and stop. Adding to this file is th
   `cnoreabbrev` maps it onto the draft path.
 - Every one of these is an nvim mapping or ex command, **not** a key the host
   intercepts. The pane keeps sole ownership of input, so there is no prefix key.
-- `ctrl+\` is the only key the host ever takes, and only so a wedged child cannot
-  trap the user.
+- `ctrl+\` and `ctrl+enter` are the only keys the host takes. `ctrl+\` exists so
+  a wedged child cannot trap the user. `ctrl+enter` is there because it cannot
+  work any other way: a terminal sends CR for both enter and ctrl+enter, so nvim
+  cannot distinguish them — we only can because Ghostty speaks the Kitty
+  keyboard protocol. It resolves to the same ex command as every other submit
+  gesture, so there is still one submit path.
+- A plain `enter` is always a newline.
+
+### Export
+
+- `Y` copies the review as markdown: a header, the progress summary, then one
+  section per commented or flagged block, each naming its anchor and quoting the
+  block so an agent can locate it.
+- Blocks that are **flagged with no comment** are included — "needs attention" is
+  itself the feedback. Blocks that are reviewed and silent are omitted.
+- **Drafts are excluded**, since unsubmitted means unsubmitted, but their count
+  is reported so nothing goes silently missing.
 
 ### Review marks
 
@@ -94,3 +117,5 @@ These have been raised but not judged. Each needs a felt leg and a review.
 - Scroll behaviour beyond keeping focus on screen — no explicit scroll keys yet.
 - What the document-tree view looks like when reviewing a directory.
 - Whether marks and comments belong in the same gutter column.
+- Whether the export should also be writable to a file or piped, rather than
+  only the clipboard.
