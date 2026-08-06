@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/AnatolyRugalev/margin/internal/review"
+	"github.com/neuroplastio/margin/internal/review"
 )
 
 func main() {

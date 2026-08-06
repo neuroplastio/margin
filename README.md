@@ -65,6 +65,12 @@ Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 `ctrl+\` is the only key the host ever intercepts, and only so a wedged child
 can't trap you.
 
+## Install
+
+```
+go install github.com/neuroplastio/margin/cmd/margin@latest
+```
+
 ## Build
 
 ```

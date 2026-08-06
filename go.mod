@@ -1,4 +1,4 @@
-module github.com/AnatolyRugalev/margin
+module github.com/neuroplastio/margin
 
 go 1.25.0
 
