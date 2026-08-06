@@ -4,40 +4,54 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"os"
 
 	"github.com/neuroplastio/margin/internal/review"
+	"github.com/spf13/cobra"
 )
 
-func usage() {
-	fmt.Fprint(os.Stderr, `margin — review markdown in the terminal
-
-usage:
-  margin FILE.md
-
-keys:
-  j/k   move          c  comment        r  mark reviewed
-  g/G   top/bottom    e  edit           f  flag for later
-  q     quit
-
-In the composer every key belongs to nvim:
-  ctrl+s submit · esc esc keep a draft · :q! discard
-`)
-}
+// version is stamped at build time; see the Makefile.
+var version = "dev"
 
 func main() {
-	flag.Usage = usage
-	flag.Parse()
-
-	if flag.NArg() != 1 {
-		usage()
-		os.Exit(2)
-	}
-
-	if err := review.Run(flag.Arg(0)); err != nil {
-		fmt.Fprintln(os.Stderr, "margin:", err)
+	if err := newRootCmd(review.Run).Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// newRootCmd builds the margin command tree. It takes the runner as an argument
+// and is a function rather than a package var so tests can construct an isolated
+// command with its own I/O, args, and a runner that does not open a terminal.
+func newRootCmd(run func(path string) error) *cobra.Command {
+	root := &cobra.Command{
+		Use:     "margin FILE.md",
+		Short:   "Review markdown in the terminal",
+		Version: version,
+		Long: `margin opens a markdown file for review: read the rendered prose, leave
+comments anchored to blocks, mark what you have reviewed and what still needs
+attention, then copy the whole review out for whatever wrote the document.
+
+Keys:
+  j/k     move                c  comment            space  cycle the mark
+  g/G     top/bottom          e  edit               r/f    reviewed / flag
+  Y       copy the review     q  quit
+
+On a heading, the mark keys apply to the whole section.
+
+The comment composer is a real nvim, so every key inside it belongs to nvim:
+  ctrl+s / ctrl+enter / :wq   submit
+  esc esc / :q                close, keeping a draft
+  :q!                         discard`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Silenced here rather than on the command, so the two kinds of
+			// failure read differently: getting the invocation wrong still
+			// prints usage, while a file that does not exist is a runtime
+			// error and should not bury its message under the help text.
+			cmd.SilenceUsage = true
+			return run(args[0])
+		},
+	}
+	root.SetVersionTemplate("margin {{.Version}}\n")
+	return root
 }

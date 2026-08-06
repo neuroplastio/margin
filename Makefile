@@ -1,4 +1,6 @@
 BIN := bin/margin
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -X main.version=$(VERSION)
 
 .PHONY: check build test test-race vet fmt run doctor clean
 
@@ -7,7 +9,7 @@ check: build test vet
 
 build:
 	go build ./...
-	go build -o $(BIN) ./cmd/margin
+	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/margin
 
 test:
 	go test ./...

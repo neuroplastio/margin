@@ -79,6 +79,8 @@ go install github.com/neuroplastio/margin/cmd/margin@latest
 
 ```
 margin FILE.md
+margin --help
+margin --version
 ```
 
 ```
