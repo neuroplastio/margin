@@ -1,6 +1,7 @@
 package review
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -31,6 +32,10 @@ func parseDoc(src []byte) []block {
 		if !ok {
 			continue
 		}
+		// A line number is a locator an agent can act on today. Block ids are
+		// not stamped into the source yet (ID-01), so without this the quote is
+		// the only way to find the block being talked about.
+		b.line = 1 + bytes.Count(src[:b.start], []byte{'\n'})
 		blocks = append(blocks, b)
 	}
 	return blocks

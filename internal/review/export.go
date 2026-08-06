@@ -6,15 +6,22 @@ import (
 	"strings"
 )
 
+// maxQuoteLines caps how much of a block is quoted. Enough to identify it
+// unambiguously, not so much that the export becomes a copy of the document.
+const maxQuoteLines = 6
+
 // exportReview renders the whole review as markdown for an agent to act on.
 //
-// The shape is chosen so an agent can work from it without any tooling: every
-// item names the block it refers to, quotes enough of that block to locate it,
-// and then gives the exchange in order. Flagged blocks appear even when nobody
-// commented, because "this needs attention" is itself feedback.
+// The shape is chosen so an agent can work from it with no tooling. Each item
+// has to answer one question first — *which* block is this? — because ids are
+// not yet stamped into the source (ID-01), so the agent cannot search for
+// `^0afa31`. Until then the locator is the file and line, the enclosing
+// section, and a faithful quote. Quote fidelity is therefore the whole game:
+// a list flattened onto one line and cut mid-word is not a locator.
 //
-// Drafts are excluded — unsubmitted means unsubmitted — but they are counted in
-// the summary so nothing goes silently missing.
+// Flagged blocks appear even when nobody commented, because "this needs
+// attention" is itself feedback. Drafts are excluded — unsubmitted means
+// unsubmitted — but counted, so nothing goes silently missing.
 func exportReview(path string, doc []block, threads map[string]*thread, marks map[string]reviewMark) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Review of %s\n\n", path)
@@ -41,11 +48,15 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 	}
 	b.WriteString("\n")
 	if drafts > 0 {
-		fmt.Fprintf(&b, "\n_%d unsubmitted draft(s) were not included._\n", drafts)
+		fmt.Fprintf(&b, "\n_%d unsubmitted draft(s) not included._\n", drafts)
 	}
 
-	items := 0
+	items, section := 0, ""
 	for _, blk := range doc {
+		if blk.kind == blockHeading {
+			section = blk.text
+		}
+
 		t := threads[blk.anchor]
 		mark := marks[blk.anchor]
 		hasComments := t != nil && len(t.posted) > 0
@@ -55,15 +66,18 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 		items++
 
 		b.WriteString("\n---\n\n")
-		fmt.Fprintf(&b, "## %s", blk.anchor)
+		b.WriteString("## " + locator(path, blk))
 		if mark == markFlag {
 			b.WriteString(" — flagged, needs attention")
 		}
 		b.WriteString("\n\n")
 
-		// A quote of the block, so the agent can find it even if the id has
-		// been stripped. Kept short: it is a locator, not the document.
-		fmt.Fprintf(&b, "> %s\n", truncate(collapse(blockText(blk)), 240))
+		// The enclosing section, unless this block *is* that heading.
+		if section != "" && blk.kind != blockHeading {
+			fmt.Fprintf(&b, "Section: %s\n\n", section)
+		}
+
+		b.WriteString(quoteBlock(blk))
 
 		if hasComments {
 			b.WriteString("\n")
@@ -76,14 +90,73 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 	if items == 0 {
 		b.WriteString("\nNo comments and nothing flagged.\n")
 	}
-	return b.String()
+	// Exactly one trailing newline: this lands in a paste buffer, and a tail of
+	// blank lines reads as though something went missing.
+	return strings.TrimRight(b.String(), "\n") + "\n"
 }
 
-func blockText(b block) string {
-	if b.kind == blockRaw {
-		return strings.Join(b.lines, " ")
+// locator names the block in the way most useful to whoever has to find it.
+func locator(path string, b block) string {
+	if b.line > 0 {
+		return fmt.Sprintf("%s:%d", path, b.line)
 	}
-	return b.text
+	return b.anchor
+}
+
+// quoteBlock renders the block as a markdown blockquote.
+//
+// Structure is preserved for anything whose structure is its content — a list,
+// a code fence, a table. Flattening those onto one line, as an earlier version
+// did, produced quotes that were neither readable nor searchable.
+func quoteBlock(b block) string {
+	var lines []string
+	truncated := false
+
+	switch b.kind {
+	case blockHeading:
+		// Reconstruct the markdown so the level is visible and the line is
+		// greppable in the source.
+		lines = []string{strings.Repeat("#", max(b.level, 1)) + " " + b.text}
+
+	case blockRaw:
+		lines = b.lines
+		if len(lines) > maxQuoteLines {
+			lines, truncated = lines[:maxQuoteLines], true
+		}
+
+	default:
+		text := collapse(b.text)
+		if cut, ok := truncateWords(text, 280); ok {
+			text, truncated = cut, true
+		}
+		lines = []string{text}
+	}
+
+	var out strings.Builder
+	for _, l := range lines {
+		if l == "" {
+			out.WriteString(">\n")
+			continue
+		}
+		out.WriteString("> " + l + "\n")
+	}
+	if truncated {
+		out.WriteString("> …\n")
+	}
+	return out.String()
+}
+
+// truncateWords cuts at a word boundary rather than mid-word, and reports
+// whether it cut anything.
+func truncateWords(s string, limit int) (string, bool) {
+	if len(s) <= limit {
+		return s, false
+	}
+	cut := s[:limit]
+	if i := strings.LastIndexByte(cut, ' '); i > limit/2 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,.;:—-"), true
 }
 
 // copyToClipboard puts s on the system clipboard by whatever means the machine

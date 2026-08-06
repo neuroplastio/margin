@@ -33,6 +33,7 @@ type block struct {
 	lines []string
 
 	level       int // heading level
+	line        int // 1-based line the block starts on; 0 when unknown
 	start, stop int // byte range in the source document
 }
 

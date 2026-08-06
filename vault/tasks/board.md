@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -49,7 +49,9 @@ Last updated: 2026-08-06
 - **EXPORT-03** `[mech]` `--stdout` export, to pipe a review into an agent
   without going through the clipboard.
 - **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
-  an agent and seeing whether it acts correctly.
+  an agent and seeing whether it acts correctly. *First round addressed
+  2026-08-07 (line locators, structure-preserving quotes); still wants a real
+  agent to act on one.*
 
 ## Blocked
 
