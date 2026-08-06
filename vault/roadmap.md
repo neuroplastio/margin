@@ -56,9 +56,14 @@ Threads become files an agent can read and write with no tooling.
 - [ ] `--stdout` export: the whole review as a prompt an agent acts on
 - [ ] Orphan detection — a thread whose block id has vanished is surfaced, not
       silently dropped
+- [ ] Resolvable threads, resolvable by the reviewer *or* the agent — the loop
+      does not close without this, since round two otherwise re-litigates
+      everything from round one
+- [ ] Deleting a comment, and deleting a thread
 
 **Exit:** review a document, pipe the export into an agent, have it revise the
-file and reply in the thread files, reopen and see the replies.
+file and reply in the thread files, reopen and see the replies — and see which
+threads it considers resolved.
 
 ---
 

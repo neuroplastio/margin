@@ -46,8 +46,23 @@ Last updated: 2026-08-07
   markdown with frontmatter. Read and write, round-trip tested.
 - **STORE-02** `[mech]` Load threads on open; `fsnotify` reload when an agent
   writes one while margin is running.
+- **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved state,
+  set by either the reviewer or the agent, and it round-trips through the thread
+  file. Blocked on **Q-0002** for how it is represented.
+- **THREAD-02** `[felt]` What resolving *looks* like — which key, whether a
+  resolved thread dims, collapses, or disappears, and whether resolving is
+  reachable from the collapsed line or only the expanded thread.
+- **THREAD-03** `[mech]` Delete a comment, and delete a whole thread. Deletion is
+  the one gesture that destroys the reviewer's own words, so it is explicit and
+  confirmed — see principle 3 in goals.md. Blocked on **Q-0002**.
+- **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
+  reply already in the thread makes "delete the thread" less obviously the
+  reviewer's alone to do.
 - **EXPORT-03** `[mech]` `--stdout` export, to pipe a review into an agent
   without going through the clipboard.
+- **EXPORT-05** `[mech]` Resolved threads are excluded from the export by
+  default — it is a list of what still needs doing — with a flag to include them
+  so an agent can see what it already addressed. Depends on THREAD-01.
 - **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
   an agent and seeing whether it acts correctly. *First round addressed
   2026-08-07 (line locators, structure-preserving quotes); still wants a real
@@ -56,6 +71,9 @@ Last updated: 2026-08-07
 ## Blocked
 
 - Everything in M3 — blocked on **Q-0001** (file or tree as the unit of review).
+- **THREAD-01**, **THREAD-03** — blocked on **Q-0002** (how resolution and
+  deletion are represented in the thread file). Worth answering before STORE-01
+  fixes that format.
 
 ## Done
 
