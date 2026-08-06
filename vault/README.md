@@ -20,7 +20,9 @@ needs to steer it. Start here, then read [`/CLAUDE.md`](../CLAUDE.md).
 ## The two loops
 
 **The agent's loop** is one leg at a time: orient, pick, claim, implement, verify,
-record, commit, stop. Never more than one leg per invocation.
+record, commit, stop. `/do-leg` runs exactly one. The daily scheduled `/do-run`
+chains *mechanical* legs back to back — tests settle those, so they need not wait
+on anyone — and stops the moment it produces something only you can judge.
 
 **The maintainer's loop** is: run the thing, judge it, drop a file in
 [`feedback/`](feedback/) or answer something in [`questions/`](questions/).

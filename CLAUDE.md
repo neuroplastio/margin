@@ -42,6 +42,14 @@ review:` line names it. While it is set, you may do mechanical legs or nothing �
 you may not queue up more felt work. This is the whole pacing mechanism; do not
 route around it.
 
+Note what is *not* rationed: mechanical legs. Tests settle those, so they have no
+reason to wait on anyone, and a scheduled run chains them back to back. Only work
+that needs a human eye is paced.
+
+Note what is *not* rationed: mechanical legs. Tests settle those, so they have no
+reason to wait on anyone and a run chains them back to back. Only work that needs
+a human eye is paced.
+
 ## Blocking is correct here
 
 The usual advice to an autonomous agent is *never block — pick a default and
@@ -75,6 +83,13 @@ test strategy, error handling, naming of internals.
   composer**; every entry cost real debugging.
 - [`vault/journal/`](vault/journal/) — one file per leg, `YYYY-MM-DD.N.md`.
 
+## Two entry points
+
+- **`/do-leg`** — one leg, then stop. What you run by hand.
+- **`/do-run`** — the daily scheduled run. Chains mechanical legs in fresh
+  subagents and stops on the first felt leg, the first question, an empty
+  unblocked board, or its budget.
+
 ## The leg loop (what `/do-leg` does)
 
 1. **Orient** — pull `main`; read goals, the active milestone, the board, the last
@@ -104,8 +119,9 @@ test strategy, error handling, naming of internals.
 ## Hard rules
 
 - **Green or revert.** Never commit a leg that fails `make check`.
-- **One leg per invocation.** There is no batching skill and there should not be
-  one. Small steps are the point.
+- **One leg per `/do-leg` invocation.** A scheduled run may chain several
+  mechanical legs via `/do-run`, but each leg is still a separate subagent with
+  its own commit, and the first felt leg or raised question ends the run.
 - **Never invent an interaction.** Ask instead.
 - **Never claim a visual or timing check you did not perform.** You cannot see the
   screen and you cannot feel latency. Say "needs a human check" and put it in the
