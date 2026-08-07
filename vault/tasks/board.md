@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (STORE-03 done)
+Last updated: 2026-08-07 (CMD-02 claimed)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,7 +18,7 @@ Last updated: 2026-08-07 (STORE-03 done)
 
 ## In progress
 
-*(none)*
+- **CMD-02** `[mech]` claimed 2026-08-07 — palette matching logic.
 
 ## Backlog — M1
 
