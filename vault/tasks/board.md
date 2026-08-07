@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (ID-02)
+Last updated: 2026-08-07 (STORE-01 claimed)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,7 +18,7 @@ Last updated: 2026-08-07 (ID-02)
 
 ## In progress
 
-*(none)*
+- **STORE-01** `[mech]` claimed 2026-08-07
 
 ## Backlog — M1
 
@@ -36,8 +36,6 @@ Last updated: 2026-08-07 (ID-02)
 
 ## Backlog — M2
 
-- **STORE-01** `[mech]` Thread files under `.margin/threads/`, one per thread,
-  markdown with frontmatter. Read and write, round-trip tested.
 - **STORE-02** `[mech]` Load threads on open; `fsnotify` reload when an agent
   writes one while margin is running.
 - **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved state,
