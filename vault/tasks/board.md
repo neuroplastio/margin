@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (STORE-02 done)
+Last updated: 2026-08-07 (EXPORT-03 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -57,9 +57,6 @@ Last updated: 2026-08-07 (STORE-02 done)
 - **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
   reply already in the thread makes "delete the thread" less obviously the
   reviewer's alone to do.
-- **EXPORT-03** `[mech]` `--stdout` export, to pipe a review into an agent
-  without going through the clipboard. *Promoted by feedback 2026-08-07 — take
-  it ahead of the rest of M2.*
 - **EXPORT-05** `[mech]` Resolved threads are excluded from the export by
   default — it is a list of what still needs doing — with a flag to include them
   so an agent can see what it already addressed. Depends on THREAD-01.
@@ -154,3 +151,13 @@ independent of whether the unit of review turns out to be a file or a tree.
       model a test builds so submitting in a test never touches disk. The
       fsnotify live-reload half of the original task is split out as
       STORE-03 — done 2026-08-07
+- [x] **EXPORT-03** (from feedback, promoted ahead of the rest of M2)
+      `margin --stdout FILE.md` runs the review interactively and, on quit,
+      writes the same content `Y` produces to stdout instead of the
+      clipboard — same `exportReview` call, no second non-interactive mode,
+      per the feedback's own note that STORE-01 landing does not change this
+      leg's semantics. `tea.WithOutput` points the interface at `/dev/tty`
+      (see F11 in findings.md) so the pipe stays ANSI-free — pinned by
+      `TestExportReviewContainsNoANSI` and a test that a missing controlling
+      terminal is a reported error, not a silent fall-through to drawing over
+      the pipe — done 2026-08-07

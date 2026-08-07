@@ -194,3 +194,19 @@ lands block quotes/rules and this surfaces again.
 `yuin/goldmark-meta` exists and would subsume the leading-case fix, but was
 not adopted here — check what it does to byte offsets before reaching for it,
 since ID-01's stamping depends on `extent()`'s ranges staying exact.
+
+## F11 — Bubble Tea defaults its output to stdout; redirect it explicitly whenever stdout carries something else
+
+`tea.NewProgram` writes the whole interface — every escape sequence, every
+redraw — to `os.Stdout` unless told otherwise (`tea.go`: `if p.output == nil
+{ p.output = os.Stdout }`). Any flag that repurposes stdout for program output
+(`--stdout`, and any future one like it) has to pass `tea.WithOutput` pointed
+at the controlling terminal (`/dev/tty`) *before* starting the program, or the
+piped stream fills with ANSI and the interface has nowhere to draw.
+
+`Run`'s `openTTY` var is the seam: production opens `/dev/tty`, and a test
+substitutes a func that fails without needing a real terminal, to pin that a
+missing tty is a reported error rather than a silent fall-through to drawing
+over the pipe. It does not exercise `tea.NewProgram(...).Run()` itself — that
+needs an interactive session, same boundary every other test in this package
+respects.

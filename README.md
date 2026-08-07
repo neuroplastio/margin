@@ -60,6 +60,14 @@ detectably orphaned rather than silently misplaced.
 
 On a heading, the mark keys apply to the whole section.
 
+`margin --stdout FILE.md` runs the same review, but writes it to stdout on
+quit instead of requiring `Y` — the same content `Y` produces — so it can be
+piped straight into an agent:
+
+```
+margin --stdout spec.md | agent -p "address this review"
+```
+
 Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 
 | Key | Does |
@@ -113,7 +121,7 @@ of the stripped one, for comparison.
 - [x] Thread persistence as markdown under `.margin/`, readable and writable by
       an agent with no tooling
 - [ ] Live reload — pick up a thread file an agent writes mid-session
-- [ ] `--stdout` export, to pipe a review straight into an agent
+- [x] `--stdout` export, to pipe a review straight into an agent
 - [ ] Link navigation between blocks, with a jumplist
 - [ ] Rendered diff between review rounds
 

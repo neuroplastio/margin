@@ -5,13 +5,15 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/neuroplastio/margin/internal/review"
 )
 
 // exec runs the root command with args and a stub runner, capturing its output.
-func exec(t *testing.T, run func(string) error, args ...string) (string, error) {
+func exec(t *testing.T, run func(string, review.RunOptions) error, args ...string) (string, error) {
 	t.Helper()
 	if run == nil {
-		run = func(string) error { return nil }
+		run = func(string, review.RunOptions) error { return nil }
 	}
 	var out bytes.Buffer
 	root := newRootCmd(run)
@@ -24,7 +26,7 @@ func exec(t *testing.T, run func(string) error, args ...string) (string, error) 
 
 func TestRunsWithOneFile(t *testing.T) {
 	var got string
-	if _, err := exec(t, func(p string) error { got = p; return nil }, "spec.md"); err != nil {
+	if _, err := exec(t, func(p string, _ review.RunOptions) error { got = p; return nil }, "spec.md"); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 	if got != "spec.md" {
@@ -35,7 +37,7 @@ func TestRunsWithOneFile(t *testing.T) {
 func TestRejectsWrongNumberOfArguments(t *testing.T) {
 	for _, args := range [][]string{{}, {"a.md", "b.md"}} {
 		called := false
-		out, err := exec(t, func(string) error { called = true; return nil }, args...)
+		out, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }, args...)
 		if err == nil {
 			t.Errorf("%v was accepted; margin takes exactly one file", args)
 		}
@@ -51,7 +53,7 @@ func TestRejectsWrongNumberOfArguments(t *testing.T) {
 // A missing file is a runtime failure, not a misuse of the command. Dumping the
 // full help text on top of it buries the actual message.
 func TestRuntimeErrorDoesNotPrintUsage(t *testing.T) {
-	out, err := exec(t, func(string) error {
+	out, err := exec(t, func(string, review.RunOptions) error {
 		return errors.New("open nope.md: no such file or directory")
 	}, "nope.md")
 
@@ -92,10 +94,43 @@ func TestHelpListsTheKeys(t *testing.T) {
 
 func TestUnknownFlagIsRejected(t *testing.T) {
 	called := false
-	if _, err := exec(t, func(string) error { called = true; return nil }, "--nope", "spec.md"); err == nil {
+	if _, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }, "--nope", "spec.md"); err == nil {
 		t.Error("an unknown flag was accepted")
 	}
 	if called {
 		t.Error("an unknown flag reached the runner")
+	}
+}
+
+// --- --stdout ----------------------------------------------------------------
+
+func TestStdoutFlagReachesTheRunner(t *testing.T) {
+	var got review.RunOptions
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "--stdout", "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !got.Stdout {
+		t.Error("--stdout did not set RunOptions.Stdout")
+	}
+}
+
+func TestWithoutStdoutFlagDefaultsFalse(t *testing.T) {
+	var got review.RunOptions
+	got.Stdout = true // prove the zero value, not a leftover
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got.Stdout {
+		t.Error("RunOptions.Stdout is set without --stdout")
+	}
+}
+
+func TestHelpMentionsStdout(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "--stdout") {
+		t.Errorf("help does not mention --stdout:\n%s", out)
 	}
 }

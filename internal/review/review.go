@@ -12,6 +12,7 @@ package review
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -995,8 +996,30 @@ func reportLatency(samples []time.Duration) {
 		len(sorted), at(0.5), at(0.9), at(0.99), at(1))
 }
 
+// RunOptions controls how Run behaves, beyond which file it opens.
+type RunOptions struct {
+	// Stdout, when set, writes the review to stdout on quit instead of
+	// requiring Y — the same content Y produces, via the same exportReview
+	// call — so a review can be piped straight into an agent:
+	//
+	//	margin --stdout FILE.md | agent -p "address this review"
+	//
+	// Threads are session-only until STORE-01's persistence is read back
+	// without opening the interface, so this always runs the review
+	// interactively first; there is no non-interactive "just print what's on
+	// disk" mode yet.
+	Stdout bool
+}
+
+// openTTY opens the controlling terminal for the TUI to draw on when stdout
+// is carrying the review instead. A var so a test can substitute one that
+// does not need a real terminal.
+var openTTY = func() (io.WriteCloser, error) {
+	return os.OpenFile("/dev/tty", os.O_RDWR, 0)
+}
+
 // Run opens path for review and reports what the session produced.
-func Run(path string) error {
+func Run(path string, opts RunOptions) error {
 	doc, err := loadDoc(path)
 	if err != nil {
 		return err
@@ -1016,10 +1039,29 @@ func Run(path string) error {
 	m.store = &threadStore{root: root, docPath: docPath}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
-	if _, err := tea.NewProgram(m, tea.WithFPS(120)).Run(); err != nil {
+	progOpts := []tea.ProgramOption{tea.WithFPS(120)}
+	if opts.Stdout {
+		// Bubble Tea defaults its output to stdout, which here is carrying the
+		// review — the pipe would fill with escape sequences and the interface
+		// would have nowhere usable to draw. Point it at the controlling
+		// terminal instead and leave stdout untouched until the review itself
+		// is printed below.
+		tty, err := openTTY()
+		if err != nil {
+			return fmt.Errorf("run: --stdout needs a controlling terminal to draw the interface on: %w", err)
+		}
+		defer tty.Close()
+		progOpts = append(progOpts, tea.WithOutput(tty))
+	}
+	if _, err := tea.NewProgram(m, progOpts...).Run(); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
 	reportLatency(m.samples)
+
+	if opts.Stdout {
+		fmt.Print(exportReview(m.path, m.doc, m.threads, m.marks))
+		return nil
+	}
 
 	for _, b := range m.doc {
 		if !b.commentable() || b.anchor == "" {

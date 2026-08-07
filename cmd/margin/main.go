@@ -22,7 +22,9 @@ func main() {
 // newRootCmd builds the margin command tree. It takes the runner as an argument
 // and is a function rather than a package var so tests can construct an isolated
 // command with its own I/O, args, and a runner that does not open a terminal.
-func newRootCmd(run func(path string) error) *cobra.Command {
+func newRootCmd(run func(path string, opts review.RunOptions) error) *cobra.Command {
+	var stdout bool
+
 	root := &cobra.Command{
 		Use:     "margin FILE.md",
 		Short:   "Review markdown in the terminal",
@@ -41,7 +43,13 @@ On a heading, the mark keys apply to the whole section.
 The comment composer is a real nvim, so every key inside it belongs to nvim:
   ctrl+s / ctrl+enter / :wq   submit
   esc esc / :q                close, keeping a draft
-  :q!                         discard`,
+  :q!                         discard
+
+--stdout runs the review as usual, but writes it to stdout on quit instead of
+requiring Y — the same content Y produces — so it can be piped straight into
+an agent:
+
+  margin --stdout FILE.md | agent -p "address this review"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Silenced here rather than on the command, so the two kinds of
@@ -49,9 +57,10 @@ The comment composer is a real nvim, so every key inside it belongs to nvim:
 			// prints usage, while a file that does not exist is a runtime
 			// error and should not bury its message under the help text.
 			cmd.SilenceUsage = true
-			return run(args[0])
+			return run(args[0], review.RunOptions{Stdout: stdout})
 		},
 	}
+	root.Flags().BoolVar(&stdout, "stdout", false, "write the review to stdout on quit, instead of requiring Y")
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	return root
 }

@@ -92,6 +92,12 @@ On a heading, the mark keys apply to the whole section.
   itself the feedback. Blocks that are reviewed and silent are omitted.
 - **Drafts are excluded**, since unsubmitted means unsubmitted, but their count
   is reported so nothing goes silently missing.
+- `margin --stdout FILE.md` runs the review interactively as normal, and on quit
+  writes the same content `Y` produces to stdout instead of the clipboard — same
+  `exportReview` call, same code path, no separate "already reviewed" mode. The
+  TUI itself draws on the controlling terminal (`tea.WithOutput` → `/dev/tty`), so
+  the pipe carries only the review, ANSI-free, and is safe to hand straight to an
+  agent: `margin --stdout spec.md | agent -p "address this review"`.
 
 ### Review marks
 
@@ -119,5 +125,3 @@ These have been raised but not judged. Each needs a felt leg and a review.
   see SCROLL-02 and SCROLL-03 on the board.
 - What the document-tree view looks like when reviewing a directory.
 - Whether marks and comments belong in the same gutter column.
-- Whether the export should also be writable to a file or piped, rather than
-  only the clipboard.
