@@ -56,7 +56,8 @@ Last updated: 2026-08-07 (ID-01)
   reply already in the thread makes "delete the thread" less obviously the
   reviewer's alone to do.
 - **EXPORT-03** `[mech]` `--stdout` export, to pipe a review into an agent
-  without going through the clipboard.
+  without going through the clipboard. *Promoted by feedback 2026-08-07 — take
+  it ahead of the rest of M2.*
 - **EXPORT-05** `[mech]` Resolved threads are excluded from the export by
   default — it is a list of what still needs doing — with a flag to include them
   so an agent can see what it already addressed. Depends on THREAD-01.
