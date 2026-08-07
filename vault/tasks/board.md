@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (PARSE-03 done)
+Last updated: 2026-08-07 (CMD-01 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -66,6 +66,26 @@ Last updated: 2026-08-07 (PARSE-03 done)
   2026-08-07 (line locators, structure-preserving quotes); still wants a real
   agent to act on one.*
 
+## Backlog — Commands (from feedback, 2026-08-07-command-palette)
+
+Not part of a milestone; cross-cutting infrastructure the palette feedback
+asked for. Split per the feedback's own suggested ordering — see
+`vault/journal/2026-08-07.6.md` for why CMD-01 alone is this leg.
+
+- **CMD-02** `[mech]` Palette matching logic: given the registry and a query
+  string, rank and filter commands — no UI, just the function and its tests.
+  Testable in isolation from where or how it is ever displayed.
+- **CMD-03** `[felt]` The palette itself: `:` opens it, where it appears, how
+  much room it takes, whether it dims the document, ranked vs. stable
+  ordering. Needs a real screen — see the feedback's "Not settled" section for
+  the open questions.
+- **CMD-04** `[mech]` Focus-sensitive listing and a titled target: given the
+  registry's `Applicable` and the current focus, produce the filtered,
+  targeted list the palette would show (e.g. "Delete — comment by agent").
+  Still no UI.
+- **CMD-05** Staged value commands and key-opens-a-stage (requirement 5) —
+  later; depends on CMD-03 existing first.
+
 ## Backlog — M3 (navigation)
 
 Not blocked by Q-0001: these are about moving around one document, and are
@@ -119,3 +139,10 @@ independent of whether the unit of review turns out to be a file or a tree.
       setext heading (F10), given its own `blockFrontmatter` kind, and
       excluded from comments, marks and review progress. The visual
       treatment is deliberately left undecided — RENDER-07 — done 2026-08-07
+- [x] **CMD-01** command registry (from feedback, the prerequisite it asked
+      for): every verb margin can perform is now one entry in
+      `internal/review/command.go` — id, description, applicability guard,
+      `Run`. `handleKey` resolves a key through `keymap` to a command id and
+      calls its `Run`; it carries no verb-specific behaviour of its own. No
+      behaviour change — existing tests pass unmodified, plus new registry
+      tests. The palette itself (CMD-02 onward) is not built — done 2026-08-07

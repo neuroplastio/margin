@@ -585,36 +585,19 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 
-	switch msg.String() {
-	case "j", "down":
-		m.moveFocus(1)
-	case "k", "up":
-		m.moveFocus(-1)
-	case "g":
-		m.at = cursor{entry: 0, comment: commentNone}
-	case "G":
-		m.at = cursor{entry: len(m.entries) - 1, comment: commentNone}
-	case "c":
-		// A new comment always starts a reply, never edits, wherever focus is.
-		if a := m.anchorAt(); a != "" {
-			return m.openComposer(a, newCommentSlot)
-		}
-		m.status = "nothing to comment on here"
-	case "e":
-		return m.editFocused()
-	case "r":
-		m.toggleMark(markOK)
-	case "f":
-		m.toggleMark(markFlag)
-	case "space", " ":
-		m.cycleMark()
-	case "Y":
-		return m.exportToClipboard()
-	case "q", "ctrl+c":
-		m.quitting = true
-		return tea.Quit
+	// Every key margin recognises resolves to a command id via keymap and runs
+	// through that command's Run — see command.go. handleKey itself carries no
+	// verb-specific behaviour, so a future palette invoking the same command
+	// id is guaranteed to do exactly what the key does.
+	id, ok := keymap[msg.String()]
+	if !ok {
+		return nil
 	}
-	return nil
+	cmd, ok := commandByID(id)
+	if !ok {
+		return nil
+	}
+	return cmd.Run(m)
 }
 
 // editFocused opens whatever the focus is sitting on for editing: a posted
