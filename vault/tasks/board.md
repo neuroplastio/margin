@@ -18,7 +18,8 @@ Last updated: 2026-08-07 (CMD-01 done)
 
 ## In progress
 
-*(none)*
+- **STORE-02** `[mech]` claimed 2026-08-07 — load-on-open + write-on-submit
+  slice; the fsnotify live-reload part is split out, see the leg's own note.
 
 ## Backlog — M1
 
