@@ -132,3 +132,40 @@ Provision with `scripts/setup-env.sh`. Two details that matter:
   it. The official tarball ships `runtime/spell/en.utf-8.spl`, so this is handled
   — but a hand-rolled minimal install can miss it. The `.sug` companion is
   optional and only affects `z=` suggestion quality.
+
+## F9 — The cloud run cannot push; it hands back a patch
+
+The scheduled run has no write access to `neuroplastio/margin` — the git egress
+proxy and the GitHub App integration both deny it. The org has not authorised
+the app (the same org policy that blocked a fine-grained PAT for `gh api`).
+
+**This is a known, accepted constraint, not something a run should debug.** The
+routine prompt says so explicitly. A run commits locally, then produces
+`git format-patch origin/main..HEAD` as an artifact and opens its report with a
+line naming what did not land — `UNPUSHED: ID-02 — 1 commit, patch attached`.
+
+The maintainer applies it:
+
+```bash
+git checkout main && git pull origin main
+git am --3way 0001-<leg>.patch     # author, message and trailers preserved
+make check && make test-race
+git push origin main
+```
+
+`git am` is what keeps the leg's authorship and commit message intact — do not
+reconstruct the change by hand from the diff.
+
+Two things worth knowing when picking a patch up:
+
+- **Verify, do not trust.** A patch that applies cleanly has still only been
+  tested in the environment that produced it. Run `make check`, `make test-race`
+  and `make doctor` before pushing.
+- **The artifact page, not the API file.** A run's patch is reachable at
+  `claude.ai/code/artifact/<uuid>`, which can be fetched. The
+  `claude.ai/api/organizations/.../files/.../contents` URL for the same content
+  returns 403.
+
+To retire this: authorise the app for the org at
+`github.com/organizations/neuroplastio/settings/installations`, then drop the
+PUSH ACCESS block from the routine prompt.
