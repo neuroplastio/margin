@@ -18,7 +18,8 @@ Last updated: 2026-08-07 (ID-01)
 
 ## In progress
 
-*(none)*
+- **ID-02** `[mech]` claimed 2026-08-07 — re-attach threads to blocks by id on
+  open.
 
 ## Backlog — M1
 
@@ -33,9 +34,6 @@ Last updated: 2026-08-07 (ID-01)
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables.
 - **RENDER-04** `[felt]` Render block quotes.
-- **ID-02** `[mech]` Re-attach threads to blocks by id on open. Test that a block
-  can be fully reworded and keep its thread, and that a deleted block orphans its
-  thread detectably.
 
 ## Backlog — M2
 
