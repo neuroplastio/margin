@@ -53,6 +53,13 @@ type comment struct {
 	author string
 	body   string
 	at     time.Time
+
+	// deleted marks this comment as tombstoned rather than removed, per D11:
+	// author and at are kept so a reply that answered it does not end up
+	// dangling above nothing, and body is dropped. Set only by deleteComment
+	// (or deleteThread, which tombstones every comment in a thread) — never
+	// construct one with deleted set and body non-empty by hand.
+	deleted bool
 }
 
 // reviewMark records how far a block has been reviewed. Marks live per
@@ -183,6 +190,35 @@ func reattach(doc []block, threads map[string]*thread) {
 		// impossible if the same anchor is stamped back in by hand) is not
 		// left stuck orphaned from an earlier reattach.
 		t.orphaned = !live[anchor]
+	}
+}
+
+// deleteComment tombstones the posted comment at index i (D11): its author
+// and timestamp are kept so a reply that answered it does not end up
+// dangling above nothing, and its body is dropped. An out-of-range index is a
+// no-op — a caller holding a stale index should not panic. Any in-progress
+// edit of the comment is discarded along with it: editing a tombstoned
+// comment's now-empty body makes no sense.
+//
+// What a tombstone looks like on screen — whether it renders at all, or only
+// prevents the dangle — is not decided here; nothing in this package's
+// renderers branches on deleted yet. That is THREAD-04.
+func (t *thread) deleteComment(i int) {
+	if i < 0 || i >= len(t.posted) {
+		return
+	}
+	t.posted[i].body = ""
+	t.posted[i].deleted = true
+	delete(t.drafts, i)
+}
+
+// deleteThread tombstones every posted comment in t. D11 gives "delete a
+// whole thread" the same shape as deleting one comment, applied to all of
+// them — there is nothing else per-thread left to distinguish "deleted" from
+// "never had a comment," so no separate thread-level flag is needed.
+func (t *thread) deleteThread() {
+	for i := range t.posted {
+		t.deleteComment(i)
 	}
 }
 

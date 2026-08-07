@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 )
 
 // deleteMarkedBlock removes block b, plus the id marker stampAll/stampID
@@ -192,5 +193,77 @@ func TestNewModelReattachesOnOpen(t *testing.T) {
 	orphans := m.orphanedThreads()
 	if len(orphans) != 1 || orphans[0] != threads[gone.anchor] {
 		t.Errorf("orphanedThreads() = %v, want just the deleted block's thread", orphans)
+	}
+}
+
+// TestDeleteCommentTombstones pins D11's shape: author and timestamp survive,
+// body does not.
+func TestDeleteCommentTombstones(t *testing.T) {
+	at := time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC)
+	th := &thread{posted: []comment{
+		{author: "toly", body: "why thirty seconds?", at: at},
+		{author: "agent", body: "cited the incident", at: at.Add(time.Minute)},
+	}}
+
+	th.deleteComment(0)
+
+	if !th.posted[0].deleted {
+		t.Error("posted[0].deleted = false, want true")
+	}
+	if th.posted[0].body != "" {
+		t.Errorf("posted[0].body = %q, want empty after deletion", th.posted[0].body)
+	}
+	if th.posted[0].author != "toly" {
+		t.Errorf("posted[0].author = %q, want kept as toly", th.posted[0].author)
+	}
+	if !th.posted[0].at.Equal(at) {
+		t.Errorf("posted[0].at = %v, want kept as %v", th.posted[0].at, at)
+	}
+	// The reply is untouched — deleting one comment must not touch its siblings.
+	if th.posted[1].deleted || th.posted[1].body == "" {
+		t.Error("deleteComment(0) affected posted[1]")
+	}
+}
+
+// TestDeleteCommentClearsPendingEdit covers the case an edit draft targets the
+// comment being deleted: editing a now-bodyless comment makes no sense, so the
+// draft should not survive it.
+func TestDeleteCommentClearsPendingEdit(t *testing.T) {
+	th := &thread{posted: []comment{{author: "toly", body: "orig"}}}
+	th.setDraft(0, "an in-progress edit")
+
+	th.deleteComment(0)
+
+	if d := th.draft(0); d != "" {
+		t.Errorf("draft(0) = %q after deleting the comment it edits, want empty", d)
+	}
+}
+
+// TestDeleteCommentOutOfRangeIsNoop guards a caller holding a stale index —
+// deleteComment must not panic.
+func TestDeleteCommentOutOfRangeIsNoop(t *testing.T) {
+	th := &thread{posted: []comment{{author: "toly", body: "hi"}}}
+	th.deleteComment(5)
+	th.deleteComment(-1)
+	if th.posted[0].deleted || th.posted[0].body != "hi" {
+		t.Error("an out-of-range deleteComment mutated the existing comment")
+	}
+}
+
+// TestDeleteThreadTombstonesEveryComment covers "delete a whole thread" (D11):
+// the same tombstone treatment applied to every posted comment, since there is
+// nothing else per-thread to mark deleted.
+func TestDeleteThreadTombstonesEveryComment(t *testing.T) {
+	th := &thread{posted: []comment{
+		{author: "toly", body: "first"},
+		{author: "agent", body: "second"},
+	}}
+
+	th.deleteThread()
+
+	for i, c := range th.posted {
+		if !c.deleted || c.body != "" {
+			t.Errorf("posted[%d] = %+v, want tombstoned", i, c)
+		}
 	}
 }

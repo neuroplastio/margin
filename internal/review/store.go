@@ -6,8 +6,10 @@
 // A thread file's frontmatter also carries `resolved` (THREAD-01, per D11) —
 // a bare boolean, omitted from the frontmatter entirely when false so an
 // unresolved thread's file is byte-for-byte what it was before this field
-// existed. Deletion's tombstone shape (also D11) is THREAD-03 and not part
-// of this file yet.
+// existed. A tombstoned comment (THREAD-03, also D11) keeps its `## author —
+// timestamp` header but has its body replaced with tombstoneMarker, so its
+// author and timestamp still round-trip while the body reads as gone even to
+// something opening the file without margin.
 //
 // STORE-02 wires this into the running app: Run loads every thread file on
 // disk for the document it opens (loadThreadsForDoc), and dismiss persists a
@@ -30,6 +32,13 @@ import (
 // frontmatter block, same convention as Jekyll/Hugo front matter — familiar
 // to anything that has ever looked at a markdown file with metadata.
 const frontmatterDelim = "---"
+
+// tombstoneMarker is written in place of a deleted comment's body (D11): the
+// author and timestamp header above it is untouched, so this is the only
+// signal, on disk, that the body was dropped rather than always empty. Chosen
+// to be legible to a human or agent opening the file directly, not just to
+// parseComments.
+const tombstoneMarker = "*deleted*"
 
 // threadsDir is where every thread file for a review root lives. root is the
 // directory margin was pointed at — today always the lone document's
@@ -155,7 +164,11 @@ func marshalThread(docPath string, t *thread) []byte {
 		b.WriteString(" — ")
 		b.WriteString(c.at.UTC().Format(time.RFC3339Nano))
 		b.WriteString("\n\n")
-		b.WriteString(strings.Trim(c.body, "\n"))
+		if c.deleted {
+			b.WriteString(tombstoneMarker)
+		} else {
+			b.WriteString(strings.Trim(c.body, "\n"))
+		}
 		b.WriteString("\n")
 	}
 	return []byte(b.String())
@@ -240,10 +253,16 @@ func parseComments(lines []string) ([]comment, error) {
 		for i < len(lines) && !strings.HasPrefix(lines[i], "## ") {
 			i++
 		}
+		body := strings.Trim(strings.Join(lines[start:i], "\n"), "\n")
+		deleted := body == tombstoneMarker
+		if deleted {
+			body = ""
+		}
 		out = append(out, comment{
-			author: author,
-			body:   strings.Trim(strings.Join(lines[start:i], "\n"), "\n"),
-			at:     at,
+			author:  author,
+			body:    body,
+			at:      at,
+			deleted: deleted,
 		})
 		i = skipBlankFrom(lines, i)
 	}

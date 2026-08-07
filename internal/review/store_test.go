@@ -35,6 +35,9 @@ func sameThread(t *testing.T, got, want *thread) {
 		if g.body != w.body {
 			t.Errorf("comment %d: body = %q, want %q", i, g.body, w.body)
 		}
+		if g.deleted != w.deleted {
+			t.Errorf("comment %d: deleted = %v, want %v", i, g.deleted, w.deleted)
+		}
 		if !g.at.Equal(w.at) {
 			t.Errorf("comment %d: at = %v, want %v", i, g.at, w.at)
 		}
@@ -162,6 +165,40 @@ func TestParseThreadFileResolvedCaseInsensitive(t *testing.T) {
 	}
 	if !got.resolved {
 		t.Error("resolved = false, want true for resolved: True")
+	}
+}
+
+// TestMarshalParseThreadRoundTripTombstonedComment covers THREAD-03/D11: a
+// deleted comment's author and timestamp round-trip, its body does not.
+func TestMarshalParseThreadRoundTripTombstonedComment(t *testing.T) {
+	want := &thread{
+		anchor: "^deleted1",
+		quote:  "a paragraph",
+		posted: []comment{
+			{author: "toly", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC), deleted: true},
+			{author: "agent", body: "still here", at: time.Date(2026, 8, 7, 9, 5, 0, 0, time.UTC)},
+		},
+	}
+
+	data := marshalThread("doc.md", want)
+	_, got, err := parseThreadFile(data)
+	if err != nil {
+		t.Fatalf("parseThreadFile: %v\n--- file ---\n%s", err, data)
+	}
+	sameThread(t, got, want)
+}
+
+// TestMarshalThreadWritesTombstoneMarkerForDeletedComment pins the on-disk
+// shape: a deleted comment's body is replaced with the tombstone marker, not
+// left blank — a human or agent reading the file directly should be able to
+// tell "deleted" apart from "posted with nothing in it."
+func TestMarshalThreadWritesTombstoneMarkerForDeletedComment(t *testing.T) {
+	th := &thread{anchor: "^x", posted: []comment{
+		{author: "toly", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC), deleted: true},
+	}}
+	data := string(marshalThread("doc.md", th))
+	if !strings.Contains(data, tombstoneMarker) {
+		t.Errorf("marshalled tombstoned comment does not contain the marker %q:\n%s", tombstoneMarker, data)
 	}
 }
 

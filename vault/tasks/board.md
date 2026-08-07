@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (THREAD-01 done)
+Last updated: 2026-08-07 (THREAD-03 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -62,13 +62,11 @@ Last updated: 2026-08-07 (THREAD-01 done)
 - **THREAD-02** `[felt]` What resolving *looks* like — which key, whether a
   resolved thread dims, collapses, or disappears, and whether resolving is
   reachable from the collapsed line or only the expanded thread.
-- **THREAD-03** `[mech]` Delete a comment, and delete a whole thread, as a
-  tombstone — author and timestamp kept, body dropped — per **D11**. Deletion is
-  the one gesture that destroys the reviewer's own words, so it is explicit and
-  confirmed — see principle 3 in goals.md.
 - **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
   reply already in the thread makes "delete the thread" less obviously the
-  reviewer's alone to do.
+  reviewer's alone to do. THREAD-03 landed the tombstone data model and
+  persistence; no command calls it yet — this is what wires one in, with the
+  confirmation D11 calls for.
 - **EXPORT-05** `[mech]` Resolved threads are excluded from the export by
   default — it is a list of what still needs doing — with a flag to include them
   so an agent can see what it already addressed. THREAD-01 landed, so this is
@@ -119,6 +117,21 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **THREAD-03** delete a comment, and a whole thread, as a tombstone
+      (`internal/review/document.go`): `comment` gains a `deleted bool`;
+      `deleteComment(i)` blanks `posted[i].body`, sets `deleted`, and drops any
+      pending edit draft for it — editing a now-empty comment makes no sense;
+      `deleteThread()` gives "delete a whole thread" (D11) the same treatment
+      applied to every posted comment, since nothing else per-thread needs its
+      own deleted flag. `marshalThread`/`parseThreadFile` (`store.go`) carry it
+      through a `tombstoneMarker` (`*deleted*`) written in place of the body
+      under the untouched `## author — timestamp` header, so a deleted
+      comment's provenance still round-trips and reads plainly to a human or
+      agent opening the file directly. `reloadThreads` needed no change — it
+      already replaces `posted` wholesale on every reload, tombstones included.
+      No command, no key, no rendering: nothing in the registry calls either
+      method yet, and no renderer branches on `deleted` — that is THREAD-04 —
+      done 2026-08-07
 - [x] **THREAD-01** resolvable threads: `thread` gains a `resolved bool`
       (`internal/review/document.go`), settable and clearable by either party
       per D11 — no dedicated setter, since a plain field is all "either the
