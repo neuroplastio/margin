@@ -27,6 +27,16 @@ type command struct {
 	// would just suppress that message. It exists for a future palette to
 	// decide what to list, per requirement 4 of the command-palette feedback.
 	Applicable func(m *model) bool
+	// Target names what the command is about to act on, given the current
+	// focus — e.g. "comment by agent" — so the palette can show "Delete —
+	// comment by agent" rather than a bare "Delete" (requirement 4: "the
+	// difference between confidence and a guess"). nil for a command with no
+	// focus-specific target (move.*, review.export, app.quit): those act the
+	// same regardless of where focus sits, so a title is just the
+	// description. When non-nil, an empty return also falls back to the
+	// description alone — Applicable can be true (a thread exists) while
+	// there is nothing more specific to name (no comment focused, no draft).
+	Target func(m *model) string
 	// Run performs the command against m, returning whatever tea.Cmd the
 	// action needs — identical to what the pre-registry switch case did.
 	Run func(m *model) tea.Cmd
@@ -71,6 +81,7 @@ var commands = []command{
 		ID:          "comment.new",
 		Description: "New comment on the focused block",
 		Applicable:  func(m *model) bool { return m.anchorAt() != "" },
+		Target:      commentTarget,
 		Run: func(m *model) tea.Cmd {
 			// A new comment always starts a reply, never edits, wherever
 			// focus is.
@@ -88,24 +99,28 @@ var commands = []command{
 			a := m.anchorAt()
 			return a != "" && m.threads[a] != nil
 		},
-		Run: func(m *model) tea.Cmd { return m.editFocused() },
+		Target: editTarget,
+		Run:    func(m *model) tea.Cmd { return m.editFocused() },
 	},
 	{
 		ID:          "mark.reviewed",
 		Description: "Mark reviewed",
 		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
+		Target:      markTarget,
 		Run:         func(m *model) tea.Cmd { m.toggleMark(markOK); return nil },
 	},
 	{
 		ID:          "mark.flagged",
 		Description: "Flag for later",
 		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
+		Target:      markTarget,
 		Run:         func(m *model) tea.Cmd { m.toggleMark(markFlag); return nil },
 	},
 	{
 		ID:          "mark.cycle",
 		Description: "Cycle the review mark",
 		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
+		Target:      markTarget,
 		Run:         func(m *model) tea.Cmd { m.cycleMark(); return nil },
 	},
 	{
@@ -133,6 +148,61 @@ func commandByID(id string) (command, bool) {
 		}
 	}
 	return command{}, false
+}
+
+// commentTarget names the block comment.new would attach to, by kind — the
+// only thing distinguishing one focused block from another before any
+// comment exists on it.
+func commentTarget(m *model) string {
+	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
+		return ""
+	}
+	switch m.entries[m.at.entry].b.kind {
+	case blockHeading:
+		return "heading"
+	case blockPara:
+		return "paragraph"
+	default:
+		return "block"
+	}
+}
+
+// editTarget names what comment.edit would open, mirroring editFocused's own
+// precedence (review.go) without any of its side effects: the focused posted
+// comment by author, else an unsubmitted reply draft, else a posted comment
+// with an edit in progress. Applicable already guarantees a thread exists;
+// none of the three matching is possible when focus is on the block itself
+// with nothing yet drafted, in which case an empty target falls back to the
+// bare description, same as editFocused's own status message covers that
+// case at Run time.
+func editTarget(m *model) string {
+	t := m.threads[m.anchorAt()]
+	if t == nil {
+		return ""
+	}
+	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
+		return "comment by " + t.posted[m.at.comment].author
+	}
+	if t.draft(newCommentSlot) != "" {
+		return "draft reply"
+	}
+	if i := t.pendingEdit(); i >= 0 {
+		return "unsaved edit to comment by " + t.posted[i].author
+	}
+	return ""
+}
+
+// markTarget names what a mark command would act on: a single block, or the
+// whole section when focus sits on a heading. Shares sectionLabel (review.go)
+// with toggleMark and cycleMark's own status messages, so the palette's title
+// and the status line left behind by pressing the key never say two
+// different things about the same action.
+func markTarget(m *model) string {
+	anchors := m.sectionAnchors(m.at.entry)
+	if len(anchors) == 0 {
+		return ""
+	}
+	return sectionLabel(anchors)
 }
 
 // keymap is the one place a raw key string binds to a command id. Every key

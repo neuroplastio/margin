@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (CMD-02 done)
+Last updated: 2026-08-07 (CMD-04 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -71,10 +71,6 @@ asked for. Split per the feedback's own suggested ordering — see
   much room it takes, whether it dims the document, ranked vs. stable
   ordering. Needs a real screen — see the feedback's "Not settled" section for
   the open questions.
-- **CMD-04** `[mech]` Focus-sensitive listing and a titled target: given the
-  registry's `Applicable` and the current focus, produce the filtered,
-  targeted list the palette would show (e.g. "Delete — comment by agent").
-  Still no UI.
 - **CMD-05** Staged value commands and key-opens-a-stage (requirement 5) —
   later; depends on CMD-03 existing first.
 
@@ -108,6 +104,18 @@ independent of whether the unit of review turns out to be a file or a tree.
 
 ## Done
 
+- [x] **CMD-04** focus-sensitive listing and the titled target: `paletteRows`
+      (`internal/review/palette.go`) filters the registry to what
+      `Applicable` allows given the current focus; a new `command.Target`
+      field (nil for focus-independent commands) names what `comment.new`,
+      `comment.edit` and the three mark commands would act on —
+      `commentTarget`, `editTarget`, `markTarget` — and `paletteTitle`
+      appends it to the description, e.g. "Mark reviewed — section (3
+      blocks)". `editTarget` mirrors `editFocused`'s own precedence
+      read-only; `markTarget` shares a new `sectionLabel` helper factored out
+      of `toggleMark`/`cycleMark` so the palette and the status line can
+      never disagree. Still no UI, no `:` key, nothing wired into
+      `handleKey` — done 2026-08-07
 - [x] **CMD-02** palette matching logic: `matchCommands` (new
       `internal/review/palette.go`) ranks and filters the registry against a
       query string — a fuzzy subsequence match (`fuzzyScore`) against each

@@ -107,3 +107,86 @@ func TestUnknownKeyIsANoop(t *testing.T) {
 		t.Fatal("unbound key changed model state")
 	}
 }
+
+// --- CMD-04: focus-sensitive Target functions --------------------------------
+
+// TestCommentTargetNamesBlockKind: comment.new's target names the kind of
+// block it would attach to — the only thing distinguishing one before any
+// comment exists on it.
+func TestCommentTargetNamesBlockKind(t *testing.T) {
+	m := newTestModel(t)
+
+	m.at = cursor{entry: blockEntryFor(t, m, "^h1"), comment: commentNone}
+	if got := commentTarget(m); got != "heading" {
+		t.Errorf("commentTarget on a heading = %q, want %q", got, "heading")
+	}
+
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+	if got := commentTarget(m); got != "paragraph" {
+		t.Errorf("commentTarget on a paragraph = %q, want %q", got, "paragraph")
+	}
+}
+
+// TestEditTargetNamesFocusedComment: focusing a specific posted comment names
+// its author, so a palette row for that comment could not be confused with
+// another one in the same thread.
+func TestEditTargetNamesFocusedComment(t *testing.T) {
+	m := newTestModel(t)
+	i := entryFor(t, m, convoAnchor)
+
+	m.at = cursor{entry: i, comment: 0}
+	if got, want := editTarget(m), "comment by toly"; got != want {
+		t.Errorf("editTarget at comment 0 = %q, want %q", got, want)
+	}
+	m.at = cursor{entry: i, comment: 1}
+	if got, want := editTarget(m), "comment by agent"; got != want {
+		t.Errorf("editTarget at comment 1 = %q, want %q", got, want)
+	}
+}
+
+// TestEditTargetNamesDraftReply: focus on a thread holding only an
+// unsubmitted reply names the draft, not a comment — there is no posted
+// comment yet to attribute it to.
+func TestEditTargetNamesDraftReply(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: entryFor(t, m, draftAnchor), comment: commentNone}
+	if got, want := editTarget(m), "draft reply"; got != want {
+		t.Errorf("editTarget on a draft-only thread = %q, want %q", got, want)
+	}
+}
+
+// TestEditTargetEmptyWhenNothingSpecificToEdit: comment.edit's Applicable
+// only requires a thread to exist, which is true as soon as focus sits on
+// the thread entry itself with no comment selected, no draft and no pending
+// edit — editTarget has nothing more specific to say than editFocused's own
+// "select a comment" status covers at Run time, so it returns "".
+func TestEditTargetEmptyWhenNothingSpecificToEdit(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: entryFor(t, m, soloAnchor), comment: commentNone}
+	if got := editTarget(m); got != "" {
+		t.Errorf("editTarget = %q, want \"\"", got)
+	}
+}
+
+// TestMarkTargetNamesSectionSize: a single paragraph names itself "block"; a
+// heading names the whole section it rolls up, matching sectionLabel's own
+// wording so the palette and the status line left behind by the key never
+// disagree.
+func TestMarkTargetNamesSectionSize(t *testing.T) {
+	m := newTestModel(t)
+
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+	if got, want := markTarget(m), "block"; got != want {
+		t.Errorf("markTarget on a paragraph = %q, want %q", got, want)
+	}
+
+	m.at = cursor{entry: blockEntryFor(t, m, "^h1"), comment: commentNone}
+	if got, want := markTarget(m), "section (3 blocks)"; got != want {
+		t.Errorf("markTarget on a heading = %q, want %q", got, want)
+	}
+
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+	if got := markTarget(m); got != "" {
+		t.Errorf("markTarget on a thread entry = %q, want \"\" (nothing markable there)", got)
+	}
+}

@@ -1,16 +1,21 @@
-// Palette matching: given the command registry and a query string, rank and
-// filter commands by how well they match. This is CMD-02 — mechanical, no
-// UI. It is not wired to a ':' key, no palette renders, nothing here decides
-// where results would appear or how many rows they get; that is CMD-03 and
-// the rest of the command-palette feedback (2026-08-07-command-palette,
-// drained by CMD-01 — see vault/journal/2026-08-07.6.md).
+// Palette logic: given the command registry, a typed query, and the model's
+// current focus, decide which commands to show and how to title them.
+// Mechanical, no UI — not wired to a ':' key, nothing here renders. That is
+// CMD-03 and the rest of the command-palette feedback (2026-08-07-command-
+// palette, drained by CMD-01 — see vault/journal/2026-08-07.6.md).
 //
-// Requirement 1 of that feedback: "Filtering happens as you type and results
-// are ranked, not merely substring-filtered — typing a few characters of
-// what you half-remember should surface the right verb." That is the whole
-// spec this leg implements: a fuzzy subsequence match against both a
-// command's id and its description, scored so a tighter, earlier match
-// outranks one that is merely present somewhere in a long string.
+// Two independent slices of that feedback live in this file:
+//
+// Requirement 1 (CMD-02): "Filtering happens as you type and results are
+// ranked, not merely substring-filtered." matchCommands and fuzzyScore are a
+// subsequence match against both a command's id and its description, scored
+// so a tighter, earlier match outranks one that is merely present somewhere
+// in a long string.
+//
+// Requirement 4 (CMD-04): "It offers what applies to what is focused, and
+// names the target." paletteRows and paletteTitle filter the registry by
+// Applicable against the current focus and title each surviving command with
+// what it would act on.
 package review
 
 import (
@@ -119,4 +124,50 @@ func fuzzyScore(target, query string) (score int, ok bool) {
 // counts as the start of a new word for fuzzyScore's bonus.
 func isWordBoundary(r rune) bool {
 	return r == '.' || r == '_' || r == '-' || r == ' '
+}
+
+// paletteRow is one row the palette would show at a given moment: a command
+// together with the title that names what it is about to act on, per
+// requirement 4 of the command-palette feedback — "the difference between
+// 'Delete' and 'Delete — comment by agent' is the difference between
+// confidence and a guess."
+type paletteRow struct {
+	Command command
+	Title   string
+}
+
+// paletteRows produces the palette's rows for m's current focus: every
+// command from cmds whose Applicable reports true against m, in registry
+// order, each carrying its title. A command that does not apply is left out
+// entirely, not listed and disabled — the same rule requirement 4 states for
+// a query that matches nothing (matchCommands, CMD-02).
+//
+// This says nothing about a typed query. Focus-applicability and
+// search-ranking are two different filters the palette (CMD-03) will need to
+// compose, and which one narrows first — or whether composing them even
+// matters, since both are pure filters over the same list — is not something
+// this leg decides without a screen to judge it on.
+func paletteRows(m *model, cmds []command) []paletteRow {
+	out := make([]paletteRow, 0, len(cmds))
+	for _, c := range cmds {
+		if !c.Applicable(m) {
+			continue
+		}
+		out = append(out, paletteRow{Command: c, Title: paletteTitle(c, m)})
+	}
+	return out
+}
+
+// paletteTitle names what c is about to act on, given m's focus. A command
+// with no focus-specific Target — or whose Target has nothing more specific
+// to say than "yes, this applies" (an empty string) — is titled by its
+// description alone.
+func paletteTitle(c command, m *model) string {
+	if c.Target == nil {
+		return c.Description
+	}
+	if t := c.Target(m); t != "" {
+		return c.Description + " — " + t
+	}
+	return c.Description
 }

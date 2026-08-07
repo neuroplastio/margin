@@ -135,3 +135,111 @@ func ids(cmds []command) []string {
 	}
 	return out
 }
+
+// --- CMD-04: focus-sensitive listing and the titled target -------------------
+
+// TestPaletteTitleFallsBackToDescriptionWhenTargetIsNil: a command with no
+// Target (move.*, review.export, app.quit) is titled by its description
+// alone, no matter where focus sits.
+func TestPaletteTitleFallsBackToDescriptionWhenTargetIsNil(t *testing.T) {
+	m := newTestModel(t)
+	down, ok := commandByID("move.down")
+	if !ok {
+		t.Fatal("move.down is not registered")
+	}
+	if got := paletteTitle(down, m); got != down.Description {
+		t.Errorf("paletteTitle(move.down) = %q, want the bare description %q", got, down.Description)
+	}
+}
+
+// TestPaletteTitleAppendsTarget: a command whose Target has something to say
+// appends it after an em dash, matching requirement 4's own example — "Delete
+// — comment by agent" — with mark.reviewed and a heading standing in since
+// there is no delete command yet (blocked on Q-0002).
+func TestPaletteTitleAppendsTarget(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: blockEntryFor(t, m, "^h1"), comment: commentNone}
+	reviewed, ok := commandByID("mark.reviewed")
+	if !ok {
+		t.Fatal("mark.reviewed is not registered")
+	}
+	want := "Mark reviewed — section (3 blocks)"
+	if got := paletteTitle(reviewed, m); got != want {
+		t.Errorf("paletteTitle(mark.reviewed) = %q, want %q", got, want)
+	}
+}
+
+// TestPaletteTitleFallsBackToDescriptionWhenTargetIsEmpty: Applicable and
+// Target are asked separately, and Applicable being true does not guarantee
+// Target has anything to add (see TestEditTargetEmptyWhenNothingSpecificToEdit)
+// — the title falls back to the description rather than showing a bare
+// trailing dash.
+func TestPaletteTitleFallsBackToDescriptionWhenTargetIsEmpty(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: entryFor(t, m, soloAnchor), comment: commentNone}
+	edit, ok := commandByID("comment.edit")
+	if !ok {
+		t.Fatal("comment.edit is not registered")
+	}
+	if !edit.Applicable(m) {
+		t.Fatal("test setup: comment.edit should be applicable on a thread entry")
+	}
+	if got := paletteTitle(edit, m); got != edit.Description {
+		t.Errorf("paletteTitle(comment.edit) = %q, want the bare description %q", got, edit.Description)
+	}
+}
+
+// TestPaletteRowsExcludesInapplicableCommands: focus on a plain paragraph
+// with no thread yet excludes comment.edit (nothing to edit) but keeps the
+// mark commands and comment.new; registry order is preserved.
+func TestPaletteRowsExcludesInapplicableCommands(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+
+	rows := paletteRows(m, commands)
+	got := make([]string, len(rows))
+	for i, r := range rows {
+		got[i] = r.Command.ID
+	}
+	for _, want := range []string{"move.down", "comment.new", "mark.reviewed", "review.export", "app.quit"} {
+		if !containsID(got, want) {
+			t.Errorf("paletteRows on a fresh paragraph = %v, want it to include %q", got, want)
+		}
+	}
+	if containsID(got, "comment.edit") {
+		t.Errorf("paletteRows on a fresh paragraph = %v, want it to exclude comment.edit (no thread there)", got)
+	}
+}
+
+// TestPaletteRowsExcludesMarkCommandsOnAThreadEntry: focus on a thread entry
+// itself (nothing sectionAnchors considers markable) drops all three mark
+// commands, but comment.edit is applicable — the inverse case from
+// TestPaletteRowsExcludesInapplicableCommands, so the two together pin that
+// applicability is judged per command, not per focus position wholesale.
+func TestPaletteRowsExcludesMarkCommandsOnAThreadEntry(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+
+	rows := paletteRows(m, commands)
+	got := make([]string, len(rows))
+	for i, r := range rows {
+		got[i] = r.Command.ID
+	}
+	for _, unwanted := range []string{"mark.reviewed", "mark.flagged", "mark.cycle"} {
+		if containsID(got, unwanted) {
+			t.Errorf("paletteRows on a thread entry = %v, want it to exclude %q", got, unwanted)
+		}
+	}
+	if !containsID(got, "comment.edit") {
+		t.Errorf("paletteRows on a thread entry = %v, want it to include comment.edit", got)
+	}
+}
+
+func containsID(ids []string, want string) bool {
+	for _, id := range ids {
+		if id == want {
+			return true
+		}
+	}
+	return false
+}

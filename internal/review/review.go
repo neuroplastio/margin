@@ -356,10 +356,7 @@ func (m *model) toggleMark(want reviewMark) {
 		}
 	}
 
-	what := "block"
-	if len(anchors) > 1 {
-		what = fmt.Sprintf("section (%d blocks)", len(anchors))
-	}
+	what := sectionLabel(anchors)
 	switch {
 	case clearing:
 		m.status = "cleared " + what
@@ -368,6 +365,18 @@ func (m *model) toggleMark(want reviewMark) {
 	default:
 		m.status = "flagged " + what + " for later"
 	}
+}
+
+// sectionLabel names what a mark command is about to act on: a single block,
+// or the whole section when focus sits on a heading — the same distinction
+// sectionAnchors already draws. Shared by toggleMark, cycleMark and the mark
+// commands' palette Target (command.go) so the wording never drifts between
+// the status line and what the palette would show for the same action.
+func sectionLabel(anchors []string) string {
+	if len(anchors) > 1 {
+		return fmt.Sprintf("section (%d blocks)", len(anchors))
+	}
+	return "block"
 }
 
 // cycleMark steps the focused block — or the whole section, on a heading —
@@ -395,10 +404,7 @@ func (m *model) cycleMark() {
 		}
 	}
 
-	what := "block"
-	if len(anchors) > 1 {
-		what = fmt.Sprintf("section (%d blocks)", len(anchors))
-	}
+	what := sectionLabel(anchors)
 	switch want {
 	case markOK:
 		m.status = "reviewed · " + what
