@@ -37,6 +37,12 @@ feels. For these:
    the right cell in insert mode?" beats "does it look OK?".
 3. **Stop.** Do not start another felt leg until feedback lands.
 
+A mechanical leg can grow a felt half without anyone noticing. When one
+introduces a new block kind, message, state or mode, ask: **does something now
+render differently, or not render at all?** If yes, that half is felt — stop and
+show it. Leaving the renderer with no branch for a new case is still a decision
+about how it looks; it just does not feel like one at the time.
+
 **At most one unreviewed felt leg exists at a time.** The board's `Awaiting
 review:` line names it. While it is set, you may do mechanical legs or nothing —
 you may not queue up more felt work. This is the whole pacing mechanism; do not
