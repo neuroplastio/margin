@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (CMD-04 done)
+Last updated: 2026-08-07 (SCROLL-01 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -79,10 +79,6 @@ asked for. Split per the feedback's own suggested ordering — see
 Not blocked by Q-0001: these are about moving around one document, and are
 independent of whether the unit of review turns out to be a file or a tree.
 
-- **SCROLL-01** `[mech]` Decouple the scroll offset from focus. Today `clampScroll`
-  recomputes it from the focused block on every render, so any user-driven scroll
-  would snap straight back. Needs a real offset the user owns, with focus-follow
-  applying only when focus actually moved. Prerequisite for the other two.
 - **SCROLL-02** `[felt]` Page and half-page keys — `ctrl+d`/`ctrl+u`,
   `ctrl+f`/`ctrl+b`, `pgup`/`pgdn`, `home`/`end`. The open decision is whether
   they carry focus along with the viewport, the way vim's `ctrl+d` carries the
@@ -104,6 +100,13 @@ independent of whether the unit of review turns out to be a file or a tree.
 
 ## Done
 
+- [x] **SCROLL-01** decouple the scroll offset from focus: `model` gains
+      `scrollAnchor cursor`, the focus position `clampScroll` last followed;
+      it now re-derives the offset from the focused span only when
+      `m.at != m.scrollAnchor`, otherwise returning `m.scroll` as-is
+      (clamped only to stay in range). Prerequisite for SCROLL-02/03 — no
+      observable behaviour change today, since nothing yet sets `m.scroll`
+      any other way — done 2026-08-07
 - [x] **CMD-04** focus-sensitive listing and the titled target: `paletteRows`
       (`internal/review/palette.go`) filters the registry to what
       `Applicable` allows given the current focus; a new `command.Target`

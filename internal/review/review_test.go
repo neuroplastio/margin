@@ -703,6 +703,52 @@ func TestCursorTracksScroll(t *testing.T) {
 	}
 }
 
+// TestClampScrollPreservesScrollWhenFocusUnchanged is the regression SCROLL-01
+// exists for: clampScroll used to re-derive the offset from focus on every
+// render, so a scroll set some other way (a future page key, a mouse wheel)
+// would snap straight back on the very next frame. It should only follow
+// focus when focus has actually moved since the last time it was asked.
+func TestClampScrollPreservesScrollWhenFocusUnchanged(t *testing.T) {
+	m := newTestModel(t)
+	m.spans = []span{{start: 0, end: 4}, {start: 5, end: 9}, {start: 10, end: 50}}
+	m.at = cursor{entry: 2, comment: commentNone}
+
+	total, viewport := 51, 10
+	first := m.clampScroll(total, viewport)
+	if want := 41; first != want { // pulls the tail of entry 2's span into view
+		t.Fatalf("initial clampScroll = %d, want %d", first, want)
+	}
+
+	// Simulate a user-driven scroll that does not touch focus: clampScroll
+	// must leave it alone rather than snapping back to the focused entry.
+	m.scroll = 5
+	if got := m.clampScroll(total, viewport); got != 5 {
+		t.Fatalf("clampScroll = %d with focus unchanged, want the scroll preserved at 5", got)
+	}
+	// Calling it again with nothing changed must be idempotent.
+	if got := m.clampScroll(total, viewport); got != 5 {
+		t.Fatalf("second clampScroll call = %d, want still 5", got)
+	}
+}
+
+// TestClampScrollFollowsFocusOnceItMoves is the other half: focus-follow still
+// works, just only fires on an actual move.
+func TestClampScrollFollowsFocusOnceItMoves(t *testing.T) {
+	m := newTestModel(t)
+	m.spans = []span{{start: 0, end: 4}, {start: 5, end: 9}, {start: 10, end: 50}}
+	m.at = cursor{entry: 2, comment: commentNone}
+
+	total, viewport := 51, 10
+	m.scroll = m.clampScroll(total, viewport)
+	m.scroll = 5 // a scroll unrelated to the still-focused entry 2
+
+	m.at = cursor{entry: 0, comment: commentNone}
+	got := m.clampScroll(total, viewport)
+	if want := 0; got != want { // entry 0's span must be pulled back into view
+		t.Fatalf("clampScroll after focus moved = %d, want %d", got, want)
+	}
+}
+
 // --- unit-level rules -------------------------------------------------------
 
 func TestOutcomeFromExit(t *testing.T) {

@@ -122,10 +122,16 @@ type model struct {
 	// exit — so the new focus has to wait its turn.
 	pendingOpen *cursor
 
-	w, h     int
-	scroll   int
-	status   string
-	quitting bool
+	w, h   int
+	scroll int
+	// scrollAnchor is the last focus position clampScroll pulled the viewport
+	// to. Re-anchoring only fires when m.at has moved since — otherwise a
+	// scroll offset the user set directly (SCROLL-02/03) would snap straight
+	// back to focus on the very next render. Starts at an entry index no
+	// cursor legitimately has, so the first render always anchors once.
+	scrollAnchor cursor
+	status       string
+	quitting     bool
 
 	spans    []span
 	subspans map[cursor]span // comment-level spans of the expanded thread
@@ -162,9 +168,10 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	reattach(doc, threads)
 	m := &model{
 		path: path, doc: doc, threads: threads,
-		marks:   map[string]reviewMark{},
-		at:      cursor{entry: 0, comment: commentNone},
-		paneTop: -1,
+		marks:        map[string]reviewMark{},
+		at:           cursor{entry: 0, comment: commentNone},
+		scrollAnchor: cursor{entry: -1, comment: commentNone},
+		paneTop:      -1,
 	}
 	m.rebuild()
 	return m
@@ -959,24 +966,32 @@ func (m *model) View() tea.View {
 	return v
 }
 
-// clampScroll keeps the focused position — and so all of the composer, when one
-// is open — inside the viewport.
+// clampScroll owns the scroll offset. It only pulls the viewport to follow
+// focus when focus has actually moved since the last render — the rest of the
+// time m.scroll is whatever it already was, merely clamped to stay in range.
+// That is what leaves room for a user-driven scroll (SCROLL-02/03) to hold:
+// today nothing sets m.scroll directly, so this only changes behaviour once
+// something does, but re-deriving the offset from focus unconditionally, the
+// way this used to work, would undo that scroll on the very next render.
 func (m *model) clampScroll(total, viewport int) int {
 	if total <= viewport {
 		return 0
 	}
-	f, ok := m.subspans[m.at]
-	if !ok && m.at.entry < len(m.spans) {
-		f = m.spans[m.at.entry]
-		ok = true
-	}
 	s := m.scroll
-	if ok {
-		if f.start < s {
-			s = f.start
+	if m.at != m.scrollAnchor {
+		m.scrollAnchor = m.at
+		f, ok := m.subspans[m.at]
+		if !ok && m.at.entry < len(m.spans) {
+			f = m.spans[m.at.entry]
+			ok = true
 		}
-		if f.end >= s+viewport {
-			s = f.end - viewport + 1
+		if ok {
+			if f.start < s {
+				s = f.start
+			}
+			if f.end >= s+viewport {
+				s = f.end - viewport + 1
+			}
 		}
 	}
 	return max(0, min(s, total-viewport))
