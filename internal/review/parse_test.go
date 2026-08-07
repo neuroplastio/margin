@@ -359,3 +359,48 @@ func TestParsedDocumentDrivesTheModel(t *testing.T) {
 		t.Errorf("progress = %d/%d, want 1 of a non-zero total", done, total)
 	}
 }
+
+// TestStampEveryBlockSequentially covers the property ID-02 will actually rely
+// on, which the single-stamp tests do not: stamping *every* block of a document
+// one after another, rather than one block of a pristine source.
+//
+// stampID only guarantees that bytes before the stamped block are undisturbed,
+// so a caller must work backwards through the document — otherwise each
+// insertion invalidates the offsets of every block after it.
+func TestStampEveryBlockSequentially(t *testing.T) {
+	orig := parseSample(t)
+	cur := []byte(sampleDoc)
+	want := map[int]string{}
+
+	for i := len(orig) - 1; i >= 0; i-- {
+		blocks := parseDoc(cur)
+		if len(blocks) != len(orig) {
+			t.Fatalf("stamping block %d: block count drifted to %d, want %d", i, len(blocks), len(orig))
+		}
+		id := newBlockID()
+		want[i] = id
+		cur = stampID(cur, blocks[i], id)
+	}
+
+	final := parseDoc(cur)
+	if len(final) != len(orig) {
+		t.Fatalf("after stamping every block: %d blocks, want %d", len(final), len(orig))
+	}
+	for i := range orig {
+		if final[i].text != orig[i].text {
+			t.Errorf("block %d text changed:\n  was %q\n  now %q", i, orig[i].text, final[i].text)
+		}
+		if final[i].kind != orig[i].kind {
+			t.Errorf("block %d kind changed: %v -> %v", i, orig[i].kind, final[i].kind)
+		}
+		if final[i].anchor != want[i] {
+			t.Errorf("block %d anchor = %q, want %q", i, final[i].anchor, want[i])
+		}
+		if !final[i].stamped {
+			t.Errorf("block %d is not flagged as stamped", i)
+		}
+	}
+	if n := strings.Count(string(cur), "<!--margin:"); n != len(orig) {
+		t.Errorf("%d markers in the source, stamped %d blocks", n, len(orig))
+	}
+}
