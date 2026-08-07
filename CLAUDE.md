@@ -46,10 +46,6 @@ Note what is *not* rationed: mechanical legs. Tests settle those, so they have n
 reason to wait on anyone, and a scheduled run chains them back to back. Only work
 that needs a human eye is paced.
 
-Note what is *not* rationed: mechanical legs. Tests settle those, so they have no
-reason to wait on anyone and a run chains them back to back. Only work that needs
-a human eye is paced.
-
 ## Blocking is correct here
 
 The usual advice to an autonomous agent is *never block — pick a default and
