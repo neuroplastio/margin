@@ -133,80 +133,75 @@ Provision with `scripts/setup-env.sh`. Two details that matter:
   — but a hand-rolled minimal install can miss it. The `.sug` companion is
   optional and only affects `z=` suggestion quality.
 
-## F9 — The cloud run cannot push; it hands back a patch
+## F9 — A fine-grained PAT cannot grant write outside its resource owner
 
-The scheduled run has no write access to `neuroplastio/margin` — the git egress
-proxy and the GitHub App integration both deny it. The org has not authorised
-the app (the same org policy that blocked a fine-grained PAT for `gh api`).
+**Superseded diagnosis.** This entry previously said the cloud run could not push
+because the org had not authorised the GitHub App, and described a patch-handoff
+workaround. That was wrong, and it sent two rounds of effort at the org settings
+page. What follows is what was actually true. The run pushes normally now.
 
-**This is a known, accepted constraint, not something a run should debug.** The
-routine prompt says so explicitly. A run commits locally, then produces
-`git format-patch origin/main..HEAD` as an artifact and opens its report with a
-line naming what did not land — `UNPUSHED: ID-02 — 1 commit, patch attached`.
+A cloud session's git credential is minted from the GitHub connection on the
+Claude account — the one `/web-setup` syncs from the local `gh` CLI. So the
+session can do exactly what that token can do, and nothing more.
 
-The maintainer applies it:
+**A fine-grained PAT is scoped to a single resource owner, fixed at creation.**
+A token whose owner is the user account has no write access to org-owned
+repositories at all, whatever the org permits and whatever the token's own
+repository-access setting says. Its "All repositories" option means *all
+repositories you own*; everything else falls under the fine print, "also includes
+public repositories (read-only)". No org setting can widen that, because the
+constraint is on the token.
+
+Replacing it needs three things, and missing any one produces the identical
+symptom:
+
+1. A **new** token with the organisation as its resource owner. The existing one
+   cannot be converted.
+2. **Org approval** of that token, if the org requires it.
+3. **Contents: Read and write.** A token defaults to Metadata only, which reads
+   fine and writes nothing.
+
+### How to tell these apart
+
+Two readings that look like evidence and are not:
+
+- `gh api repos/<owner>/<repo> --jq .permissions` showing `push: true` reports
+  **your** access to the repository, not the token's. It says nothing.
+- A successful read of a **public** repo says nothing either — any token can read
+  those. Read a *private* repo in the org to prove the grant is approved.
+
+The only honest test is a real write. This one leaves no visible artifact and
+needs no cleanup, because an unreferenced blob is simply garbage-collected:
+
+```bash
+gh api -X POST repos/<owner>/<repo>/git/blobs -f content=probe -f encoding=utf-8
+```
+
+A sha back means write access. `403 Resource not accessible by personal access
+token` means one of the three requirements above is missing.
+
+**Local `git push` proves nothing about the cloud path.** It goes over SSH with
+the maintainer's key; the cloud session goes through a proxy using minted,
+scoped credentials. The two share no configuration, so "it works from my machine"
+is not evidence — the run that reasoned that way concluded the environment was at
+fault when the token was.
+
+### If a run ever cannot push again
+
+It commits locally and hands back `git format-patch origin/main..HEAD` as an
+artifact. To land it:
 
 ```bash
 git checkout main && git pull origin main
-git am --3way 0001-<leg>.patch     # author, message and trailers preserved
-make check && make test-race
+git am --3way 0001-*.patch        # preserves author, message and trailers
+make check && make test-race && make doctor
 git push origin main
 ```
 
-`git am` is what keeps the leg's authorship and commit message intact — do not
-reconstruct the change by hand from the diff.
+`git am` is what keeps the leg's authorship intact — do not reconstruct the
+change by hand from the diff. And verify before pushing: a patch that applies
+cleanly has still only been tested in the environment that produced it.
 
-Two things worth knowing when picking a patch up:
-
-- **Verify, do not trust.** A patch that applies cleanly has still only been
-  tested in the environment that produced it. Run `make check`, `make test-race`
-  and `make doctor` before pushing.
-- **The artifact page, not the API file.** A run's patch is reachable at
-  `claude.ai/code/artifact/<uuid>`, which can be fetched. The
-  `claude.ai/api/organizations/.../files/.../contents` URL for the same content
-  returns 403.
-
-To retire this: authorise the app for the org at
-`github.com/organizations/neuroplastio/settings/installations`, then drop the
-PUSH ACCESS block from the routine prompt.
-
-## F10 — A bare `goldmark.New()` turns a leading `---…---` block into a setext heading
-
-`goldmark.New()` has no frontmatter extension enabled, and CommonMark's own
-grammar has no concept of frontmatter — it sees two separate constructs that
-happen to collide. The opening `---` is a thematic break (silently dropped by
-`blockFor`'s `*ast.ThematicBreak` case). The **closing** `---` is read as a
-setext heading underline for whatever paragraph-like text sits above it, so
-the entire block between the two fences collapses onto one line and becomes a
-level-2 heading — bold, in heading colour, the first thing a reader sees.
-
-This is not frontmatter-specific: *any* paragraph immediately followed by a
-line that is exactly `---` (not `***` or `___`, which are unambiguous
-thematic breaks) gets promoted to a heading the same way. `parseDoc` (see
-`frontmatterExtent` in `parse.go`) now special-cases the leading case — a
-document whose very first line is `---` and some later line is `---` or
-`...` — by pulling that whole range out as `blockFrontmatter` before goldmark
-sees it as prose. The general case, a `---` used as a horizontal rule
-anywhere else in a document, is **not** handled: it still silently promotes
-the paragraph above it to a heading. Worth a test fixture if `RENDER-0x`
-lands block quotes/rules and this surfaces again.
-
-`yuin/goldmark-meta` exists and would subsume the leading-case fix, but was
-not adopted here — check what it does to byte offsets before reaching for it,
-since ID-01's stamping depends on `extent()`'s ranges staying exact.
-
-## F11 — Bubble Tea defaults its output to stdout; redirect it explicitly whenever stdout carries something else
-
-`tea.NewProgram` writes the whole interface — every escape sequence, every
-redraw — to `os.Stdout` unless told otherwise (`tea.go`: `if p.output == nil
-{ p.output = os.Stdout }`). Any flag that repurposes stdout for program output
-(`--stdout`, and any future one like it) has to pass `tea.WithOutput` pointed
-at the controlling terminal (`/dev/tty`) *before* starting the program, or the
-piped stream fills with ANSI and the interface has nowhere to draw.
-
-`Run`'s `openTTY` var is the seam: production opens `/dev/tty`, and a test
-substitutes a func that fails without needing a real terminal, to pin that a
-missing tty is a reported error rather than a silent fall-through to drawing
-over the pipe. It does not exercise `tea.NewProgram(...).Run()` itself — that
-needs an interactive session, same boundary every other test in this package
-respects.
+The patch is reachable at `claude.ai/code/artifact/<uuid>`, which can be fetched.
+The `claude.ai/api/organizations/.../files/.../contents` URL for the same content
+returns 403.
