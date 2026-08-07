@@ -70,6 +70,39 @@ func TestReloadThreadsMergesAnAppendedReplyIntoAnExistingThread(t *testing.T) {
 	}
 }
 
+// TestReloadThreadsMergesResolvedFlag pins reloadThreads' extension for
+// THREAD-01: an agent that resolves a thread by writing `resolved: true`
+// straight to its file, the same way it appends a reply, is picked up on the
+// next reload rather than requiring margin to be restarted.
+func TestReloadThreadsMergesResolvedFlag(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+
+	existing := m.threads[soloAnchor]
+	if existing.resolved {
+		t.Fatal("test fixture assumption broken: soloAnchor already resolved")
+	}
+
+	resolved := &thread{
+		anchor:   existing.anchor,
+		quote:    existing.quote,
+		posted:   append([]comment{}, existing.posted...),
+		resolved: true,
+	}
+	if err := writeThreadFile(root, "document.md", resolved); err != nil {
+		t.Fatalf("writeThreadFile: %v", err)
+	}
+
+	if err := m.reloadThreads(); err != nil {
+		t.Fatalf("reloadThreads: %v", err)
+	}
+
+	if got := m.threads[soloAnchor]; !got.resolved {
+		t.Fatal("reloadThreads did not pick up the externally set resolved flag")
+	}
+}
+
 func TestReloadThreadsPreservesAnUnsubmittedDraft(t *testing.T) {
 	m := newTestModel(t)
 	root := t.TempDir()

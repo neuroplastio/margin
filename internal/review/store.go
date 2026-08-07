@@ -3,13 +3,11 @@
 // file tools" half of D5 — an agent reads and writes these with nothing
 // beyond a text editor.
 //
-// Deliberately absent: any field for resolved/deleted state. Q-0002 asks how
-// those are represented, and baking a guess into the on-disk shape here is
-// exactly what that question exists to prevent — see the note in
-// vault/questions/Q-0002-resolution-and-deletion.md. THREAD-01 and THREAD-03
-// extend this format once that is answered; until then a thread file holds
-// only what is already settled: its anchor, its quote fallback, and its
-// posted comments.
+// A thread file's frontmatter also carries `resolved` (THREAD-01, per D11) —
+// a bare boolean, omitted from the frontmatter entirely when false so an
+// unresolved thread's file is byte-for-byte what it was before this field
+// existed. Deletion's tombstone shape (also D11) is THREAD-03 and not part
+// of this file yet.
 //
 // STORE-02 wires this into the running app: Run loads every thread file on
 // disk for the document it opens (loadThreadsForDoc), and dismiss persists a
@@ -37,7 +35,7 @@ const frontmatterDelim = "---"
 // directory margin was pointed at — today always the lone document's
 // directory, since M1 reviews one file at a time, but the layout does not
 // assume that: everything is already keyed by docPath underneath it, which is
-// what lets a future tree review (Q-0001) add documents without moving
+// what lets a future tree review (D10) add documents without moving
 // anything that already exists on disk.
 func threadsDir(root string) string {
 	return filepath.Join(root, ".margin", "threads")
@@ -141,6 +139,9 @@ func marshalThread(docPath string, t *thread) []byte {
 	b.WriteString(frontmatterDelim + "\n")
 	fmt.Fprintf(&b, "anchor: %s\n", t.anchor)
 	fmt.Fprintf(&b, "document: %s\n", docPath)
+	if t.resolved {
+		b.WriteString("resolved: true\n")
+	}
 	b.WriteString(frontmatterDelim + "\n\n")
 
 	for _, l := range quoteAsLines(t.quote) {
@@ -196,6 +197,10 @@ func parseThreadFile(data []byte) (docPath string, t *thread, err error) {
 		return "", nil, fmt.Errorf("frontmatter missing anchor")
 	}
 	docPath = fields["document"]
+	// Anything other than a literal "true" reads as unresolved, including a
+	// missing field (every thread file written before THREAD-01) and a
+	// hand-edited "false" — there is no third state to mismatch on.
+	resolved := strings.EqualFold(fields["resolved"], "true")
 
 	body = skipBlank(body)
 	var quote []string
@@ -210,9 +215,10 @@ func parseThreadFile(data []byte) (docPath string, t *thread, err error) {
 	}
 
 	return docPath, &thread{
-		anchor: anchor,
-		quote:  linesFromQuote(quote),
-		posted: posted,
+		anchor:   anchor,
+		quote:    linesFromQuote(quote),
+		posted:   posted,
+		resolved: resolved,
 	}, nil
 }
 

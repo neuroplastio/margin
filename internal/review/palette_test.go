@@ -155,7 +155,7 @@ func TestPaletteTitleFallsBackToDescriptionWhenTargetIsNil(t *testing.T) {
 // TestPaletteTitleAppendsTarget: a command whose Target has something to say
 // appends it after an em dash, matching requirement 4's own example — "Delete
 // — comment by agent" — with mark.reviewed and a heading standing in since
-// there is no delete command yet (blocked on Q-0002).
+// there is no delete command yet (THREAD-03, unbuilt).
 func TestPaletteTitleAppendsTarget(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, "^h1"), comment: commentNone}

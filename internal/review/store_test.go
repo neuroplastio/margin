@@ -21,6 +21,9 @@ func sameThread(t *testing.T, got, want *thread) {
 	if got.quote != want.quote {
 		t.Errorf("quote = %q, want %q", got.quote, want.quote)
 	}
+	if got.resolved != want.resolved {
+		t.Errorf("resolved = %v, want %v", got.resolved, want.resolved)
+	}
 	if len(got.posted) != len(want.posted) {
 		t.Fatalf("posted = %d comments, want %d", len(got.posted), len(want.posted))
 	}
@@ -94,6 +97,72 @@ func TestMarshalParseThreadRoundTripNoComments(t *testing.T) {
 		t.Fatalf("parseThreadFile: %v\n--- file ---\n%s", err, data)
 	}
 	sameThread(t, got, want)
+}
+
+func TestMarshalParseThreadRoundTripResolved(t *testing.T) {
+	want := &thread{
+		anchor:   "^resolved1",
+		quote:    "a paragraph",
+		resolved: true,
+		posted:   []comment{{author: "toly", body: "fixed?", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC)}},
+	}
+
+	data := marshalThread("doc.md", want)
+	_, got, err := parseThreadFile(data)
+	if err != nil {
+		t.Fatalf("parseThreadFile: %v\n--- file ---\n%s", err, data)
+	}
+	sameThread(t, got, want)
+}
+
+// TestMarshalThreadOmitsResolvedWhenFalse pins the on-disk shape's backward
+// compatibility claim from the header comment: an unresolved thread's file
+// carries no `resolved` line at all, not `resolved: false` — so a thread file
+// written before THREAD-01 existed and one written by an unresolved thread
+// today are indistinguishable.
+func TestMarshalThreadOmitsResolvedWhenFalse(t *testing.T) {
+	data := string(marshalThread("doc.md", &thread{anchor: "^x", quote: "q"}))
+	if strings.Contains(data, "resolved") {
+		t.Errorf("unresolved thread file should not mention resolved at all:\n%s", data)
+	}
+}
+
+// TestParseThreadFileResolvedDefaultsFalse covers every thread file already
+// on disk before this leg: no `resolved` field at all must read as
+// unresolved, not an error and not some other default.
+func TestParseThreadFileResolvedDefaultsFalse(t *testing.T) {
+	src := "---\nanchor: ^abc\ndocument: doc.md\n---\n\n> quote\n"
+	_, got, err := parseThreadFile([]byte(src))
+	if err != nil {
+		t.Fatalf("parseThreadFile: %v", err)
+	}
+	if got.resolved {
+		t.Error("resolved = true, want false for a file with no resolved field")
+	}
+}
+
+// TestParseThreadFileResolvedExplicitFalse covers a hand-edited or agent-
+// unresolved file that spells the field out rather than omitting it.
+func TestParseThreadFileResolvedExplicitFalse(t *testing.T) {
+	src := "---\nanchor: ^abc\ndocument: doc.md\nresolved: false\n---\n\n> quote\n"
+	_, got, err := parseThreadFile([]byte(src))
+	if err != nil {
+		t.Fatalf("parseThreadFile: %v", err)
+	}
+	if got.resolved {
+		t.Error("resolved = true, want false for resolved: false")
+	}
+}
+
+func TestParseThreadFileResolvedCaseInsensitive(t *testing.T) {
+	src := "---\nanchor: ^abc\ndocument: doc.md\nresolved: True\n---\n\n> quote\n"
+	_, got, err := parseThreadFile([]byte(src))
+	if err != nil {
+		t.Fatalf("parseThreadFile: %v", err)
+	}
+	if !got.resolved {
+		t.Error("resolved = false, want true for resolved: True")
+	}
 }
 
 func TestParseThreadFileRejectsMissingFrontmatter(t *testing.T) {

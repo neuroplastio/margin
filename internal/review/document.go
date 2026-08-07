@@ -149,6 +149,14 @@ type thread struct {
 	// orphaned thread looks like on screen, only that it can be told apart
 	// from an attached one.
 	orphaned bool
+
+	// resolved is a single boolean, settable and clearable by either party —
+	// the reviewer or an agent replying in the thread file — per D11. There
+	// is no separate "addressed" state and no record of who last flipped it;
+	// the whole point (see D11's export-safety rationale) is that undoing an
+	// over-eager resolution costs one flip, not a negotiation. Nothing here
+	// decides what a resolved thread looks like on screen — that is THREAD-02.
+	resolved bool
 }
 
 // reattach matches every thread in threads to the block that now carries its

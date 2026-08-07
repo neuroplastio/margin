@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (Q-0001/Q-0002 folded into decisions.md as D10/D11)
+Last updated: 2026-08-07 (THREAD-01 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,7 +18,7 @@ Last updated: 2026-08-07 (Q-0001/Q-0002 folded into decisions.md as D10/D11)
 
 ## In progress
 
-- **THREAD-01** `[mech]` claimed 2026-08-07 — resolvable threads (D11).
+*(none)*
 
 ## Backlog — M1
 
@@ -59,9 +59,6 @@ Last updated: 2026-08-07 (Q-0001/Q-0002 folded into decisions.md as D10/D11)
 
 ## Backlog — M2
 
-- **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved
-  boolean, settable and clearable by either the reviewer or the agent, and it
-  round-trips through the thread file, per **D11**.
 - **THREAD-02** `[felt]` What resolving *looks* like — which key, whether a
   resolved thread dims, collapses, or disappears, and whether resolving is
   reachable from the collapsed line or only the expanded thread.
@@ -74,7 +71,9 @@ Last updated: 2026-08-07 (Q-0001/Q-0002 folded into decisions.md as D10/D11)
   reviewer's alone to do.
 - **EXPORT-05** `[mech]` Resolved threads are excluded from the export by
   default — it is a list of what still needs doing — with a flag to include them
-  so an agent can see what it already addressed. Depends on THREAD-01.
+  so an agent can see what it already addressed. THREAD-01 landed, so this is
+  now genuinely pickable — `thread.resolved` exists and round-trips; only
+  export.go's own filtering is left.
 - **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
   an agent and seeing whether it acts correctly. *First round addressed
   2026-08-07 (line locators, structure-preserving quotes); still wants a real
@@ -120,6 +119,18 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **THREAD-01** resolvable threads: `thread` gains a `resolved bool`
+      (`internal/review/document.go`), settable and clearable by either party
+      per D11 — no dedicated setter, since a plain field is all "either the
+      reviewer or the agent can flip it" needs. `marshalThread` writes
+      `resolved: true` only when set, so an unresolved thread's file is
+      byte-for-byte what it was before this leg; `parseThreadFile` reads it
+      case-insensitively and defaults every pre-existing file (no field at
+      all) to unresolved. `reloadThreads` (watch.go) now merges the flag on
+      an externally-edited file the same way it already merged an appended
+      reply, so an agent resolving a thread by hand-editing its file is
+      noticed without a restart. No command, no key, no rendering — that is
+      THREAD-02, still felt and still ahead — done 2026-08-07
 - [x] **SCROLL-01** decouple the scroll offset from focus: `model` gains
       `scrollAnchor cursor`, the focus position `clampScroll` last followed;
       it now re-derives the offset from the focused span only when

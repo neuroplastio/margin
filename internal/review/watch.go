@@ -100,10 +100,12 @@ func (tw *threadWatcher) wait() tea.Cmd {
 
 // reloadThreads re-reads every thread file on disk for the open document and
 // merges what it finds into the in-memory threads: a new anchor is added, an
-// existing one has its quote and posted comments replaced with what is on
-// disk. Local-only state — an unsubmitted draft — is never touched here,
-// since writeThreadFile never writes drafts to begin with, so there is
-// nothing on disk that could clobber one.
+// existing one has its quote, posted comments and resolved flag replaced with
+// what is on disk — an agent resolving a thread by editing its file directly
+// should be noticed the same way a reply is. Local-only state — an
+// unsubmitted draft — is never touched here, since writeThreadFile never
+// writes drafts to begin with, so there is nothing on disk that could clobber
+// one.
 func (m *model) reloadThreads() error {
 	if m.store == nil {
 		return nil
@@ -116,6 +118,7 @@ func (m *model) reloadThreads() error {
 		if existing, ok := m.threads[anchor]; ok {
 			existing.quote = t.quote
 			existing.posted = t.posted
+			existing.resolved = t.resolved
 		} else {
 			m.threads[anchor] = t
 		}
