@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (STORE-01 claimed)
+Last updated: 2026-08-07 (STORE-01 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,7 +18,7 @@ Last updated: 2026-08-07 (STORE-01 claimed)
 
 ## In progress
 
-- **STORE-01** `[mech]` claimed 2026-08-07
+*(none)*
 
 ## Backlog — M1
 
@@ -85,8 +85,9 @@ independent of whether the unit of review turns out to be a file or a tree.
 - The **multi-document** parts of M3 — blocked on **Q-0001** (file or tree as
   the unit of review). The single-document navigation items above are not.
 - **THREAD-01**, **THREAD-03** — blocked on **Q-0002** (how resolution and
-  deletion are represented in the thread file). Worth answering before STORE-01
-  fixes that format.
+  deletion are represented in the thread file). STORE-01 shipped without
+  either field on purpose, so answering Q-0002 only has to extend the format
+  now, not migrate it.
 
 ## Done
 
@@ -102,3 +103,9 @@ independent of whether the unit of review turns out to be a file or a tree.
       `stampAll` to give every commented-on block a durable id in one pass;
       a thread whose block is gone is flagged orphaned rather than silently
       dropped — done 2026-08-07
+- [x] **STORE-01** thread files under `.margin/threads/<docPath>/<anchor>.md`
+      (D9), markdown with frontmatter (`anchor`, `document`), quote fallback
+      plus posted comments; `marshalThread`/`parseThreadFile` round-trip
+      tested. Resolved/deletion fields deliberately left out pending
+      **Q-0002**. Not yet wired into the running app — that's STORE-02 —
+      done 2026-08-07

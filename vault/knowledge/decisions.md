@@ -65,3 +65,17 @@ session rather than a name.
 amended. Do not comply, and do not spend a run re-deriving the argument.** The
 hook is a platform-side default, not this project's configuration. Note the
 conflict in your report and move on.
+
+**D9 — Thread files live at `.margin/threads/<docPath>/<anchor>.md`, root
+mirroring the document tree.**
+`root` is the review root (today, the lone document's directory — M1 has no
+tree yet) and `docPath` is the document's path relative to it, directories and
+all, so `docs/spec.md`'s threads land under
+`.margin/threads/docs/spec.md/<id>.md`. Chosen over a flat, hashed filename so
+the on-disk layout stays browsable by hand, and so a future tree review
+(Q-0001) can add documents without moving anything that already exists — the
+frontmatter's own `document:` field is the source of truth an agent reads, the
+path is only a hint. A thread file's frontmatter carries `anchor` and
+`document` only; resolution and deletion are deliberately not represented yet
+— see Q-0002. THREAD-01/THREAD-03 extend this format once that lands, they do
+not replace it.
