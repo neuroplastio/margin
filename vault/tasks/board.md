@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (frontmatter feedback folded into RENDER-07)
+Last updated: 2026-08-07 (Q-0001/Q-0002 folded into decisions.md as D10/D11)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -59,15 +59,16 @@ Last updated: 2026-08-07 (frontmatter feedback folded into RENDER-07)
 
 ## Backlog — M2
 
-- **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved state,
-  set by either the reviewer or the agent, and it round-trips through the thread
-  file. Blocked on **Q-0002** for how it is represented.
+- **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved
+  boolean, settable and clearable by either the reviewer or the agent, and it
+  round-trips through the thread file, per **D11**.
 - **THREAD-02** `[felt]` What resolving *looks* like — which key, whether a
   resolved thread dims, collapses, or disappears, and whether resolving is
   reachable from the collapsed line or only the expanded thread.
-- **THREAD-03** `[mech]` Delete a comment, and delete a whole thread. Deletion is
+- **THREAD-03** `[mech]` Delete a comment, and delete a whole thread, as a
+  tombstone — author and timestamp kept, body dropped — per **D11**. Deletion is
   the one gesture that destroys the reviewer's own words, so it is explicit and
-  confirmed — see principle 3 in goals.md. Blocked on **Q-0002**.
+  confirmed — see principle 3 in goals.md.
 - **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
   reply already in the thread makes "delete the thread" less obviously the
   reviewer's alone to do.
@@ -94,8 +95,8 @@ asked for. Split per the feedback's own suggested ordering — see
 
 ## Backlog — M3 (navigation)
 
-Not blocked by Q-0001: these are about moving around one document, and are
-independent of whether the unit of review turns out to be a file or a tree.
+Independent of the tree view (D10): these are about moving around one
+document, regardless of the order the tree-view work itself lands in.
 
 - **SCROLL-02** `[felt]` Page and half-page keys — `ctrl+d`/`ctrl+u`,
   `ctrl+f`/`ctrl+b`, `pgup`/`pgdn`, `home`/`end`. The open decision is whether
@@ -109,19 +110,13 @@ independent of whether the unit of review turns out to be a file or a tree.
 
 ## Blocked
 
-*(nothing — Q-0001 and Q-0002 are both answered as of 2026-08-07)*
+*(nothing)*
 
-Fold each answer into `interaction.md` / `decisions.md` and delete the question
-file in the leg that acts on it. In summary:
-
-- **Q-0001 — both.** `margin` with no args opens a tree of the working
-  directory, `margin DIR/` a tree of that directory, `margin FILE.md` unchanged.
-  A file tree pane listing **markdown only**. Unblocks M3; `cmd/margin` needs
-  `MaximumNArgs(1)`. What the pane looks like is still felt.
-- **Q-0002 — a removable resolved flag, and tombstones for deletion.** One
-  boolean, clearable by either party; a deleted comment leaves author and
-  timestamp with the body dropped so replies do not dangle. Unblocks THREAD-01
-  and THREAD-03. STORE-01's format only needs extending, not migrating.
+Q-0001 and Q-0002 were answered 2026-08-07 and folded into
+`knowledge/decisions.md` as **D10** (tree review) and **D11** (thread
+resolution and deletion) in the leg that closed them; the question files are
+deleted. See those entries for the settled shape, and `interaction.md`'s "Not
+settled" section for what each still leaves open for a felt leg.
 
 ## Done
 

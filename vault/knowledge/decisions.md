@@ -73,9 +73,47 @@ tree yet) and `docPath` is the document's path relative to it, directories and
 all, so `docs/spec.md`'s threads land under
 `.margin/threads/docs/spec.md/<id>.md`. Chosen over a flat, hashed filename so
 the on-disk layout stays browsable by hand, and so a future tree review
-(Q-0001) can add documents without moving anything that already exists — the
+(D10) can add documents without moving anything that already exists — the
 frontmatter's own `document:` field is the source of truth an agent reads, the
 path is only a hint. A thread file's frontmatter carries `anchor` and
 `document` only; resolution and deletion are deliberately not represented yet
-— see Q-0002. THREAD-01/THREAD-03 extend this format once that lands, they do
+— see D11. THREAD-01/THREAD-03 extend this format once that lands, they do
 not replace it.
+
+**D10 — The unit of review is both a file and a tree, chosen by argv; the
+navigation surface (M3) is not built yet.** Answers Q-0001.
+
+- `margin` with no arguments opens a tree of the working directory.
+- `margin DIR/` opens a tree of that directory.
+- `margin FILE.md` keeps working exactly as it does today — a single-document
+  review, unchanged.
+- There is a file tree pane, and it lists **markdown files only**. A directory
+  with no markdown anywhere beneath it does not appear either — it would be a
+  branch that leads nowhere, the same noise as a non-markdown file.
+- `cmd/margin`'s argument validation moves from `cobra.ExactArgs(1)` to
+  `cobra.MaximumNArgs(1)`.
+- Thread storage needs no format change to support this: it is already keyed
+  by document path under `.margin/threads/` (D9), which was built with this
+  answer in mind.
+
+Still felt and unsettled, tracked in `interaction.md`: what the pane looks
+like, where it sits, how it is toggled and focused, what review progress looks
+like rolled up across a tree, and whether the export covers one document or
+all of them. Those want a real screen and are separate legs.
+
+**D11 — Thread resolution is a removable boolean; deletion is a tombstone.**
+Answers Q-0002. Extends D9's thread-file format rather than replacing it.
+
+- **Resolution:** a single boolean flag on the thread, not the two-state
+  `addressed`/`resolved` split that was on the table. It is settable *and*
+  clearable by either party — an agent may resolve a thread it was asked to
+  fix, and the reviewer may unresolve it. This is what makes excluding
+  resolved threads from the export by default (EXPORT-05) safe: an agent that
+  resolves too eagerly costs one keystroke to correct, not lost feedback.
+- **Deletion:** a tombstone, not a removal. A deleted comment keeps its author
+  and timestamp and drops the body, so a reply that answered it does not end
+  up dangling above nothing.
+
+Still felt and unsettled, tracked in `interaction.md`: whether a tombstone
+renders at all or only prevents the dangle, whether a resolved thread
+collapses, dims, or disappears, and which keys drive either.
