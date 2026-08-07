@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (Q-0001 and Q-0002 answered)
+Last updated: 2026-08-07 (frontmatter feedback folded into RENDER-07)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -37,7 +37,25 @@ Last updated: 2026-08-07 (Q-0001 and Q-0002 answered)
   from corrupting the block model and made it invisible in the meantime, but
   invisible is a default, not a decision — the maintainer's feedback offered
   three real candidates (hidden-on-demand, a dimmed key/value block, a
-  collapsed line that expands) and none is picked yet.
+  collapsed line that expands) and none is picked yet. A 2026-08-07 follow-up
+  feedback item confirmed this is the same gap (not a new one — PARSE-03 named
+  it as this task the moment it landed) and supplied a ready-made fixture for
+  the demo recipe:
+
+  ```markdown
+  ---
+  name: retry-policy
+  description: How outbound calls are retried
+  status: draft
+  tags: [reliability, networking]
+  ---
+
+  # Retry policy
+  ```
+
+  Use this (or one like it) when this leg is picked, so the demo recipe has a
+  concrete document with a realistic key/value spread to judge the treatment
+  against rather than a synthetic one.
 
 ## Backlog — M2
 
