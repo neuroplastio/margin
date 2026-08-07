@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (EXPORT-03 done)
+Last updated: 2026-08-07 (STORE-03 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -41,10 +41,6 @@ Last updated: 2026-08-07 (EXPORT-03 done)
 
 ## Backlog — M2
 
-- **STORE-03** `[mech]` Live reload: watch `.margin/threads/` with `fsnotify`
-  and pick up a thread file an agent writes while margin is already running.
-  Split off STORE-02, which shipped load-on-open and write-on-submit but not
-  this — see `vault/journal/2026-08-07.7.md`.
 - **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved state,
   set by either the reviewer or the agent, and it round-trips through the thread
   file. Blocked on **Q-0002** for how it is represented.
@@ -115,6 +111,16 @@ independent of whether the unit of review turns out to be a file or a tree.
 
 ## Done
 
+- [x] **STORE-03** live reload: `threadWatcher` (`internal/review/watch.go`)
+      wraps `fsnotify`, watching `.margin/threads/<docPath>/` for the open
+      document and turning a create/write/rename of a `.md` file into a
+      `threadsChangedMsg` the Bubble Tea loop reloads on. `reloadThreads`
+      re-reads every thread file for the document and merges into the
+      in-memory map — new anchor added, existing anchor's quote and posted
+      comments replaced — without touching unsubmitted drafts, since those
+      are never written to disk to begin with. Watcher setup is non-fatal:
+      a review still opens if it fails. Completes the STORE-02 journal's
+      three-part split — done 2026-08-07
 - [x] **EXPORT-01/02** clipboard export with `Y`; headings commentable; `space`
       cycles marks; `ctrl+enter` submits — done 2026-08-06
 - [x] **PARSE-01** goldmark into a block list with byte offsets — done 2026-08-06

@@ -107,6 +107,12 @@ type model struct {
 	// somewhere on disk to write to.
 	store *threadStore
 
+	// watcher notices a thread file changing on disk out from under the
+	// running session — an agent replying, or writing a new thread — and is
+	// what makes reloadThreads fire without the reviewer reopening the
+	// document. nil wherever store is nil, for the same reason.
+	watcher *threadWatcher
+
 	at   cursor
 	comp *composer
 	gen  int
@@ -203,7 +209,7 @@ func (m *model) rebuild() {
 	}
 }
 
-func (m *model) Init() tea.Cmd { return m.heartbeat() }
+func (m *model) Init() tea.Cmd { return tea.Batch(m.heartbeat(), m.watcher.wait()) }
 
 func (m *model) heartbeat() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return heartbeatMsg(t) })
@@ -570,6 +576,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.dismiss(msg.err)
+
+	case threadsChangedMsg:
+		if m.quitting {
+			return m, nil
+		}
+		if err := m.reloadThreads(); err != nil {
+			// Surface, don't drop — same reasoning loadThreadsForDoc already
+			// documents for a malformed file found on open. Live reload
+			// failing once should not stop watching for the next change.
+			m.status = "reload: " + err.Error()
+		}
+		return m, m.watcher.wait()
 
 	case tea.MouseClickMsg:
 		return m, m.handleClick(msg.Mouse())
@@ -1037,6 +1055,15 @@ func Run(path string, opts RunOptions) error {
 
 	m := newModelAt(path, doc, threads)
 	m.store = &threadStore{root: root, docPath: docPath}
+	// Live reload is a nice-to-have on top of a working review, not a
+	// precondition for one — a read-only filesystem or an exhausted inotify
+	// watch budget should not stop the reviewer from opening the document,
+	// so a failure here is silently not fatal. watcher stays nil and
+	// m.watcher.wait() (nil-safe) simply never fires.
+	if watcher, err := newThreadWatcher(root, docPath); err == nil {
+		m.watcher = watcher
+		defer watcher.close()
+	}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
 	progOpts := []tea.ProgramOption{tea.WithFPS(120)}
