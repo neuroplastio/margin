@@ -169,3 +169,28 @@ Two things worth knowing when picking a patch up:
 To retire this: authorise the app for the org at
 `github.com/organizations/neuroplastio/settings/installations`, then drop the
 PUSH ACCESS block from the routine prompt.
+
+## F10 — A bare `goldmark.New()` turns a leading `---…---` block into a setext heading
+
+`goldmark.New()` has no frontmatter extension enabled, and CommonMark's own
+grammar has no concept of frontmatter — it sees two separate constructs that
+happen to collide. The opening `---` is a thematic break (silently dropped by
+`blockFor`'s `*ast.ThematicBreak` case). The **closing** `---` is read as a
+setext heading underline for whatever paragraph-like text sits above it, so
+the entire block between the two fences collapses onto one line and becomes a
+level-2 heading — bold, in heading colour, the first thing a reader sees.
+
+This is not frontmatter-specific: *any* paragraph immediately followed by a
+line that is exactly `---` (not `***` or `___`, which are unambiguous
+thematic breaks) gets promoted to a heading the same way. `parseDoc` (see
+`frontmatterExtent` in `parse.go`) now special-cases the leading case — a
+document whose very first line is `---` and some later line is `---` or
+`...` — by pulling that whole range out as `blockFrontmatter` before goldmark
+sees it as prose. The general case, a `---` used as a horizontal rule
+anywhere else in a document, is **not** handled: it still silently promotes
+the paragraph above it to a heading. Worth a test fixture if `RENDER-0x`
+lands block quotes/rules and this surfaces again.
+
+`yuin/goldmark-meta` exists and would subsume the leading-case fix, but was
+not adopted here — check what it does to byte offsets before reaching for it,
+since ID-01's stamping depends on `extent()`'s ranges staying exact.

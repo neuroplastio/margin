@@ -24,11 +24,22 @@ import (
 // verbatim. That is deliberate for now: each of those is a felt decision about
 // how it should look, and guessing at six of them at once is exactly what the
 // review gate exists to prevent.
+//
+// A leading YAML frontmatter block is recognised and pulled out before goldmark
+// ever sees it as prose (see frontmatterExtent) — left to goldmark it misparses
+// as a thematic break plus a setext heading, which corrupts both the section
+// model and the export.
 func parseDoc(src []byte) []block {
 	md := goldmark.New()
 	root := md.Parser().Parse(text.NewReader(src))
 
 	var blocks []block
+	fmStart, fmStop, hasFM := frontmatterExtent(src)
+	if hasFM {
+		b := block{kind: blockFrontmatter, text: string(src[fmStart:fmStop]), start: fmStart, stop: fmStop, line: 1}
+		b.anchor = anchorFor(b)
+		blocks = append(blocks, b)
+	}
 	for n := root.FirstChild(); n != nil; n = n.NextSibling() {
 		if id, ok := markerID(n, src); ok {
 			// An id marker carries no content of its own — it is metadata about
@@ -41,6 +52,14 @@ func parseDoc(src []byte) []block {
 			}
 			continue
 		}
+		if hasFM {
+			if start, stop := extent(n, src); start >= fmStart && stop <= fmStop {
+				// Whatever goldmark made of this range — the dropped thematic
+				// break, the setext heading the closing "---" produces — is
+				// already covered by the frontmatter block above.
+				continue
+			}
+		}
 		b, ok := blockFor(n, src)
 		if !ok {
 			continue
@@ -51,6 +70,40 @@ func parseDoc(src []byte) []block {
 		blocks = append(blocks, b)
 	}
 	return blocks
+}
+
+// frontmatterExtent reports the byte range [0, stop) of a leading YAML
+// frontmatter block: the document's very first line is "---" alone, and some
+// later line is "---" or "..." alone. ok is false when the document does not
+// open that way, or opens that way but never closes.
+//
+// Scope is deliberately narrow — the opening fence must be the first byte of
+// the file. A "---" used as a horizontal rule elsewhere in a document has the
+// same misparse (see the frontmatter-rendering feedback) but is not what this
+// recognises; that is a separate, broader problem.
+func frontmatterExtent(src []byte) (start, stop int, ok bool) {
+	nl := bytes.IndexByte(src, '\n')
+	if nl < 0 {
+		return 0, 0, false
+	}
+	if strings.TrimSpace(string(src[:nl])) != "---" {
+		return 0, 0, false
+	}
+	for offset := nl + 1; offset <= len(src); {
+		end := bytes.IndexByte(src[offset:], '\n')
+		line := src[offset:]
+		if end >= 0 {
+			line = src[offset : offset+end]
+		}
+		if t := strings.TrimSpace(string(line)); t == "---" || t == "..." {
+			return 0, offset + len(line), true
+		}
+		if end < 0 {
+			break
+		}
+		offset += end + 1
+	}
+	return 0, 0, false
 }
 
 // idMarkerRE matches the invisible comment stampID writes after a block to

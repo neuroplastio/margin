@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (STORE-01 done)
+Last updated: 2026-08-07 (PARSE-03 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -33,6 +33,11 @@ Last updated: 2026-08-07 (STORE-01 done)
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables.
 - **RENDER-04** `[felt]` Render block quotes.
+- **RENDER-07** `[felt]` Frontmatter's visual treatment. PARSE-03 stopped it
+  from corrupting the block model and made it invisible in the meantime, but
+  invisible is a default, not a decision — the maintainer's feedback offered
+  three real candidates (hidden-on-demand, a dimmed key/value block, a
+  collapsed line that expands) and none is picked yet.
 
 ## Backlog — M2
 
@@ -109,3 +114,8 @@ independent of whether the unit of review turns out to be a file or a tree.
       tested. Resolved/deletion fields deliberately left out pending
       **Q-0002**. Not yet wired into the running app — that's STORE-02 —
       done 2026-08-07
+- [x] **PARSE-03** frontmatter parsing (from feedback): a leading
+      `---…---` block is recognised before goldmark can misparse it as a
+      setext heading (F10), given its own `blockFrontmatter` kind, and
+      excluded from comments, marks and review progress. The visual
+      treatment is deliberately left undecided — RENDER-07 — done 2026-08-07

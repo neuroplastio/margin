@@ -18,6 +18,13 @@ const (
 	// blockRaw is any block type whose rendering has not been decided yet —
 	// lists, code fences, quotes, tables. Its source lines are shown verbatim.
 	blockRaw
+	// blockFrontmatter is a leading YAML frontmatter block (see
+	// frontmatterExtent in parse.go). It is metadata about the document, not
+	// part of it: never commentable, never markable, excluded from review
+	// progress. Added after the other kinds so a document with no frontmatter
+	// never sees its blocks' kind values shift — those feed anchorFor's hash
+	// for any block that has not yet been stamped.
+	blockFrontmatter
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which

@@ -290,6 +290,126 @@ func TestNewBlockIDIsDistinctAndWellFormed(t *testing.T) {
 	}
 }
 
+// frontmatterDoc reproduces the 2026-08-07 frontmatter-rendering feedback
+// verbatim: left to goldmark alone, the opening "---" is a thematic break
+// (dropped) and the closing one turns the YAML above it into a setext
+// heading, which then corrupts both the section model and the export.
+const frontmatterDoc = `---
+name: retry-policy
+description: How outbound calls are retried
+status: draft
+tags: [reliability, networking]
+---
+
+# Retry policy
+
+Each outbound call is retried up to three times.
+`
+
+func TestParseRecognisesLeadingFrontmatter(t *testing.T) {
+	blocks := parseDoc([]byte(frontmatterDoc))
+
+	if len(blocks) == 0 || blocks[0].kind != blockFrontmatter {
+		t.Fatalf("first block kind = %v, want blockFrontmatter", blocks[0].kind)
+	}
+	if !strings.Contains(blocks[0].text, "name: retry-policy") {
+		t.Errorf("frontmatter block text = %q, want the YAML body", blocks[0].text)
+	}
+	if strings.Contains(blocks[0].text, "# Retry policy") {
+		t.Errorf("frontmatter block swallowed prose after it: %q", blocks[0].text)
+	}
+
+	var got []blockKind
+	for _, b := range blocks {
+		got = append(got, b.kind)
+	}
+	want := []blockKind{blockFrontmatter, blockHeading, blockPara}
+	if len(got) != len(want) {
+		for i, b := range blocks {
+			t.Logf("  [%d] kind=%d %q", i, b.kind, truncate(firstLine(b.text), 60))
+		}
+		t.Fatalf("parsed %d blocks, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("block %d: kind %d, want %d", i, got[i], want[i])
+		}
+	}
+
+	// The setext trap: the real heading must read as the heading, not as a
+	// one-line collapse of the whole frontmatter body.
+	if blocks[1].text != "Retry policy" {
+		t.Errorf("heading text = %q, want %q", blocks[1].text, "Retry policy")
+	}
+	if blocks[1].level != 1 {
+		t.Errorf("heading level = %d, want 1", blocks[1].level)
+	}
+}
+
+// TestParseFrontmatterIsNotCommentableOrMarkable is the other half of the
+// feedback: frontmatter must not be reviewable, or it inflates the progress
+// denominator and pollutes the export's Section: line.
+func TestParseFrontmatterIsNotCommentableOrMarkable(t *testing.T) {
+	blocks := parseDoc([]byte(frontmatterDoc))
+	fm := blocks[0]
+	if fm.kind != blockFrontmatter {
+		t.Fatalf("fixture bug: block 0 is not frontmatter (kind=%v)", fm.kind)
+	}
+	if fm.commentable() {
+		t.Error("frontmatter block is commentable, want it excluded")
+	}
+	if fm.markable() {
+		t.Error("frontmatter block is markable, want it excluded")
+	}
+}
+
+// TestParseFrontmatterRequiresLeadingPosition confirms the fix is scoped to a
+// document that opens with "---": a "---" used as a horizontal rule elsewhere
+// keeps its existing (separately tracked) behaviour rather than being
+// swallowed as frontmatter.
+func TestParseFrontmatterRequiresLeadingPosition(t *testing.T) {
+	src := "# Heading\n\n---\n\nAfter the rule.\n"
+	_, _, ok := frontmatterExtent([]byte(src))
+	if ok {
+		t.Error("frontmatterExtent matched a mid-document horizontal rule")
+	}
+}
+
+// TestParseUnterminatedFrontmatterIsNotSwallowed checks the case where a
+// document opens with "---" but never closes it — parseDoc must not eat the
+// rest of the document looking for a fence that is not there.
+func TestParseUnterminatedFrontmatterIsNotSwallowed(t *testing.T) {
+	src := "---\nnot actually frontmatter\n"
+	_, _, ok := frontmatterExtent([]byte(src))
+	if ok {
+		t.Error("frontmatterExtent matched an unterminated opening fence")
+	}
+}
+
+// TestParsedFrontmatterDoesNotRenderOrCrash is the render half of the fix:
+// how frontmatter should look is an open felt question, so for now it must
+// not appear in the rendered document at all, and it must not hit the
+// default branch of the render switch — which is built for a thread entry
+// and would misbehave given a bare block.
+func TestParsedFrontmatterDoesNotRenderOrCrash(t *testing.T) {
+	m := newModel(parseDoc([]byte(frontmatterDoc)), nil)
+	m.w, m.h = 100, 60
+
+	lines := m.render()
+	joined := strings.Join(lines, "\n")
+	if strings.Contains(joined, "name: retry-policy") {
+		t.Errorf("frontmatter rendered into the document view:\n%s", joined)
+	}
+	if !strings.Contains(joined, "Retry policy") {
+		t.Error("real heading did not render")
+	}
+	for _, e := range m.entries {
+		if e.b.kind == blockFrontmatter {
+			t.Error("a frontmatter block reached m.entries; it should be filtered in rebuild")
+		}
+	}
+}
+
 func TestLoadDoc(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "spec.md")

@@ -175,6 +175,13 @@ func (m *model) orphanedThreads() []*thread {
 func (m *model) rebuild() {
 	m.entries = m.entries[:0]
 	for _, b := range m.doc {
+		if b.kind == blockFrontmatter {
+			// Not rendered at all: it is metadata about the document, not part
+			// of it, and how it should look on screen is an open felt question
+			// (see the frontmatter-rendering feedback) that nothing here
+			// answers by picking a treatment.
+			continue
+		}
 		m.entries = append(m.entries, entry{b: b})
 		if t, ok := m.threads[b.anchor]; ok && b.anchor != "" {
 			m.entries = append(m.entries, entry{

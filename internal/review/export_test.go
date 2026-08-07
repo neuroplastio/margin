@@ -264,3 +264,26 @@ func TestExportCapsLongRawBlocks(t *testing.T) {
 		t.Errorf("long block truncation is not marked:\n%s", out)
 	}
 }
+
+// TestExportExcludesFrontmatter is the export half of the frontmatter fix:
+// it must not inflate the reviewed-block count, and it must not leak into
+// Section: for the blocks that follow it.
+func TestExportExcludesFrontmatter(t *testing.T) {
+	doc := parseDoc([]byte(frontmatterDoc))
+
+	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{})
+	if !strings.Contains(out, "0 of 1 blocks reviewed") {
+		t.Errorf("frontmatter counted toward the reviewable total:\n%s", out)
+	}
+
+	// Flag the paragraph and confirm its Section: line names the real
+	// heading, not the frontmatter.
+	marks := map[string]reviewMark{doc[2].anchor: markFlag}
+	out = exportReview("spec.md", doc, map[string]*thread{}, marks)
+	if !strings.Contains(out, "Section: Retry policy") {
+		t.Errorf("flagged block's section is not the real heading:\n%s", out)
+	}
+	if strings.Contains(out, "name: retry-policy") {
+		t.Errorf("frontmatter leaked into the export:\n%s", out)
+	}
+}
