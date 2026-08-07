@@ -1,6 +1,6 @@
 # Q-0002 — How are resolution and deletion represented?
 
-Status: open
+Status: answered
 Blocks: THREAD-01, THREAD-03, EXPORT-05
 Raised: 2026-08-07
 
@@ -63,3 +63,38 @@ fine as a reply with nothing above it.
 Worth knowing before answering: goals.md principle 3 says never lose the user's
 words, so whatever deletion is, it should be explicit and confirmed — that part
 is not in question.
+
+---
+
+## Answer (2026-08-07, maintainer)
+
+**Resolution: option A — a flag, and it can be removed again.**
+
+Not the two-state `addressed`/`resolved` split. One boolean, and unresolving is
+a first-class action rather than an escape hatch.
+
+**Deletion: option E — tombstone.**
+
+A deleted comment leaves a marker with its body dropped, so a reply that answered
+it does not dangle above nothing.
+
+### Reading of that, to be corrected if wrong
+
+- The flag is settable **and clearable by either party** — the agent may resolve a
+  thread it was asked to fix, and the reviewer may unresolve it. That is the
+  reading that makes "can be removed then" meaningful; the crux of the original
+  question was whether an agent may resolve at all, and a removable flag only
+  needs removing if something else can set it.
+- Resolved threads are excluded from the export by default (EXPORT-05), which is
+  safe precisely because unresolving exists: an agent that resolves too eagerly
+  costs one keystroke to correct, not lost feedback.
+- A tombstone keeps the author and the timestamp, drops the body. Enough to know
+  a comment was there and who wrote it, without keeping what it said.
+
+### Still felt, still unsettled
+
+Whether a tombstone renders at all or only prevents the dangle; whether resolved
+threads collapse, dim, or disappear from the document; and which keys do either.
+
+**Unblocks THREAD-01 and THREAD-03.**
+

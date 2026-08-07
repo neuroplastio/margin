@@ -1,6 +1,6 @@
 # Q-0001 — Is the unit of review a file, or a directory tree?
 
-Status: open
+Status: answered
 Blocks: M3, NAV-01, NAV-02
 Raised: 2026-08-06
 
@@ -42,3 +42,34 @@ navigation work without building the corner we would have to dig out of.
 
 Worth knowing before answering: agents here emit `docs/` trees, and the earlier
 prototype only ever handled one document.
+
+---
+
+## Answer (2026-08-07, maintainer)
+
+**Both.** Not option C — do the tree properly rather than deferring it.
+
+- `margin` with no arguments opens a tree of the working directory.
+- `margin DIR/` opens a tree of that directory.
+- `margin FILE.md` keeps working exactly as it does today.
+
+There is a **file tree pane**, and it shows **markdown files only** — nothing
+else in the directory appears in it.
+
+### Reading of that, to be corrected if wrong
+
+- A directory with no markdown anywhere beneath it should not appear either.
+  Showing it would fill the tree with branches that lead nowhere, which is the
+  same noise as showing non-markdown files.
+- `cobra.ExactArgs(1)` in `cmd/margin` becomes `MaximumNArgs(1)`.
+- Thread storage is already keyed by document path under `.margin/threads/`, so
+  it needs no change — STORE-01 was built for this.
+
+### Still felt, still unsettled
+
+What the pane looks like, where it sits, how it is toggled and focused, what
+review progress looks like across a tree, and whether the export covers one
+document or all of them. Those are separate legs and want judging on a screen.
+
+**Unblocks M3.**
+

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (SCROLL-01 done)
+Last updated: 2026-08-07 (Q-0001 and Q-0002 answered)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -91,12 +91,19 @@ independent of whether the unit of review turns out to be a file or a tree.
 
 ## Blocked
 
-- The **multi-document** parts of M3 — blocked on **Q-0001** (file or tree as
-  the unit of review). The single-document navigation items above are not.
-- **THREAD-01**, **THREAD-03** — blocked on **Q-0002** (how resolution and
-  deletion are represented in the thread file). STORE-01 shipped without
-  either field on purpose, so answering Q-0002 only has to extend the format
-  now, not migrate it.
+*(nothing — Q-0001 and Q-0002 are both answered as of 2026-08-07)*
+
+Fold each answer into `interaction.md` / `decisions.md` and delete the question
+file in the leg that acts on it. In summary:
+
+- **Q-0001 — both.** `margin` with no args opens a tree of the working
+  directory, `margin DIR/` a tree of that directory, `margin FILE.md` unchanged.
+  A file tree pane listing **markdown only**. Unblocks M3; `cmd/margin` needs
+  `MaximumNArgs(1)`. What the pane looks like is still felt.
+- **Q-0002 — a removable resolved flag, and tombstones for deletion.** One
+  boolean, clearable by either party; a deleted comment leaves author and
+  timestamp with the body dropped so replies do not dangle. Unblocks THREAD-01
+  and THREAD-03. STORE-01's format only needs extending, not migrating.
 
 ## Done
 
