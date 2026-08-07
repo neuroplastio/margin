@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (CMD-02 claimed)
+Last updated: 2026-08-07 (CMD-02 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,7 +18,7 @@ Last updated: 2026-08-07 (CMD-02 claimed)
 
 ## In progress
 
-- **CMD-02** `[mech]` claimed 2026-08-07 — palette matching logic.
+*(none)*
 
 ## Backlog — M1
 
@@ -67,9 +67,6 @@ Not part of a milestone; cross-cutting infrastructure the palette feedback
 asked for. Split per the feedback's own suggested ordering — see
 `vault/journal/2026-08-07.6.md` for why CMD-01 alone is this leg.
 
-- **CMD-02** `[mech]` Palette matching logic: given the registry and a query
-  string, rank and filter commands — no UI, just the function and its tests.
-  Testable in isolation from where or how it is ever displayed.
 - **CMD-03** `[felt]` The palette itself: `:` opens it, where it appears, how
   much room it takes, whether it dims the document, ranked vs. stable
   ordering. Needs a real screen — see the feedback's "Not settled" section for
@@ -111,6 +108,17 @@ independent of whether the unit of review turns out to be a file or a tree.
 
 ## Done
 
+- [x] **CMD-02** palette matching logic: `matchCommands` (new
+      `internal/review/palette.go`) ranks and filters the registry against a
+      query string — a fuzzy subsequence match (`fuzzyScore`) against each
+      command's id and description, scored so a match starting right after a
+      word boundary (`.`, `_`, `-`, space) and running consecutively outranks
+      the same letters found scattered. A query that matches nothing excludes
+      the command entirely, per requirement 4's "should not be listed at all"
+      applied to search too. An empty query returns the registry unranked and
+      unfiltered — deliberately not deciding the "Not settled" recency-vs-
+      stable question. No UI, no `:` key, not wired into `handleKey` — done
+      2026-08-07
 - [x] **STORE-03** live reload: `threadWatcher` (`internal/review/watch.go`)
       wraps `fsnotify`, watching `.margin/threads/<docPath>/` for the open
       document and turning a create/write/rename of a `.md` file into a
