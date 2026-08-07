@@ -93,6 +93,10 @@ margin --version
 ```
 
 ```
+./bin/margin testdata/sample.md    # a realistic document to try it against
+```
+
+```
 make check              # build + test + vet
 make doctor             # prove this machine can run the composer tests
 make run FILE=doc.md

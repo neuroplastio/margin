@@ -43,6 +43,13 @@ Judge:
 Be specific. "Does it look OK?" is not a question anyone can answer usefully.
 Name the keys to press and the exact thing to look at.
 
+**Demo against `testdata/sample.md` unless the leg needs something else.** It is
+a realistic agent-produced document — frontmatter, three heading levels, long
+paragraphs, inline markup, both list kinds, a fenced code block, a table, a
+block quote, a rule — and it is longer than a viewport, so it scrolls. Using the
+same document every time is what makes two felt reviews comparable; "README.md
+or whatever you have handy" does not.
+
 **Never claim a visual check you did not perform.** You cannot see the screen and
 you cannot feel latency. If something needs a human eye, the demo recipe is where
 it goes — not an assertion that it works.
