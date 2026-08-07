@@ -22,11 +22,20 @@ const maxQuoteLines = 6
 // Flagged blocks appear even when nobody commented, because "this needs
 // attention" is itself feedback. Drafts are excluded — unsubmitted means
 // unsubmitted — but counted, so nothing goes silently missing.
-func exportReview(path string, doc []block, threads map[string]*thread, marks map[string]reviewMark) string {
+//
+// Resolved threads are excluded by default too (D11's export-safety
+// rationale): the export is a list of what still needs doing, and a resolved
+// thread is, by definition, addressed. includeResolved overrides this so an
+// agent — or the reviewer — can see the full history instead of just what is
+// outstanding. A flagged block is shown regardless: "needs attention" and
+// "this thread is resolved" are independent signals, and the flag alone
+// justifies inclusion the same way it does for a block with no comments at
+// all.
+func exportReview(path string, doc []block, threads map[string]*thread, marks map[string]reviewMark, includeResolved bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Review of %s\n\n", path)
 
-	done, flagged, total, drafts := 0, 0, 0, 0
+	done, flagged, total, drafts, resolvedHidden := 0, 0, 0, 0, 0
 	for _, blk := range doc {
 		if blk.markable() && blk.anchor != "" {
 			total++
@@ -39,6 +48,9 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 		}
 		if t := threads[blk.anchor]; t != nil {
 			drafts += len(t.drafts)
+			if t.resolved && len(t.posted) > 0 && marks[blk.anchor] != markFlag {
+				resolvedHidden++
+			}
 		}
 	}
 
@@ -50,6 +62,9 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 	if drafts > 0 {
 		fmt.Fprintf(&b, "\n_%d unsubmitted draft(s) not included._\n", drafts)
 	}
+	if resolvedHidden > 0 && !includeResolved {
+		fmt.Fprintf(&b, "\n_%d resolved thread(s) not included._\n", resolvedHidden)
+	}
 
 	items, section := 0, ""
 	for _, blk := range doc {
@@ -60,7 +75,9 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 		t := threads[blk.anchor]
 		mark := marks[blk.anchor]
 		hasComments := t != nil && len(t.posted) > 0
-		if !hasComments && mark != markFlag {
+		resolved := hasComments && t.resolved
+		show := mark == markFlag || (hasComments && (!resolved || includeResolved))
+		if !show {
 			continue
 		}
 		items++
@@ -69,6 +86,9 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 		b.WriteString("## " + locator(path, blk))
 		if mark == markFlag {
 			b.WriteString(" — flagged, needs attention")
+		}
+		if resolved {
+			b.WriteString(" — resolved")
 		}
 		b.WriteString("\n\n")
 
@@ -88,7 +108,11 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 	}
 
 	if items == 0 {
-		b.WriteString("\nNo comments and nothing flagged.\n")
+		if resolvedHidden > 0 {
+			b.WriteString("\nNothing outstanding — every commented block is resolved.\n")
+		} else {
+			b.WriteString("\nNo comments and nothing flagged.\n")
+		}
 	}
 	// Exactly one trailing newline: this lands in a paste buffer, and a tail of
 	// blank lines reads as though something went missing.

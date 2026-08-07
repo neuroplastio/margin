@@ -24,6 +24,7 @@ func main() {
 // command with its own I/O, args, and a runner that does not open a terminal.
 func newRootCmd(run func(path string, opts review.RunOptions) error) *cobra.Command {
 	var stdout bool
+	var includeResolved bool
 
 	root := &cobra.Command{
 		Use:     "margin FILE.md",
@@ -49,7 +50,11 @@ The comment composer is a real nvim, so every key inside it belongs to nvim:
 requiring Y — the same content Y produces — so it can be piped straight into
 an agent:
 
-  margin --stdout FILE.md | agent -p "address this review"`,
+  margin --stdout FILE.md | agent -p "address this review"
+
+The export leaves out resolved threads by default — it is a list of what
+still needs doing, not a transcript of everything ever said. --include-resolved
+adds them back, for an agent that wants to see what it already addressed.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Silenced here rather than on the command, so the two kinds of
@@ -57,10 +62,11 @@ an agent:
 			// prints usage, while a file that does not exist is a runtime
 			// error and should not bury its message under the help text.
 			cmd.SilenceUsage = true
-			return run(args[0], review.RunOptions{Stdout: stdout})
+			return run(args[0], review.RunOptions{Stdout: stdout, IncludeResolved: includeResolved})
 		},
 	}
 	root.Flags().BoolVar(&stdout, "stdout", false, "write the review to stdout on quit, instead of requiring Y")
+	root.Flags().BoolVar(&includeResolved, "include-resolved", false, "include resolved threads in the export, instead of leaving them out")
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	return root
 }

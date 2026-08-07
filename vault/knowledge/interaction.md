@@ -98,6 +98,16 @@ On a heading, the mark keys apply to the whole section.
   TUI itself draws on the controlling terminal (`tea.WithOutput` → `/dev/tty`), so
   the pipe carries only the review, ANSI-free, and is safe to hand straight to an
   agent: `margin --stdout spec.md | agent -p "address this review"`.
+- **Resolved threads are excluded from the export by default** (D11's
+  export-safety rationale), for both `Y` and `--stdout` — the export is a list
+  of what still needs doing, not a transcript of everything ever said. The
+  withheld count is reported (`_N resolved thread(s) not included._`), the
+  same treatment drafts already get, so nothing goes silently missing.
+  `--include-resolved` brings them back, marked `— resolved` in their header,
+  for an agent (or reviewer) that wants the full history. A block that is
+  **flagged** is shown regardless of its thread's resolved state — the two are
+  independent signals, and "needs attention" does not retract just because the
+  conversation on it is marked done.
 
 ### Review marks
 

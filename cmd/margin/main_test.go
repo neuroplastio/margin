@@ -134,3 +134,36 @@ func TestHelpMentionsStdout(t *testing.T) {
 		t.Errorf("help does not mention --stdout:\n%s", out)
 	}
 }
+
+// --- --include-resolved -------------------------------------------------------
+
+func TestIncludeResolvedFlagReachesTheRunner(t *testing.T) {
+	var got review.RunOptions
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "--include-resolved", "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !got.IncludeResolved {
+		t.Error("--include-resolved did not set RunOptions.IncludeResolved")
+	}
+}
+
+func TestWithoutIncludeResolvedFlagDefaultsFalse(t *testing.T) {
+	var got review.RunOptions
+	got.IncludeResolved = true // prove the zero value, not a leftover
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got.IncludeResolved {
+		t.Error("RunOptions.IncludeResolved is set without --include-resolved")
+	}
+}
+
+func TestHelpMentionsIncludeResolved(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "--include-resolved") {
+		t.Errorf("help does not mention --include-resolved:\n%s", out)
+	}
+}

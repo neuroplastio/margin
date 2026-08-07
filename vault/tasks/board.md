@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (THREAD-03 done)
+Last updated: 2026-08-07 (EXPORT-05 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -67,11 +67,6 @@ Last updated: 2026-08-07 (THREAD-03 done)
   reviewer's alone to do. THREAD-03 landed the tombstone data model and
   persistence; no command calls it yet — this is what wires one in, with the
   confirmation D11 calls for.
-- **EXPORT-05** `[mech]` Resolved threads are excluded from the export by
-  default — it is a list of what still needs doing — with a flag to include them
-  so an agent can see what it already addressed. THREAD-01 landed, so this is
-  now genuinely pickable — `thread.resolved` exists and round-trips; only
-  export.go's own filtering is left.
 - **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
   an agent and seeing whether it acts correctly. *First round addressed
   2026-08-07 (line locators, structure-preserving quotes); still wants a real
@@ -117,6 +112,22 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **EXPORT-05** resolved threads excluded from the export by default,
+      `--include-resolved` to bring them back (`internal/review/export.go`):
+      `exportReview` gains an `includeResolved bool` parameter; an item stays
+      hidden when its thread is `resolved` and `includeResolved` is false,
+      *unless* the block is also flagged — the flag is an independent signal
+      and does not retract just because the thread on it is marked done. The
+      withheld count is reported the same way drafts already are (`_N
+      resolved thread(s) not included._`), and the all-clear message
+      distinguishes "everything was resolved" from "nothing was ever said"
+      (`Nothing outstanding` vs. `No comments and nothing flagged`) so the
+      count above it is never contradicted by the body. A restored item is
+      marked `— resolved` in its header, mirroring the existing `—
+      flagged, needs attention` convention. Wired through `model.
+      includeResolved` (false on every test-built model) to both `Y` and
+      `--stdout`, and a new `--include-resolved` flag on `cmd/margin` sets it
+      — done 2026-08-07
 - [x] **THREAD-03** delete a comment, and a whole thread, as a tombstone
       (`internal/review/document.go`): `comment` gains a `deleted bool`;
       `deleteComment(i)` blanks `posted[i].body`, sets `deleted`, and drops any

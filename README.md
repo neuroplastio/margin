@@ -68,6 +68,11 @@ piped straight into an agent:
 margin --stdout spec.md | agent -p "address this review"
 ```
 
+The export leaves resolved threads out by default — it's a list of what still
+needs doing, not a transcript of everything ever said. Pass `--include-resolved`
+(with `Y` or `--stdout` alike) to get the full history back, including what
+was already addressed.
+
 Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 
 | Key | Does |

@@ -101,6 +101,12 @@ type model struct {
 	marks   map[string]reviewMark
 	entries []entry
 
+	// includeResolved controls whether exportReview (Y and --stdout alike)
+	// includes resolved threads or leaves them out per D11's export-safety
+	// rationale. False on every model a test builds; only Run threads through
+	// the --include-resolved flag.
+	includeResolved bool
+
 	// store is where a posted comment is persisted, in addition to the
 	// in-memory threads map above. nil on every model a test or seedModel
 	// builds — only Run sets one, since only Run is opening a real path with
@@ -424,7 +430,7 @@ func (m *model) cycleMark() {
 
 // exportToClipboard renders the review and puts it on the clipboard.
 func (m *model) exportToClipboard() tea.Cmd {
-	out := exportReview(m.path, m.doc, m.threads, m.marks)
+	out := exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved)
 
 	via, err := copyToClipboard(out)
 	switch {
@@ -1048,6 +1054,14 @@ type RunOptions struct {
 	// interactively first; there is no non-interactive "just print what's on
 	// disk" mode yet.
 	Stdout bool
+
+	// IncludeResolved, when set, includes resolved threads in the export (Y
+	// and --stdout alike) instead of the default of leaving them out —
+	// EXPORT-05, per D11's export-safety rationale: excluding them by default
+	// is safe because undoing an over-eager resolution costs one flip, not
+	// lost feedback, and this flag is that undo for the one review that needs
+	// the full history.
+	IncludeResolved bool
 }
 
 // openTTY opens the controlling terminal for the TUI to draw on when stdout
@@ -1075,6 +1089,7 @@ func Run(path string, opts RunOptions) error {
 	}
 
 	m := newModelAt(path, doc, threads)
+	m.includeResolved = opts.IncludeResolved
 	m.store = &threadStore{root: root, docPath: docPath}
 	// Live reload is a nice-to-have on top of a working review, not a
 	// precondition for one — a read-only filesystem or an exhausted inotify
@@ -1107,7 +1122,7 @@ func Run(path string, opts RunOptions) error {
 	reportLatency(m.samples)
 
 	if opts.Stdout {
-		fmt.Print(exportReview(m.path, m.doc, m.threads, m.marks))
+		fmt.Print(exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved))
 		return nil
 	}
 
