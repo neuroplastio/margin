@@ -141,6 +141,11 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	if threads == nil {
 		threads = map[string]*thread{}
 	}
+	// Opening a document is exactly the moment a thread carried over from an
+	// earlier session needs to find its block again — see reattach in
+	// document.go. A fresh in-memory threads map reattaches as a no-op; this
+	// is where it starts mattering once threads are loaded from disk (M2).
+	reattach(doc, threads)
 	m := &model{
 		path: path, doc: doc, threads: threads,
 		marks:   map[string]reviewMark{},
@@ -149,6 +154,20 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	}
 	m.rebuild()
 	return m
+}
+
+// orphanedThreads returns every thread whose block no longer exists in the
+// current document, in no particular order. Nothing renders this yet — how an
+// orphan should be surfaced is a felt decision — but the data has to exist
+// and be queryable before it can be shown.
+func (m *model) orphanedThreads() []*thread {
+	var out []*thread
+	for _, t := range m.threads {
+		if t.orphaned {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // rebuild flattens the document and its threads into the single list that

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (ID-01)
+Last updated: 2026-08-07 (ID-02)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,8 +18,7 @@ Last updated: 2026-08-07 (ID-01)
 
 ## In progress
 
-- **ID-02** `[mech]` claimed 2026-08-07 — re-attach threads to blocks by id on
-  open.
+*(none)*
 
 ## Backlog — M1
 
@@ -101,3 +100,7 @@ independent of whether the unit of review turns out to be a file or a tree.
 - [x] **ID-01** stamp a stable block id into the source, invisible to other
       renderers, as an HTML comment after the block; content-derived anchors
       remain the fallback until a block is stamped — done 2026-08-07
+- [x] **ID-02** re-attach threads to blocks by id on open (`reattach`), plus
+      `stampAll` to give every commented-on block a durable id in one pass;
+      a thread whose block is gone is flagged orphaned rather than silently
+      dropped — done 2026-08-07

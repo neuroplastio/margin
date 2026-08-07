@@ -134,6 +134,41 @@ type thread struct {
 	quote  string
 	posted []comment
 	drafts map[int]string
+
+	// orphaned reports that no block in the current document carries this
+	// thread's anchor any more — the block it was attached to is gone, not
+	// just reworded (a reworded block keeps its stamped id, so it still
+	// matches). Set by reattach on open; nothing here decides what an
+	// orphaned thread looks like on screen, only that it can be told apart
+	// from an attached one.
+	orphaned bool
+}
+
+// reattach matches every thread in threads to the block that now carries its
+// anchor, after doc has been (re)parsed — the "on open" half of ID-01's id
+// stamping: a thread persisted against a stamped id must still find its block
+// even though the block's content, and so its position, has changed. A thread
+// whose anchor matches no block in doc is orphaned rather than silently
+// dropped, so a caller can surface it instead of losing it from view.
+//
+// Reattachment itself needs no bespoke matching logic — threads are already
+// keyed by anchor, so any lookup by anchor (map index, this function) finds
+// the same block a stamped id was written against, no matter how the text
+// around it changed. What reattach adds is the part nothing else does:
+// noticing when that lookup comes up empty.
+func reattach(doc []block, threads map[string]*thread) {
+	live := make(map[string]bool, len(doc))
+	for _, b := range doc {
+		if b.anchor != "" {
+			live[b.anchor] = true
+		}
+	}
+	for anchor, t := range threads {
+		// Idempotent: a thread whose block has reappeared (unusual, but not
+		// impossible if the same anchor is stamped back in by hand) is not
+		// left stuck orphaned from an earlier reattach.
+		t.orphaned = !live[anchor]
+	}
 }
 
 func (t *thread) draft(target int) string {

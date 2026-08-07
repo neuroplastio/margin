@@ -404,3 +404,61 @@ func TestStampEveryBlockSequentially(t *testing.T) {
 		t.Errorf("%d markers in the source, stamped %d blocks", n, len(orig))
 	}
 }
+
+// TestStampAllStampsOnlyUnstampedBlocks checks the "lazily" half of the
+// contract: stampAll must not touch a block that already carries an id, and
+// must give every other one a distinct id.
+func TestStampAllStampsOnlyUnstampedBlocks(t *testing.T) {
+	src := []byte(sampleDoc)
+	orig := parseDoc(src)
+
+	// Pre-stamp one block by hand, as if an earlier session had already
+	// commented on it.
+	pre := orig[1]
+	preID := newBlockID()
+	src = stampID(src, pre, preID)
+	afterPre := parseDoc(src)
+
+	out, blocks := stampAll(src, afterPre)
+	if len(blocks) != len(orig) {
+		t.Fatalf("stampAll changed the block count: %d, want %d", len(blocks), len(orig))
+	}
+
+	seen := map[string]bool{}
+	for i, b := range blocks {
+		if !b.stamped {
+			t.Errorf("block %d was not stamped", i)
+		}
+		if seen[b.anchor] {
+			t.Errorf("block %d reuses id %s", i, b.anchor)
+		}
+		seen[b.anchor] = true
+		if b.text != orig[i].text {
+			t.Errorf("block %d text changed: %q vs %q", i, b.text, orig[i].text)
+		}
+	}
+	if blocks[1].anchor != preID {
+		t.Errorf("stampAll gave the already-stamped block a new id: %s, want %s (untouched)", blocks[1].anchor, preID)
+	}
+	if n := strings.Count(string(out), "<!--margin:"); n != len(orig) {
+		t.Errorf("%d markers in the source, want one per block (%d)", n, len(orig))
+	}
+}
+
+// TestStampAllIsNoopOnceEverythingIsStamped confirms stampAll can be called
+// again on an already-fully-stamped document without adding duplicate
+// markers or changing any id.
+func TestStampAllIsNoopOnceEverythingIsStamped(t *testing.T) {
+	src := []byte(sampleDoc)
+	stamped, blocks := stampAll(src, parseDoc(src))
+
+	again, blocks2 := stampAll(stamped, blocks)
+	if !bytes.Equal(again, stamped) {
+		t.Error("stampAll on an already-stamped document changed the source")
+	}
+	for i := range blocks {
+		if blocks2[i].anchor != blocks[i].anchor {
+			t.Errorf("block %d anchor changed on a no-op stampAll: %s vs %s", i, blocks2[i].anchor, blocks[i].anchor)
+		}
+	}
+}

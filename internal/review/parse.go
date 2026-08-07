@@ -107,6 +107,28 @@ func stampID(src []byte, b block, id string) []byte {
 	return out.Bytes()
 }
 
+// stampAll gives every not-yet-stamped block in blocks a fresh id, in one pass
+// over src, and returns the rewritten source together with blocks reparsed
+// from it. It is what re-attachment (ID-02) actually relies on: a document
+// opened after several blocks acquired threads in an earlier session needs
+// all of them turned durable together, not one at a time with a reparse in
+// between.
+//
+// It walks from the end of the document backwards, which is the only order in
+// which stampID's guarantee — bytes before the stamped block are untouched —
+// stays true across the whole pass: stamping earlier blocks first would shift
+// every later offset out from under blocks still waiting their turn.
+func stampAll(src []byte, blocks []block) ([]byte, []block) {
+	out := src
+	for i := len(blocks) - 1; i >= 0; i-- {
+		if blocks[i].stamped {
+			continue
+		}
+		out = stampID(out, blocks[i], newBlockID())
+	}
+	return out, parseDoc(out)
+}
+
 func blockFor(n ast.Node, src []byte) (block, bool) {
 	start, stop := extent(n, src)
 	if start < 0 {
