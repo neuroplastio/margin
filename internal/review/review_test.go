@@ -222,6 +222,56 @@ func TestNewCommentAppends(t *testing.T) {
 	}
 }
 
+// TestSubmitPersistsThroughTheStore: a model opened by Run (store set) writes
+// a posted comment to disk, not just to m.threads — the STORE-02 wiring that
+// closes the loop STORE-01 only formatted.
+func TestSubmitPersistsThroughTheStore(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+
+	open(t, m, soloAnchor, newCommentSlot, "")
+	typeText(m.comp, "Persisted reply.")
+	typeKeys(m.comp, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if strings.Contains(m.status, "not saved") {
+		t.Fatalf("status = %q, want no persistence error", m.status)
+	}
+
+	th := m.threads[soloAnchor]
+	got, err := loadThreadsForDoc(root, "document.md")
+	if err != nil {
+		t.Fatalf("loadThreadsForDoc: %v", err)
+	}
+	onDisk, ok := got[th.anchor]
+	if !ok {
+		t.Fatalf("no thread file written for %s", th.anchor)
+	}
+	if last := onDisk.posted[len(onDisk.posted)-1]; last.body != "Persisted reply." {
+		t.Fatalf("on-disk comment = %q, want the submitted reply", last.body)
+	}
+}
+
+// TestSubmitWithoutAStoreDoesNotTouchDisk: seedModel and every other test
+// build a model with no store, and dismiss must not start writing to the
+// process's working directory just because a comment was submitted.
+func TestSubmitWithoutAStoreDoesNotTouchDisk(t *testing.T) {
+	m := newTestModel(t)
+	if m.store != nil {
+		t.Fatalf("newTestModel: store = %+v, want nil", m.store)
+	}
+
+	open(t, m, soloAnchor, newCommentSlot, "")
+	typeText(m.comp, "In memory only.")
+	typeKeys(m.comp, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if strings.Contains(m.status, "not saved") {
+		t.Fatalf("status = %q, a nil store should be a silent no-op", m.status)
+	}
+}
+
 // TestEditOnEmptyThreadDoesNotOpen: `e` never creates anything; that is `c`.
 func TestEditOnEmptyThreadDoesNotOpen(t *testing.T) {
 	m := newTestModel(t)

@@ -11,13 +11,15 @@
 // only what is already settled: its anchor, its quote fallback, and its
 // posted comments.
 //
-// Nothing in this file is wired into the running app yet — ensureThread still
-// never calls writeThreadFile, and Run still never calls readThreadFile.
-// STORE-02 is "load on open"; this is the format and the round trip it will
-// load.
+// STORE-02 wires this into the running app: Run loads every thread file on
+// disk for the document it opens (loadThreadsForDoc), and dismiss persists a
+// posted comment back through threadStore.save. Reloading while margin is
+// already running — noticing a file an agent wrote mid-session — is not part
+// of that; it needs a filesystem watcher and is split out on the board.
 package review
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,6 +78,57 @@ func readThreadFile(path string) (docPath string, t *thread, err error) {
 		return "", nil, fmt.Errorf("thread file %s: %w", path, err)
 	}
 	return docPath, t, nil
+}
+
+// loadThreadsForDoc reads every thread file already on disk for docPath under
+// root, keyed by anchor, so a document reopened for review finds its threads
+// still attached (goals.md item 7). A threads directory that does not exist
+// yet is not an error — it just means nothing has been said about this
+// document — but a thread file that exists and fails to parse is: the same
+// "surface, don't drop" reasoning readThreadFile already documents applies
+// here, one level up.
+func loadThreadsForDoc(root, docPath string) (map[string]*thread, error) {
+	dir := filepath.Join(threadsDir(root), filepath.FromSlash(docPath))
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]*thread{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("loading threads for %s: %w", docPath, err)
+	}
+
+	threads := map[string]*thread{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		_, t, err := readThreadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		threads[t.anchor] = t
+	}
+	return threads, nil
+}
+
+// threadStore is where a model persists posted comments once it is opened
+// against a real path (Run). It is nil on a model built for a test or the
+// seeded document, which is what keeps dismiss() from writing to disk during
+// every test that exercises a submit.
+type threadStore struct {
+	root    string
+	docPath string
+}
+
+// save writes t to its thread file. Nil-safe so callers do not need an
+// "if m.store != nil" guard at every call site — an unconfigured store is
+// simply a no-op, so the call site reads as "persistence is optional" rather
+// than a special case to remember.
+func (s *threadStore) save(t *thread) error {
+	if s == nil {
+		return nil
+	}
+	return writeThreadFile(s.root, s.docPath, t)
 }
 
 // marshalThread renders a thread as the markdown-with-frontmatter file an

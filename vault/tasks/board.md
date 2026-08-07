@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (CMD-01 done)
+Last updated: 2026-08-07 (STORE-02 done)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -18,8 +18,7 @@ Last updated: 2026-08-07 (CMD-01 done)
 
 ## In progress
 
-- **STORE-02** `[mech]` claimed 2026-08-07 — load-on-open + write-on-submit
-  slice; the fsnotify live-reload part is split out, see the leg's own note.
+*(none)*
 
 ## Backlog — M1
 
@@ -42,8 +41,10 @@ Last updated: 2026-08-07 (CMD-01 done)
 
 ## Backlog — M2
 
-- **STORE-02** `[mech]` Load threads on open; `fsnotify` reload when an agent
-  writes one while margin is running.
+- **STORE-03** `[mech]` Live reload: watch `.margin/threads/` with `fsnotify`
+  and pick up a thread file an agent writes while margin is already running.
+  Split off STORE-02, which shipped load-on-open and write-on-submit but not
+  this — see `vault/journal/2026-08-07.7.md`.
 - **THREAD-01** `[mech]` Resolvable threads: a thread carries a resolved state,
   set by either the reviewer or the agent, and it round-trips through the thread
   file. Blocked on **Q-0002** for how it is represented.
@@ -147,3 +148,9 @@ independent of whether the unit of review turns out to be a file or a tree.
       calls its `Run`; it carries no verb-specific behaviour of its own. No
       behaviour change — existing tests pass unmodified, plus new registry
       tests. The palette itself (CMD-02 onward) is not built — done 2026-08-07
+- [x] **STORE-02** (partial — see STORE-03 above) `loadThreadsForDoc` loads
+      every thread file on disk for the document `Run` opens, and `dismiss`
+      persists a posted comment through a new `threadStore`, nil on every
+      model a test builds so submitting in a test never touches disk. The
+      fsnotify live-reload half of the original task is split out as
+      STORE-03 — done 2026-08-07

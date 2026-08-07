@@ -1,6 +1,7 @@
 package review
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -172,6 +173,82 @@ func TestWriteThreadFileOverwrites(t *testing.T) {
 	}
 	if len(got.posted) != 1 || got.posted[0].body != "second" {
 		t.Fatalf("got.posted = %+v, want a single comment with body \"second\"", got.posted)
+	}
+}
+
+func TestLoadThreadsForDocReturnsEveryThreadOnDisk(t *testing.T) {
+	root := t.TempDir()
+	a := &thread{anchor: "^aaaa", quote: "q1", posted: []comment{{author: "toly", body: "one", at: time.Now()}}}
+	b := &thread{anchor: "^bbbb", quote: "q2", posted: []comment{{author: "agent", body: "two", at: time.Now()}}}
+	if err := writeThreadFile(root, "doc.md", a); err != nil {
+		t.Fatalf("writeThreadFile a: %v", err)
+	}
+	if err := writeThreadFile(root, "doc.md", b); err != nil {
+		t.Fatalf("writeThreadFile b: %v", err)
+	}
+	// A thread for a different document must not leak in.
+	other := &thread{anchor: "^cccc", quote: "q3"}
+	if err := writeThreadFile(root, "other.md", other); err != nil {
+		t.Fatalf("writeThreadFile other: %v", err)
+	}
+
+	got, err := loadThreadsForDoc(root, "doc.md")
+	if err != nil {
+		t.Fatalf("loadThreadsForDoc: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("loadThreadsForDoc returned %d threads, want 2: %+v", len(got), got)
+	}
+	sameThread(t, got["^aaaa"], a)
+	sameThread(t, got["^bbbb"], b)
+}
+
+func TestLoadThreadsForDocMissingDirIsNotAnError(t *testing.T) {
+	root := t.TempDir()
+	got, err := loadThreadsForDoc(root, "never-reviewed.md")
+	if err != nil {
+		t.Fatalf("loadThreadsForDoc: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("loadThreadsForDoc = %+v, want empty", got)
+	}
+}
+
+func TestLoadThreadsForDocSurfacesAMalformedFile(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(threadsDir(root), "doc.md")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bad.md"), []byte("not a thread file"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	if _, err := loadThreadsForDoc(root, "doc.md"); err == nil {
+		t.Fatal("loadThreadsForDoc: want an error for a malformed thread file, got nil")
+	}
+}
+
+func TestThreadStoreSaveWritesTheFile(t *testing.T) {
+	root := t.TempDir()
+	s := &threadStore{root: root, docPath: "doc.md"}
+	th := &thread{anchor: "^feed", quote: "q", posted: []comment{{author: "toly", body: "saved", at: time.Now()}}}
+
+	if err := s.save(th); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	_, got, err := readThreadFile(threadFilePath(root, "doc.md", th.anchor))
+	if err != nil {
+		t.Fatalf("readThreadFile: %v", err)
+	}
+	sameThread(t, got, th)
+}
+
+func TestNilThreadStoreSaveIsANoop(t *testing.T) {
+	var s *threadStore
+	if err := s.save(&thread{anchor: "^x"}); err != nil {
+		t.Fatalf("save on nil store: %v", err)
 	}
 }
 

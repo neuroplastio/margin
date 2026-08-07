@@ -8,9 +8,10 @@ reviewed and what still needs attention, and hand the whole lot back to whatever
 wrote it.
 
 > **Status: early.** `margin FILE.md` opens a real document and the review loop
-> works end to end. Thread persistence is not built yet, so comments live only
-> for the session, and anchors are content-derived rather than stamped into the
-> source — meaning a thread does not yet survive an agent rewording its block.
+> works end to end. Comments persist as markdown files under
+> `.margin/threads/`, and block ids are stamped into the source so a thread
+> survives its block being reworded. An agent writing a reply to a thread file
+> while margin is already open is not picked up until you reopen the document.
 > See [Roadmap](#roadmap).
 
 ## Why
@@ -108,9 +109,10 @@ of the stripped one, for comparison.
 - [x] Load a real file from the command line
 - [x] Export the review to the clipboard
 - [ ] Render headings by level, and inline markup
-- [ ] Stamp block ids into the source, so threads survive a rewrite
-- [ ] Thread persistence as markdown under `.margin/`, readable and writable by
+- [x] Stamp block ids into the source, so threads survive a rewrite
+- [x] Thread persistence as markdown under `.margin/`, readable and writable by
       an agent with no tooling
+- [ ] Live reload — pick up a thread file an agent writes mid-session
 - [ ] `--stdout` export, to pipe a review straight into an agent
 - [ ] Link navigation between blocks, with a jumplist
 - [ ] Rendered diff between review rounds

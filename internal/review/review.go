@@ -13,6 +13,7 @@ package review
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -98,6 +99,12 @@ type model struct {
 	threads map[string]*thread
 	marks   map[string]reviewMark
 	entries []entry
+
+	// store is where a posted comment is persisted, in addition to the
+	// in-memory threads map above. nil on every model a test or seedModel
+	// builds — only Run sets one, since only Run is opening a real path with
+	// somewhere on disk to write to.
+	store *threadStore
 
 	at   cursor
 	comp *composer
@@ -496,6 +503,12 @@ func (m *model) dismiss(err error) tea.Cmd {
 		}
 		t.setDraft(target, "")
 		_ = clearDraft(t.anchor, target)
+		if err := m.store.save(t); err != nil {
+			// The comment is still in m.threads, so nothing is lost this
+			// session — but it will not survive reopening the document, and
+			// that gap is worth surfacing rather than quietly succeeding.
+			m.status += " (not saved to disk: " + err.Error() + ")"
+		}
 	case out == outcomeSubmit:
 		m.status = "nothing to submit"
 		t.setDraft(target, "")
@@ -988,7 +1001,19 @@ func Run(path string) error {
 	if err != nil {
 		return err
 	}
-	m := newModelAt(path, doc, nil)
+
+	// root is the review root and docPath is the document's path relative to
+	// it (D9) — today, since M1 has no tree yet, that is just the file's own
+	// directory and base name. reattach (inside newModelAt) is what matches
+	// these loaded threads back to the parsed blocks.
+	root, docPath := filepath.Dir(path), filepath.Base(path)
+	threads, err := loadThreadsForDoc(root, docPath)
+	if err != nil {
+		return fmt.Errorf("run: %w", err)
+	}
+
+	m := newModelAt(path, doc, threads)
+	m.store = &threadStore{root: root, docPath: docPath}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
 	if _, err := tea.NewProgram(m, tea.WithFPS(120)).Run(); err != nil {
