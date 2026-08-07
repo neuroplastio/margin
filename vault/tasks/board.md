@@ -18,7 +18,7 @@ Last updated: 2026-08-07 (Q-0001/Q-0002 folded into decisions.md as D10/D11)
 
 ## In progress
 
-*(none)*
+- **THREAD-01** `[mech]` claimed 2026-08-07 — resolvable threads (D11).
 
 ## Backlog — M1
 
