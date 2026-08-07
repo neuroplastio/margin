@@ -1,6 +1,7 @@
 package review
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -158,6 +159,134 @@ func TestAnchorsAreStableAndDistinct(t *testing.T) {
 			t.Errorf("blocks %d and %d share anchor %s", prev, i, first[i].anchor)
 		}
 		seen[first[i].anchor] = i
+	}
+}
+
+// TestStampIDRoundTrip is ID-01's core guarantee: stamping a block, then
+// reparsing, gives that block back the same id — and no other block. This is
+// the property everything else (re-attachment, persistence) will build on.
+func TestStampIDRoundTrip(t *testing.T) {
+	before := parseSample(t)
+
+	for i, target := range before {
+		src := []byte(sampleDoc)
+		id := newBlockID()
+		stamped := stampID(src, target, id)
+
+		after := parseDoc(stamped)
+		if len(after) != len(before) {
+			t.Fatalf("block %d: stamping changed the block count: %d vs %d", i, len(after), len(before))
+		}
+		if after[i].anchor != id {
+			t.Errorf("block %d: anchor = %q after stamping, want %q", i, after[i].anchor, id)
+		}
+		if !after[i].stamped {
+			t.Errorf("block %d: stamped id was not flagged as stamped", i)
+		}
+		if after[i].text != before[i].text {
+			t.Errorf("block %d: text changed by stamping: %q vs %q", i, after[i].text, before[i].text)
+		}
+		if after[i].kind != before[i].kind {
+			t.Errorf("block %d: kind changed by stamping: %v vs %v", i, after[i].kind, before[i].kind)
+		}
+		for j, ob := range after {
+			if j == i {
+				continue
+			}
+			if ob.stamped {
+				t.Errorf("block %d picked up a stamp meant for block %d", j, i)
+			}
+		}
+
+		// Reparsing again — as a fresh margin session opening the file a second
+		// time would — must find the same id still attached, not a new one.
+		again := parseDoc(stamped)
+		if again[i].anchor != id {
+			t.Errorf("block %d: anchor drifted on a second reparse: %q vs %q", i, again[i].anchor, id)
+		}
+	}
+}
+
+// TestStampIDInvisibleToOtherRenderers checks the marker reads as an ordinary
+// markdown comment: it must not become a block of its own, and it must not
+// leak into the text or lines of the block it is attached to, including a
+// fenced code block where a byte in the wrong place corrupts the fence.
+func TestStampIDInvisibleToOtherRenderers(t *testing.T) {
+	src := []byte(sampleDoc)
+	before := parseDoc(src)
+
+	var code block
+	for _, b := range before {
+		if b.kind == blockRaw && strings.Contains(b.text, "func retry") {
+			code = b
+		}
+	}
+	if code.text == "" {
+		t.Fatal("fixture has no code block to stamp")
+	}
+
+	id := newBlockID()
+	stamped := stampID(src, code, id)
+	if !strings.Contains(string(stamped), "<!--margin:"+id+"-->") {
+		t.Fatalf("stamped source does not contain the marker verbatim")
+	}
+
+	after := parseDoc(stamped)
+	if len(after) != len(before) {
+		t.Fatalf("marker became its own block: %d blocks, want %d", len(after), len(before))
+	}
+	for i, b := range after {
+		if strings.Contains(b.text, "margin:") {
+			t.Errorf("block %d text leaked the marker: %q", i, b.text)
+		}
+		for _, l := range b.lines {
+			if strings.Contains(l, "margin:") {
+				t.Errorf("block %d lines leaked the marker: %q", i, l)
+			}
+		}
+	}
+
+	// The fence itself must still be intact: three lines of code, not the
+	// marker spliced in as a fourth line of "code".
+	var gotCode block
+	for _, b := range after {
+		if b.kind == blockRaw && strings.Contains(b.text, "func retry") {
+			gotCode = b
+		}
+	}
+	if len(gotCode.lines) != len(code.lines) {
+		t.Errorf("code block gained/lost lines after stamping: %v vs %v", gotCode.lines, code.lines)
+	}
+}
+
+// TestStampIDDoesNotDisturbEarlierBlocks confirms the documented guarantee on
+// stampID: bytes before the stamped block's own range are untouched, so a
+// caller stamping blocks one at a time, earliest first, never has to
+// re-locate a block it already has offsets for.
+func TestStampIDDoesNotDisturbEarlierBlocks(t *testing.T) {
+	src := []byte(sampleDoc)
+	blocks := parseDoc(src)
+
+	// Stamp the last block; everything before its start must be byte-for-byte
+	// unchanged.
+	last := blocks[len(blocks)-1]
+	stamped := stampID(src, last, newBlockID())
+	if !bytes.Equal(stamped[:last.start], src[:last.start]) {
+		t.Error("stamping the last block changed bytes before it")
+	}
+}
+
+func TestNewBlockIDIsDistinctAndWellFormed(t *testing.T) {
+	seen := map[string]bool{}
+	for i := 0; i < 100; i++ {
+		id := newBlockID()
+		if !idMarkerRE.MatchString("<!--margin:" + id + "-->") {
+			t.Fatalf("id %q does not round-trip through the marker pattern", id)
+		}
+		if seen[id] {
+			t.Fatalf("newBlockID produced a duplicate: %s", id)
+		}
+		seen[id] = true
 	}
 }
 

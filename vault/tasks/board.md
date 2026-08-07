@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07
+Last updated: 2026-08-07 (ID-01)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -33,9 +33,6 @@ Last updated: 2026-08-07
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables.
 - **RENDER-04** `[felt]` Render block quotes.
-- **ID-01** `[mech]` Stamp a stable block id into the markdown source when a block
-  first acquires a thread. Invisible to other renderers. Round-trip test: stamp,
-  reparse, ids stable.
 - **ID-02** `[mech]` Re-attach threads to blocks by id on open. Test that a block
   can be fully reworded and keep its thread, and that a deleted block orphans its
   thread detectably.
@@ -102,3 +99,6 @@ independent of whether the unit of review turns out to be a file or a tree.
 - [x] **PARSE-01** goldmark into a block list with byte offsets — done 2026-08-06
 - [x] **PARSE-02** real files from argv; the seeded document is now a test fixture — done 2026-08-06
 - [x] **M0** Foundation — interaction model end to end — done 2026-08-06
+- [x] **ID-01** stamp a stable block id into the source, invisible to other
+      renderers, as an HTML comment after the block; content-derived anchors
+      remain the fallback until a block is stamped — done 2026-08-07

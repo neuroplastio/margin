@@ -28,6 +28,11 @@ type block struct {
 	text   string
 	anchor string
 
+	// stamped reports whether anchor came from an id marker in the source
+	// (ID-01) rather than being derived from content. A stamped anchor
+	// survives the block being reworded; a derived one does not.
+	stamped bool
+
 	// lines holds the verbatim source of a blockRaw, which must not be
 	// re-wrapped — indentation and line breaks are the content.
 	lines []string
