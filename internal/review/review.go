@@ -738,6 +738,8 @@ var (
 	flagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	rawStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("109"))
+	codeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("216"))
+	linkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Underline(true)
 )
 
 // headingStyles carries the visual weight for each heading depth: bold and
@@ -827,9 +829,15 @@ func (m *model) render() []string {
 			// blockquote-rendering feedback).
 			var out []string
 			rule := ""
+			// preStyled marks output already carrying its own ANSI styling
+			// (RENDER-06's inline markup, resolved per-fragment against body
+			// above) so the loop below does not flatten it back to one
+			// uniform body.Render.
+			preStyled := false
 			switch e.b.kind {
 			case blockPara:
-				out = wrap(e.b.text, w)
+				out = wrapInline(e.b.text, w, body)
+				preStyled = true
 			case blockList, blockListItem:
 				out = wrapList(e.b.items, w)
 				if mark != markOK {
@@ -845,8 +853,12 @@ func (m *model) render() []string {
 				}
 			}
 			for _, l := range out {
+				text := l
+				if !preStyled {
+					text = body.Render(l)
+				}
 				lines = append(lines,
-					m.gutter(focused && m.at.comment == commentNone, mark, false)+rule+body.Render(l))
+					m.gutter(focused && m.at.comment == commentNone, mark, false)+rule+text)
 			}
 			// A blockListItem gets its trailing blank line only once, after
 			// the list's last item, so a six-item list still reads as one
@@ -1088,6 +1100,110 @@ func wrap(s string, w int) []string {
 	if len(line) > 0 {
 		out = append(out, strings.Join(line, " "))
 	}
+	if len(out) == 0 {
+		return []string{""}
+	}
+	return out
+}
+
+// glueWord is one unbreakable unit for wrapping: a run of text with no
+// whitespace in it, possibly stitched together from more than one inlineRun
+// (e.g. "en**hanced**" is one word made of a plain fragment and a bold one).
+// Splitting on whitespace this way, rather than treating each inlineRun as
+// its own word, is what keeps "en**hanced**" from picking up a space it
+// never had in the source.
+type glueWord struct {
+	frags []inlineRun
+	width int
+}
+
+// glueWords turns a paragraph's inline runs (see parseInline) into the
+// unbreakable units wrapInline wraps. A run's own text is split on
+// whitespace; adjacent fragments with no whitespace between them — whether
+// from the same run or a neighbouring one — join into a single glueWord, so
+// wrapping never inserts a space markup removed.
+func glueWords(s string) []glueWord {
+	var words []glueWord
+	var cur glueWord
+	flush := func() {
+		if len(cur.frags) > 0 {
+			words = append(words, cur)
+			cur = glueWord{}
+		}
+	}
+	for _, run := range parseInline(s) {
+		text := run.text
+		for len(text) > 0 {
+			if r := text[0]; r == ' ' || r == '\t' || r == '\n' {
+				flush()
+				text = strings.TrimLeft(text, " \t\n")
+				continue
+			}
+			piece := text
+			if idx := strings.IndexAny(text, " \t\n"); idx >= 0 {
+				piece, text = text[:idx], text[idx:]
+			} else {
+				text = ""
+			}
+			cur.frags = append(cur.frags, inlineRun{text: piece, bold: run.bold, code: run.code, link: run.link})
+			cur.width += lipgloss.Width(piece)
+		}
+	}
+	flush()
+	return words
+}
+
+// fragStyle picks a glueWord fragment's style: code and links always render
+// the same regardless of review state — they are markup, not prose, the same
+// reasoning RENDER-04 applied to a block quote's rule — while bold builds on
+// top of body so reviewed prose still dims even where it is emphasised.
+func fragStyle(f inlineRun, body lipgloss.Style) lipgloss.Style {
+	switch {
+	case f.code:
+		return codeStyle
+	case f.link:
+		return linkStyle
+	case f.bold:
+		return body.Bold(true)
+	default:
+		return body
+	}
+}
+
+// wrapInline is wrap's inline-markup-aware sibling: it wraps a paragraph's
+// raw markdown text to w the same way wrap does, but returns lines that are
+// already ANSI-styled per RENDER-06 — **bold**, `code`, [links](url) — rather
+// than plain text for the caller to style uniformly. body is the base style
+// (plain or dimmed-for-reviewed) plain runs and bold both build on.
+func wrapInline(s string, w int, body lipgloss.Style) []string {
+	words := glueWords(s)
+	var out []string
+	var line []glueWord
+	n := 0
+	flushLine := func() {
+		if len(line) == 0 {
+			return
+		}
+		var sb strings.Builder
+		for i, wd := range line {
+			if i > 0 {
+				sb.WriteByte(' ')
+			}
+			for _, f := range wd.frags {
+				sb.WriteString(fragStyle(f, body).Render(f.text))
+			}
+		}
+		out = append(out, sb.String())
+		line, n = nil, 0
+	}
+	for _, wd := range words {
+		if w > 0 && n > 0 && n+1+wd.width > w {
+			flushLine()
+		}
+		line = append(line, wd)
+		n += wd.width + 1
+	}
+	flushLine()
 	if len(out) == 0 {
 		return []string{""}
 	}

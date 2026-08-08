@@ -577,6 +577,105 @@ func TestWrapQuoteWrapsAndKeepsParagraphBreaks(t *testing.T) {
 	}
 }
 
+// TestParseInlineStripsMarkup pins parseInline's three recognised forms
+// (RENDER-06): the markup characters themselves must not survive into any
+// run's text, and each run must carry the right flag.
+func TestParseInlineStripsMarkup(t *testing.T) {
+	runs := parseInline("plain **bold** and `code` and [linked text](https://example.com/x) done")
+	var gotBold, gotCode, gotLink bool
+	for _, r := range runs {
+		switch {
+		case r.bold:
+			gotBold = true
+			if r.text != "bold" {
+				t.Errorf("bold run text = %q, want %q", r.text, "bold")
+			}
+		case r.code:
+			gotCode = true
+			if r.text != "code" {
+				t.Errorf("code run text = %q, want %q", r.text, "code")
+			}
+		case r.link:
+			gotLink = true
+			if r.text != "linked text" {
+				t.Errorf("link run text = %q, want %q (URL must not leak into the visible text)", r.text, "linked text")
+			}
+		}
+	}
+	if !gotBold || !gotCode || !gotLink {
+		t.Fatalf("missing a run kind: bold=%v code=%v link=%v, runs=%+v", gotBold, gotCode, gotLink, runs)
+	}
+}
+
+// TestParseInlineUnterminatedMarkerIsLiteral is the "what if the closing
+// marker is missing" case parseInline's doc comment does not spell out:
+// nothing to close a form with must fall back to literal text rather than
+// swallowing the rest of the paragraph or panicking.
+func TestParseInlineUnterminatedMarkerIsLiteral(t *testing.T) {
+	runs := parseInline("this has an unmatched `backtick and **bold that never closes")
+	var joined strings.Builder
+	for _, r := range runs {
+		if r.bold || r.code || r.link {
+			t.Fatalf("an unterminated marker produced a styled run: %+v", runs)
+		}
+		joined.WriteString(r.text)
+	}
+	if joined.String() != "this has an unmatched `backtick and **bold that never closes" {
+		t.Errorf("literal text corrupted: %q", joined.String())
+	}
+}
+
+// TestGlueWordsKeepsAdjacentRunsTogether is the case wrapInline's doc comment
+// calls out by name: "en**hanced**" has no whitespace in the source between
+// the plain and bold halves, so it must wrap as one word, not two.
+func TestGlueWordsKeepsAdjacentRunsTogether(t *testing.T) {
+	words := glueWords("en**hanced** word")
+	if len(words) != 2 {
+		t.Fatalf("glueWords(\"en**hanced** word\") = %d word(s), want 2: %+v", len(words), words)
+	}
+	var joined strings.Builder
+	for _, f := range words[0].frags {
+		joined.WriteString(f.text)
+	}
+	if joined.String() != "enhanced" {
+		t.Errorf("first glueWord = %q, want %q (markup must not insert a space)", joined.String(), "enhanced")
+	}
+	if len(words[0].frags) != 2 || !words[0].frags[1].bold {
+		t.Errorf("first glueWord's bold half went missing: %+v", words[0].frags)
+	}
+}
+
+// TestWrapInlineStripsMarkupAndWraps is the render-level regression test for
+// RENDER-06: a paragraph with bold, code and a link must wrap to the measure
+// with no raw markup characters left on screen, and none of the words may go
+// missing across the wrap.
+func TestWrapInlineStripsMarkupAndWraps(t *testing.T) {
+	text := "The store interface is already **abstracted** — `SessionStore` has exactly the three " +
+		"methods we need, see the [migration runbook](https://example.com/runbook) for details, " +
+		"rather than being deleted"
+	w := 40
+	out := wrapInline(text, w, textStyle)
+	if len(out) < 2 {
+		t.Fatalf("expected wrapping across multiple lines, got %d: %v", len(out), out)
+	}
+	joined := ansiRe.ReplaceAllString(strings.Join(out, " "), "")
+	for _, marker := range []string{"**", "`", "](", "https://example.com/runbook"} {
+		if strings.Contains(joined, marker) {
+			t.Errorf("raw markup %q survived into rendered output: %q", marker, joined)
+		}
+	}
+	for _, word := range []string{"abstracted", "SessionStore", "migration", "runbook", "deleted"} {
+		if !strings.Contains(joined, word) {
+			t.Errorf("word %q went missing across the wrap: %q", word, joined)
+		}
+	}
+	for _, l := range out {
+		if width := len(ansiRe.ReplaceAllString(l, "")); width > w {
+			t.Errorf("line %q is %d columns wide, wider than the measure %d", l, width, w)
+		}
+	}
+}
+
 func TestMarkParagraph(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}

@@ -92,7 +92,9 @@ revertible and none of them requires a maintenance window:
 - **Week 3** — remove the memory path. Delete the sticky-session config from
   the load balancer, which is the change that actually pays for this work.
 
-Rollback at any point is a config flag, not a deploy.
+Rollback at any point is a config flag, not a deploy. See the [migration
+runbook](https://runbooks.internal/redis-migration) for the on-call rollback
+steps.
 
 ---
 

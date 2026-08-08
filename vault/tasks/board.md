@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-08 (line-level-focus feedback addressed; queue empty)
+Last updated: 2026-08-08 (RENDER-06 landed for paragraphs; queue empty)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:**
@@ -9,6 +9,8 @@ Last updated: 2026-08-08 (line-level-focus feedback addressed; queue empty)
 - RENDER-04 (block quotes: rule down the left edge) — journal 2026-08-08.3
 - Lists split into per-item blocks, from the line-level-focus feedback
   (D12) — journal 2026-08-08.4
+- RENDER-06 (inline markup — bold, code, links — for paragraphs) — journal
+  2026-08-08.5
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -28,9 +30,6 @@ Last updated: 2026-08-08 (line-level-focus feedback addressed; queue empty)
 
 ## Backlog — M1
 
-- **RENDER-06** `[felt]` Inline markup — `**bold**`, `` `code` ``, links —
-  currently shows as raw source, which is a large share of the reading-comfort
-  gap on a real document.
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables. *The parse prerequisite this note used
   to name is done — 2026-08-08.1 enabled goldmark's GFM extensions, so a table
@@ -120,6 +119,17 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-06** inline markup for paragraphs: a hand-rolled scanner
+      (`parseInline`, `internal/review/parse.go`) recognises `**bold**`,
+      `` `code` `` and `[text](url)`, stripping the markup and tagging each
+      run; `glueWords`/`wrapInline` (`review.go`) wrap paragraphs the same
+      way `wrap` always has but keep adjacent styled fragments glued into one
+      word (so `en**hanced**` cannot pick up a space the source never had)
+      and render each already-styled, so `render()`'s shared block loop skips
+      re-styling a `preStyled` line rather than nesting styles. List items,
+      quotes and headings are deliberately not covered yet — `wrapInline` is
+      now the reusable primitive for extending them. `[felt]` — see journal
+      2026-08-08.5 for the demo recipe — done 2026-08-08
 - [x] **RENDER-01** render lists: shipped in two parts, neither originally
       filed under this id. Wrapping and hanging indent landed under the
       2026-08-08 rendering-bugs feedback fix; splitting each item into its

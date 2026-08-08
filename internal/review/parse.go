@@ -368,6 +368,68 @@ func collapse(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// inlineRun is a run of a paragraph's text carrying one inline style — the
+// unstyled default, bold, code, or a link's visible text. Consecutive
+// unstyled characters are folded into one run so wrapInline (review.go) does
+// not deal with markup one byte at a time.
+type inlineRun struct {
+	text             string
+	bold, code, link bool
+}
+
+// parseInline recognises RENDER-06's three inline forms — **bold**,
+// `code`, and [text](url) — and returns the text with their markup stripped,
+// split into styled runs. It is intentionally narrow: no italics, no
+// nesting, no reference-style links. Those are real gaps, not oversights —
+// widening this is its own felt decision, not a side effect of this one.
+//
+// It scans byte-by-byte rather than with a regexp because the three forms
+// need to interrupt plain text at arbitrary points and a hand-rolled scan
+// falls out of that more directly. Markers are ASCII (`*`, backtick, `[`,
+// `]`, `(`, `)`), so indexing by byte never lands inside a multi-byte UTF-8
+// rune — continuation bytes are always >= 0x80.
+func parseInline(s string) []inlineRun {
+	var runs []inlineRun
+	var plain strings.Builder
+	flushPlain := func() {
+		if plain.Len() > 0 {
+			runs = append(runs, inlineRun{text: plain.String()})
+			plain.Reset()
+		}
+	}
+	for i := 0; i < len(s); {
+		switch {
+		case strings.HasPrefix(s[i:], "**"):
+			if end := strings.Index(s[i+2:], "**"); end >= 0 {
+				flushPlain()
+				runs = append(runs, inlineRun{text: s[i+2 : i+2+end], bold: true})
+				i += 2 + end + 2
+				continue
+			}
+		case s[i] == '`':
+			if end := strings.IndexByte(s[i+1:], '`'); end >= 0 {
+				flushPlain()
+				runs = append(runs, inlineRun{text: s[i+1 : i+1+end], code: true})
+				i += 1 + end + 1
+				continue
+			}
+		case s[i] == '[':
+			if close := strings.IndexByte(s[i:], ']'); close >= 0 && i+close+1 < len(s) && s[i+close+1] == '(' {
+				if paren := strings.IndexByte(s[i+close+2:], ')'); paren >= 0 {
+					flushPlain()
+					runs = append(runs, inlineRun{text: s[i+1 : i+close], link: true})
+					i += close + 2 + paren + 1
+					continue
+				}
+			}
+		}
+		plain.WriteByte(s[i])
+		i++
+	}
+	flushPlain()
+	return runs
+}
+
 // listItemRE recognises the start of a list item line: leading indentation,
 // a marker (-, *, + or an ordered N. / N)), then its own text.
 var listItemRE = regexp.MustCompile(`^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$`)
