@@ -887,23 +887,20 @@ func TestPaneResize(t *testing.T) {
 	}
 }
 
-// TestFrameIsShorterThanTheTerminal is the regression for the document's first
-// line being invisible on open.
+// TestFrameFitsTheTerminal keeps the frame from overflowing the screen.
 //
-// margin runs inline rather than in the alternate screen, so a frame of exactly
-// the terminal's height scrolls it by one as the final newline lands — the top
-// line goes off the top and the reader has to scroll up to see the heading they
-// just opened. Nothing in the model is wrong when this happens: m.scroll is 0
-// and focus is on the first block, which is why it is invisible to any test that
-// inspects state rather than counting the frame.
-func TestFrameIsShorterThanTheTerminal(t *testing.T) {
+// In the alternate screen a frame of exactly m.h lines is correct — it fills the
+// buffer without scrolling it. One line more would push the top away, which is
+// the defect this began as, and no test that inspects model state can see it:
+// m.scroll is 0 and focus is on the first block throughout.
+func TestFrameFitsTheTerminal(t *testing.T) {
 	m := seedModel()
 	for _, h := range []int{10, 24, 30, 40, 120} {
 		m.w, m.h = 92, h
 		got := len(strings.Split(m.View().Content, "\n"))
-		if got > h-1 {
-			t.Errorf("terminal %d rows: frame is %d lines, want at most %d — "+
-				"an inline frame this tall scrolls the top line off", h, got, h-1)
+		if got > h {
+			t.Errorf("terminal %d rows: frame is %d lines — one line more than the "+
+				"screen holds pushes the top of the document away", h, got)
 		}
 	}
 }

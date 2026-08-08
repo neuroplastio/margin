@@ -37,6 +37,15 @@ On a heading, the mark keys apply to the whole section.
 - The mouse **only moves focus**. Opening an editor is always an explicit `c` or
   `e`. Clicking inside a live composer positions the cursor in it.
 
+### The screen
+
+- margin runs in the **alternate screen**. It owns the terminal while open and
+  hands it back untouched — scrollback and all — on exit, leaving no trace of the
+  review in your shell history.
+- The frame fills the terminal exactly. Rendering inline cost two rows to chrome
+  nobody asked for: the shell prompt kept one above the document, and a second
+  had to be left empty to stop the frame scrolling the terminal.
+
 ### Threads
 
 - A thread renders in one of three states, all from the same block list:

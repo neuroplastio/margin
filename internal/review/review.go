@@ -31,9 +31,6 @@ const (
 	borderW    = 1
 	maxMeasure = 76 // the comfortable reading measure
 	footerRows = 2
-	// inlineReservedRow keeps the rendered frame strictly shorter than the
-	// terminal. See the viewport calculation in View for why.
-	inlineReservedRow = 1
 )
 
 // damageMsg says the child wrote something, so the grid may have changed. It is
@@ -922,7 +919,9 @@ func (m *model) View() tea.View {
 	// clamp lands on 1 — an offset every later render inherits, which silently
 	// hides the document's first line for the rest of the session.
 	if m.w == 0 || m.h == 0 {
-		return tea.NewView("")
+		v := tea.NewView("")
+		v.AltScreen = true
+		return v
 	}
 	// Sample only on a frame the child's output actually triggered. Bubble Tea
 	// also renders immediately after the keypress itself, and counting that
@@ -941,11 +940,7 @@ func (m *model) View() tea.View {
 		m.paneW = m.contentWidth() - 2*borderW
 	}
 
-	// One row short of the terminal, not exactly its height. A frame of exactly
-	// m.h lines makes an inline (non-altscreen) terminal scroll by one as the
-	// final newline lands, pushing the first line off the top — which is how a
-	// document's opening heading became invisible the moment it was opened.
-	viewport := max(m.h-footerRows-inlineReservedRow, 1)
+	viewport := max(m.h-footerRows, 1)
 	m.scroll = m.clampScroll(len(lines), viewport)
 	visible := lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
 
@@ -973,6 +968,12 @@ func (m *model) View() tea.View {
 	}
 
 	v := tea.NewView(b.String())
+	// margin owns the terminal while it runs and hands it back untouched —
+	// scrollback and all — on exit. Rendering inline left the shell prompt
+	// occupying a row above the document and cost a second row to keep the
+	// frame from scrolling the terminal, so two of the reader's rows went to
+	// chrome nobody asked for.
+	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	if m.comp != nil && m.paneTop >= 0 {
 		if shape, blink, shown := m.comp.cur.get(); shown {

@@ -82,10 +82,8 @@ Fixed by reserving one row, so the frame is always at most `m.h - 1` lines.
 several terminal heights — the only kind of test that could have caught this,
 since every piece of model state was correct while it was happening.
 
-**Still worth deciding: should margin use the alternate screen?**
-`tea.WithAltScreen()` would make this class of bug impossible rather than
-guarded against, and would restore the terminal's scrollback on exit instead of
-leaving the whole review in your history. The cost is that the terminal's own
-scrollback no longer scrolls the document — but SCROLL-03 wants an in-app wheel
-anyway, and in inline mode those two would fight each other. Felt, and not mine
-to decide.
+**Answered 2026-08-08: yes, the alternate screen.** Asked for as "the viewport is
+not full screen" once the heading came back and the shell prompt was still
+sitting above it. In v2 it is `View.AltScreen`, a per-frame field rather than a
+program option. The reserved row went with it — in the alternate screen a frame
+of exactly the terminal's height is correct — so the reader got both rows back.
