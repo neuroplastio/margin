@@ -787,6 +787,34 @@ func TestTableColumnWidthsLeavesRoomWhenItFits(t *testing.T) {
 	}
 }
 
+// TestRenderFrontmatterTruncatesLongFields confirms a field wider than the
+// measure is truncated with an ellipsis rather than wrapped or overflowing —
+// frontmatter is key: value pairs, not prose, so a wrapped continuation line
+// would misleadingly read as a second field.
+func TestRenderFrontmatterTruncatesLongFields(t *testing.T) {
+	b := block{kind: blockFrontmatter, text: "---\ndescription: " + strings.Repeat("x", 80) + "\n---"}
+	lines := renderFrontmatter(b, 20)
+	if len(lines) != 2 { // the one field, plus the trailing blank line
+		t.Fatalf("renderFrontmatter produced %d lines, want 2 (field + blank): %v", len(lines), lines)
+	}
+	stripped := ansiRe.ReplaceAllString(lines[0], "")
+	// gutterW spaces of indent, then the truncated field capped at the
+	// measure (20 runes, ellipsis included).
+	if got := len([]rune(strings.TrimPrefix(stripped, strings.Repeat(" ", gutterW)))); got != 20 {
+		t.Errorf("truncated field is %d runes wide, want 20: %q", got, stripped)
+	}
+	if !strings.HasSuffix(stripped, "…") {
+		t.Errorf("truncated field = %q, want it to end with an ellipsis", stripped)
+	}
+}
+
+func TestRenderFrontmatterEmptyIsNil(t *testing.T) {
+	b := block{kind: blockFrontmatter, text: "---\n---"}
+	if got := renderFrontmatter(b, 40); got != nil {
+		t.Errorf("renderFrontmatter of an empty body = %v, want nil", got)
+	}
+}
+
 func TestMarkParagraph(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}

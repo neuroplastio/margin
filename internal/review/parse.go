@@ -128,6 +128,27 @@ func frontmatterExtent(src []byte) (start, stop int, ok bool) {
 	return 0, 0, false
 }
 
+// frontmatterFields returns a frontmatter block's inner lines — the ones
+// between the opening and closing "---" fences — trimmed of trailing
+// whitespace but otherwise byte-for-byte what the document had, so a nested
+// YAML value (a list, a folded scalar) keeps the indentation that makes it
+// readable. raw is a blockFrontmatter's b.text, fences included, exactly as
+// frontmatterExtent sliced it out of the source. Fewer than two lines (no
+// closing fence reachable) yields nil — should not happen given how the
+// block was built, but a renderer should not panic over it either.
+func frontmatterFields(raw string) []string {
+	lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
+	if len(lines) < 2 {
+		return nil
+	}
+	inner := lines[1 : len(lines)-1]
+	out := make([]string, 0, len(inner))
+	for _, l := range inner {
+		out = append(out, strings.TrimRight(l, " \t"))
+	}
+	return out
+}
+
 // idMarkerRE matches the invisible comment stampID writes after a block to
 // carry its id. Any markdown renderer treats it as a raw HTML comment, which
 // is to say it renders as nothing.

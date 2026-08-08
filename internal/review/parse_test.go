@@ -537,6 +537,29 @@ func TestParseFrontmatterIsNotCommentableOrMarkable(t *testing.T) {
 	}
 }
 
+// TestFrontmatterFieldsStripsFences confirms the render side (RENDER-07)
+// gets back the YAML body alone, fences dropped, with each field's own
+// indentation preserved.
+func TestFrontmatterFieldsStripsFences(t *testing.T) {
+	raw := "---\nname: retry-policy\ntags:\n  - reliability\n---"
+	got := frontmatterFields(raw)
+	want := []string{"name: retry-policy", "tags:", "  - reliability"}
+	if len(got) != len(want) {
+		t.Fatalf("frontmatterFields(%q) = %v, want %v", raw, got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("field %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestFrontmatterFieldsTooShortIsNil(t *testing.T) {
+	if got := frontmatterFields("---"); got != nil {
+		t.Errorf("frontmatterFields(%q) = %v, want nil (no closing fence)", "---", got)
+	}
+}
+
 // TestParseFrontmatterRequiresLeadingPosition confirms the fix is scoped to a
 // document that opens with "---": a "---" used as a horizontal rule elsewhere
 // keeps its existing (separately tracked) behaviour rather than being
@@ -560,19 +583,21 @@ func TestParseUnterminatedFrontmatterIsNotSwallowed(t *testing.T) {
 	}
 }
 
-// TestParsedFrontmatterDoesNotRenderOrCrash is the render half of the fix:
-// how frontmatter should look is an open felt question, so for now it must
-// not appear in the rendered document at all, and it must not hit the
-// default branch of the render switch — which is built for a thread entry
-// and would misbehave given a bare block.
-func TestParsedFrontmatterDoesNotRenderOrCrash(t *testing.T) {
+// TestParsedFrontmatterRendersDimmedAndDoesNotCrash is the render half of
+// RENDER-07: frontmatter now draws as a dimmed key/value block ahead of the
+// document (see renderFrontmatter), so its fields are expected in the
+// output — but it must still never reach m.entries (no focus stop, no
+// comments, no mark) and must not hit the default branch of the render
+// switch, which is built for a thread entry and would misbehave given a
+// bare block.
+func TestParsedFrontmatterRendersDimmedAndDoesNotCrash(t *testing.T) {
 	m := newModel(parseDoc([]byte(frontmatterDoc)), nil)
 	m.w, m.h = 100, 60
 
 	lines := m.render()
 	joined := strings.Join(lines, "\n")
-	if strings.Contains(joined, "name: retry-policy") {
-		t.Errorf("frontmatter rendered into the document view:\n%s", joined)
+	if !strings.Contains(joined, "name: retry-policy") {
+		t.Errorf("frontmatter did not render into the document view:\n%s", joined)
 	}
 	if !strings.Contains(joined, "Retry policy") {
 		t.Error("real heading did not render")

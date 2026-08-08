@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-08 (RENDER-03 landed — tables now render as aligned columns)
+Last updated: 2026-08-08 (RENDER-07 landed — frontmatter renders as a dimmed key/value block)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:**
@@ -15,6 +15,8 @@ Last updated: 2026-08-08 (RENDER-03 landed — tables now render as aligned colu
   journal 2026-08-08.6
 - RENDER-03 (tables: aligned columns, dim header rule, no vertical bars) —
   journal 2026-08-08.7
+- RENDER-07 (frontmatter: dimmed key/value block ahead of the document) —
+  journal 2026-08-08.8
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -34,29 +36,7 @@ Last updated: 2026-08-08 (RENDER-03 landed — tables now render as aligned colu
 
 ## Backlog — M1
 
-- **RENDER-07** `[felt]` Frontmatter's visual treatment. PARSE-03 stopped it
-  from corrupting the block model and made it invisible in the meantime, but
-  invisible is a default, not a decision — the maintainer's feedback offered
-  three real candidates (hidden-on-demand, a dimmed key/value block, a
-  collapsed line that expands) and none is picked yet. A 2026-08-07 follow-up
-  feedback item confirmed this is the same gap (not a new one — PARSE-03 named
-  it as this task the moment it landed) and supplied a ready-made fixture for
-  the demo recipe:
-
-  ```markdown
-  ---
-  name: retry-policy
-  description: How outbound calls are retried
-  status: draft
-  tags: [reliability, networking]
-  ---
-
-  # Retry policy
-  ```
-
-  Use this (or one like it) when this leg is picked, so the demo recipe has a
-  concrete document with a realistic key/value spread to judge the treatment
-  against rather than a synthetic one.
+*(none)*
 
 ## Backlog — M2
 
@@ -118,6 +98,23 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-07** frontmatter's visual treatment: a new `renderFrontmatter`
+      (`internal/review/review.go`) draws a `blockFrontmatter` block as a
+      dimmed key/value block ahead of the document, picking the maintainer's
+      middle candidate over hidden-on-demand or a collapsed line that
+      expands — it needs no new key or interaction state to see, unlike
+      either of the others. `frontmatterFields` (`internal/review/parse.go`)
+      strips the `---` fences from the block's raw text and returns the
+      inner lines with their own indentation kept, so a nested YAML value
+      (a list, say) still reads correctly. It stays out of `m.entries`
+      entirely — `rebuild` still filters it, unchanged from PARSE-03 — so it
+      remains not focusable, not commentable, not markable; `render()` draws
+      it directly against `m.doc[0]` ahead of the entry loop instead. A field
+      wider than the measure is truncated with an ellipsis rather than
+      wrapped, since frontmatter is key: value pairs, not prose — a wrapped
+      continuation line would misread as a second field. This was the last
+      item in M1's backlog, which is now empty. `[felt]` — see journal
+      2026-08-08.8 for the demo recipe — done 2026-08-08
 - [x] **RENDER-03** render tables: a new `blockTable` kind (`internal/
       review/document.go`, `parse.go`) replaces the old verbatim `blockRaw`
       treatment, carrying a parsed `*tableBlock` (header, rows, per-column

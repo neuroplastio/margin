@@ -206,10 +206,12 @@ func (m *model) rebuild() {
 	m.entries = m.entries[:0]
 	for _, b := range m.doc {
 		if b.kind == blockFrontmatter {
-			// Not rendered at all: it is metadata about the document, not part
-			// of it, and how it should look on screen is an open felt question
-			// (see the frontmatter-rendering feedback) that nothing here
-			// answers by picking a treatment.
+			// Metadata about the document, not part of it: no focus stop, no
+			// comments, no mark, no review-progress accounting — none of
+			// that changes here. It does get a visual treatment now
+			// (RENDER-07); render() draws it directly against m.doc,
+			// outside the entry list entirely, since nothing about it
+			// should behave like a real block.
 			continue
 		}
 		m.entries = append(m.entries, entry{b: b})
@@ -803,6 +805,13 @@ func (m *model) render() []string {
 	m.subspans = map[cursor]span{}
 	var lines []string
 
+	if len(m.doc) > 0 && m.doc[0].kind == blockFrontmatter {
+		// Always first when present (parseDoc emits it before anything
+		// else) — drawn ahead of the entry loop rather than folded into it,
+		// since it is not an entry at all (see rebuild).
+		lines = append(lines, renderFrontmatter(m.doc[0], w)...)
+	}
+
 	for i, e := range m.entries {
 		start := len(lines)
 		focused := m.at.entry == i
@@ -1313,6 +1322,35 @@ func highlightCode(lines []string, lang string) []string {
 		return lines
 	}
 	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+}
+
+// renderFrontmatter draws a document's leading frontmatter (blockFrontmatter)
+// as a dimmed key/value block, indented to match the gutter width so it lines
+// up with the prose below rather than sitting flush against the left edge.
+// RENDER-07: the maintainer's feedback offered three candidates — hidden on
+// demand, a dimmed key/value block, or a collapsed line that expands — and
+// this picks the middle one. It needs no new key, no new focus state and no
+// interaction to see at all, unlike the other two; a reviewer scanning
+// name/status/tags before the prose is the common case a felt leg should
+// optimise for, not the rare one a hidden-by-default treatment assumes. A
+// field line longer than the measure is truncated with an ellipsis rather
+// than wrapped — frontmatter is short key: value pairs, not prose, so a
+// wrapped continuation line would read as a second field.
+func renderFrontmatter(b block, w int) []string {
+	fields := frontmatterFields(b.text)
+	if len(fields) == 0 {
+		return nil
+	}
+	indent := strings.Repeat(" ", gutterW)
+	lines := make([]string, 0, len(fields)+1)
+	for _, f := range fields {
+		if len([]rune(f)) > w {
+			f = truncate(f, w)
+		}
+		lines = append(lines, indent+dimStyle.Render(f))
+	}
+	lines = append(lines, "")
+	return lines
 }
 
 // tableColumnSpacing is the gap between two adjacent columns. No vertical
