@@ -28,14 +28,10 @@ Last updated: 2026-08-08 (RENDER-02 landed — fenced code blocks now chroma-hig
 
 ## In progress
 
-*(none)*
+- **RENDER-03** claimed 2026-08-08 (agent) — render tables.
 
 ## Backlog — M1
 
-- **RENDER-03** `[felt]` Render tables. *The parse prerequisite this note used
-  to name is done — 2026-08-08.1 enabled goldmark's GFM extensions, so a table
-  now arrives as a `blockRaw`, shown verbatim, rather than a paragraph. This
-  task is now purely the visual treatment: what a table actually looks like.*
 - **RENDER-07** `[felt]` Frontmatter's visual treatment. PARSE-03 stopped it
   from corrupting the block model and made it invisible in the meantime, but
   invisible is a default, not a decision — the maintainer's feedback offered
