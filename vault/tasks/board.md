@@ -3,11 +3,12 @@
 Last updated: 2026-08-08 (EXPORT-05 done; first real review filed, queue has 5)
 
 **Active milestone:** M1 — Real documents
-**Awaiting review:** *(none)*
+**Needs a look:** *(nothing outstanding)*
 
-> `Awaiting review:` names the one felt leg the maintainer has not judged yet.
-> While it is set, only mechanical legs may be picked. Clear it when feedback
-> lands.
+> A running list of felt legs the maintainer has not judged yet — a log, not a
+> gate. Nothing waits on it. Agents append a line with the leg id and its journal
+> entry; the maintainer deletes lines as they are judged, and files feedback for
+> anything wrong.
 
 ## Legend
 

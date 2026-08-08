@@ -10,7 +10,7 @@ Do **exactly one leg**, then stop. Never two.
 Read [`/CLAUDE.md`](../../../CLAUDE.md) and [`vault/README.md`](../../../vault/README.md)
 before anything else. The rule that governs this whole skill:
 
-> **You decide how it is built. You do not decide how it feels.**
+> **Build it. A wrong thing on screen is worth more than a right thing described.**
 
 ## 1. Orient
 
@@ -35,9 +35,7 @@ several are invisible to tests.
 2. **Feedback preempts the board.** If `vault/feedback/` holds anything but its
    README, the oldest item is this leg. Address it and delete the file in the
    same commit.
-3. **Check the gate.** If the board's `Awaiting review:` names a leg, you may only
-   pick a `[mech]` task. Do not start `[felt]` work while it is set.
-4. Otherwise take the next unblocked board item in milestone order. If it is too
+3. Take the next unblocked board item in milestone order. If it is too
    big, split it and take the first slice — splitting is a legitimate leg.
 
 If everything is blocked, **stop and report which question or gate is holding
@@ -60,13 +58,14 @@ This acts as a lock for any concurrent agent.
 Small — roughly ≤300 lines of diff. One logical change. A compiling stub with
 tests beats a large half-wired change.
 
-**If you hit an unsettled interaction decision**, stop implementing. Write
-`vault/questions/Q-NNNN-slug.md` in the documented format, commit it, and report.
-A half-built leg parked behind a real question is a good outcome. A guessed
-keybinding is not.
+**If you hit a decision that is expensive to unwind** — an on-disk format, what
+an anchor means, something the next legs will build on — stop implementing, write
+`vault/questions/Q-NNNN-slug.md`, commit it, and report.
 
-Check `vault/knowledge/interaction.md` before assuming any behaviour. If it is
-not in there, it is not settled.
+**Everything else, decide.** How it looks, where it sits, which key does it: pick
+the most defensible option and build it. Check
+`vault/knowledge/interaction.md` first — behaviour recorded there is settled and
+binding — but its silence is permission, not a blocker.
 
 ## 5. Verify
 
@@ -91,18 +90,24 @@ looks right or feels responsive — put it in the demo recipe instead.
 
 - Durable technical facts → `vault/knowledge/findings.md` (append only).
 - Binding architectural choices → `vault/knowledge/decisions.md` as a new `Dn`.
-- Interaction behaviour that the maintainer has **already approved** →
+- Interaction behaviour the maintainer has **already approved** →
   `vault/knowledge/interaction.md`. Never add something there that has not been
-  judged; that file is the record of what is settled, not a place to declare it.
+  judged: that file records what is settled, and a choice you made this leg is
+  not settled just because you made it. It goes in the journal and on
+  `Needs a look:` until someone says otherwise.
 
 ## 7. Journal and board
 
 Add `vault/journal/YYYY-MM-DD.N.md` in the documented format. Move the task to
 Done on the board and update `Last updated:`.
 
-**If the leg was `[felt]`:** set the board's `Awaiting review:` to this leg's id,
-and end the journal entry with a `## Demo` section — the exact command, the keys
-to press, and the specific questions to answer. Concrete questions only.
+**If the leg was `[felt]`:** append a line to the board's `Needs a look:` list
+naming this leg and its journal entry, and end the journal entry with a `## Demo`
+section — the exact command, the keys to press, and the specific questions to
+answer. Concrete questions only. Say in one line what you chose and what you
+rejected; that is what makes a correction cheap.
+
+`Needs a look:` is a log, not a gate. Nothing waits on it.
 
 ## 8. Commit and stop
 

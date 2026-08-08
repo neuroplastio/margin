@@ -2,13 +2,14 @@
 
 **Agent → human.** Interaction decisions the agent must not make on its own.
 
-If a leg needs a behaviour that is not already settled in
-[`../knowledge/interaction.md`](../knowledge/interaction.md), the agent does *not*
-pick a sensible default. It writes a file here and stops.
+**Only for decisions that are expensive to unwind.** The test is *if this turns
+out wrong, is it a rename or a migration?* — on-disk formats, anchoring
+semantics, anything the next few legs will build on top of.
 
-That inversion is deliberate. A wrong interaction guess gets built on, and by the
-time it is seen the cost of changing it has multiplied. An unanswered question
-costs one round trip.
+Not for how something looks. A question about a visual treatment costs a round
+trip and comes back "I do not know either, build one" — so build one, show it,
+and expect to be corrected. That is cheaper for everybody, and it is what the
+demo recipe in the journal entry is for.
 
 ## Format
 

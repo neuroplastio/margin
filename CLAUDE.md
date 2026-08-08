@@ -7,65 +7,79 @@ recorded, and are committed to `main`. Run one with **`/do-leg`**.
 ## The one thing to know
 
 **margin's interaction model is not yet known.** There is no existing tool to
-match, no spec that settles what a keypress should do, and no test that can tell
-you whether the result is any good. The scarce resource on this project is the
-maintainer's judgement, not your throughput.
+match and no test that can tell you whether a keypress feels right. The
+maintainer's judgement is what settles that — but judgement needs something to
+judge.
 
 So the rule that governs everything else:
 
-> **You decide how it is built. You do not decide how it feels.**
+> **Build it. A wrong thing on screen is worth more than a right thing
+> described.**
 
-Anything a human has to *feel* to evaluate — layout, keybindings, modes, timing,
-wording, colour, what happens on a keypress — is theirs. Build it, stop, and ask.
+It is far easier to say "that block quote should be a vertical rule, not a `>` on
+every line" than to answer "how should block quotes look?" in the abstract. Ship
+your best guess, say what you guessed and why, and expect to be corrected.
 
-## Felt legs and mechanical legs
+*(This reverses an earlier rule that told you to stop and ask before deciding
+anything visual. Two days under that rule produced fourteen legs and not one
+change to how a document looks — the gate did not produce caution, it produced
+silence. The record is in the journal if you want it.)*
 
-Every leg is one or the other. Decide which **before** you start, and say so in
-the journal entry and the commit.
+## What still stops you
 
-**Mechanical** — correctness is provable by tests. Markdown parsing, block-id
-stamping, thread persistence, export format, file loading, refactors, bug fixes
-with a failing test. Proceed on your own judgement and keep moving.
+Blocking is right for exactly one class of decision: **the ones that are
+expensive to unwind.**
+
+The test is *if this turns out wrong, is it a rename or a migration?*
+
+- **On-disk formats** — thread files, the id marker syntax, anything an agent or
+  a future version has to keep reading.
+- **Anchoring semantics** — what an id means, what happens when it goes missing.
+- **Anything the next few legs will build on top of**, where changing it later
+  means changing them too.
+
+For those, write `vault/questions/Q-NNNN-slug.md` and stop. Everything else —
+layout, colour, spacing, which key does what, what a thing looks like — you
+decide. Pick the most defensible option, build it, and record what you picked and
+why.
+
+## Felt and mechanical
+
+Both still exist, but the distinction now changes *what you write down*, not
+whether you proceed.
+
+**Mechanical** — correctness is provable by tests. Parsing, persistence, export,
+refactors, bug fixes. Nothing extra needed.
 
 **Felt** — a passing test proves nothing about whether it is any good. Anything
 that changes what the screen looks like, what a key does, or how fast something
-feels. For these:
+feels. For these, still:
 
 1. Build the smallest version that can be judged.
-2. Write the demo recipe into the journal: the exact command, what to look at,
-   and the specific questions to answer. Be concrete — "does the cursor sit on
-   the right cell in insert mode?" beats "does it look OK?".
-3. **Stop.** Do not start another felt leg until feedback lands.
+2. End the journal entry with a demo recipe: the exact command, the keys to
+   press, and the specific questions to answer. Concrete — "does the level hint
+   in the gutter read at a glance?" beats "does it look OK?".
+3. Add a line to the board's `Needs a look:` list.
+4. **Keep going.** That list is a log, not a gate. Nothing waits on it.
 
-A mechanical leg can grow a felt half without anyone noticing. When one
-introduces a new block kind, message, state or mode, ask: **does something now
-render differently, or not render at all?** If yes, that half is felt — stop and
-show it. Leaving the renderer with no branch for a new case is still a decision
-about how it looks; it just does not feel like one at the time.
+Say which kind a leg was in the journal entry and the commit, as before.
 
-**At most one unreviewed felt leg exists at a time.** The board's `Awaiting
-review:` line names it. While it is set, you may do mechanical legs or nothing —
-you may not queue up more felt work. This is the whole pacing mechanism; do not
-route around it.
+## Bias, stated plainly
 
-Note what is *not* rationed: mechanical legs. Tests settle those, so they have no
-reason to wait on anyone, and a scheduled run chains them back to back. Only work
-that needs a human eye is paced.
+When you are unsure how something should look:
 
-## Blocking is correct here
+- **Do not park it.** A question about a visual treatment costs a round trip and
+  returns "I do not know either, build one".
+- **Do not build the most cautious version.** An invisible frontmatter block and
+  a heading with no level cue are both technically defensible and both useless.
+  Commit to something.
+- **Do say what you chose and what you rejected**, in one line, in the demo
+  recipe. That is what makes the correction cheap.
 
-The usual advice to an autonomous agent is *never block — pick a default and
-move on*. **On this project that advice is wrong.** If a leg needs an
-interaction decision that is not already settled in
-[`vault/knowledge/interaction.md`](vault/knowledge/interaction.md), do not pick a
-default and move on — write it to [`vault/questions/`](vault/questions/) and stop.
-
-A wrong interaction guess is worse than no progress: it gets built on, and by the
-time the maintainer sees it the cost of changing it has multiplied. An unanswered
-question costs one round trip.
-
-You still decide freely on: package layout, types, algorithms, dependencies,
-test strategy, error handling, naming of internals.
+The accepted cost is rework: some of what you build will be thrown away. That is
+the cheaper failure, and it is deliberate. If it stops being cheaper — if
+rendering choices start compounding into each other — say so and this gets
+revisited.
 
 ## Where everything lives (read before working)
 
@@ -101,7 +115,6 @@ test strategy, error handling, naming of internals.
      from what you may pick. If everything is blocked, stop and say so.
    - **Feedback preempts the board.** If `vault/feedback/` holds anything but its
      README, the oldest item *is* this leg. Address it, delete the file.
-   - **If `Awaiting review:` is set**, you may only pick a mechanical leg.
    - Otherwise take the next unblocked board item, respecting milestone order.
 3. **Claim** it on the board and commit that immediately (`chore(board): claim
    <id>`) so concurrent agents see the lock.
@@ -113,18 +126,18 @@ test strategy, error handling, naming of internals.
 6. **Record** — durable learnings to `vault/knowledge/`; any binding choice to
    `decisions.md`; any newly settled interaction to `interaction.md`.
 7. **Journal + board** — add the journal entry, move the task to done. If the leg
-   was felt, set `Awaiting review:` on the board and put the demo recipe in the
-   journal entry.
+   was felt, put the demo recipe in the journal entry and append a line to the
+   board's `Needs a look:` list. That list is a log; nothing waits on it.
 8. **Commit** to `main`. Stop; report what you did and what the maintainer should
    look at.
 
 ## Hard rules
 
 - **Green or revert.** Never commit a leg that fails `make check`.
-- **One leg per `/do-leg` invocation.** A scheduled run may chain several
-  mechanical legs via `/do-run`, but each leg is still a separate subagent with
-  its own commit, and the first felt leg or raised question ends the run.
-- **Never invent an interaction.** Ask instead.
+- **One leg per `/do-leg` invocation.** A scheduled run may chain legs via
+  `/do-run`, but each is a separate subagent with its own commit.
+- **Never guess at something expensive to unwind.** A format, an anchor, a thing
+  the next legs build on — ask. Everything else, decide.
 - **Never claim a visual or timing check you did not perform.** You cannot see the
   screen and you cannot feel latency. Say "needs a human check" and put it in the
   demo recipe. Tests that pass while the thing looks wrong are the normal case in
