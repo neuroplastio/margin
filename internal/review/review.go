@@ -31,6 +31,9 @@ const (
 	borderW    = 1
 	maxMeasure = 76 // the comfortable reading measure
 	footerRows = 2
+	// inlineReservedRow keeps the rendered frame strictly shorter than the
+	// terminal. See the viewport calculation in View for why.
+	inlineReservedRow = 1
 )
 
 // damageMsg says the child wrote something, so the grid may have changed. It is
@@ -930,7 +933,11 @@ func (m *model) View() tea.View {
 		m.paneW = m.contentWidth() - 2*borderW
 	}
 
-	viewport := max(m.h-footerRows, 1)
+	// One row short of the terminal, not exactly its height. A frame of exactly
+	// m.h lines makes an inline (non-altscreen) terminal scroll by one as the
+	// final newline lands, pushing the first line off the top — which is how a
+	// document's opening heading became invisible the moment it was opened.
+	viewport := max(m.h-footerRows-inlineReservedRow, 1)
 	m.scroll = m.clampScroll(len(lines), viewport)
 	visible := lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
 

@@ -60,21 +60,32 @@ lists wrap each item to the measure with a hanging indent that keeps the marker
 column clear; code fences and tables stay verbatim and scroll horizontally if
 they must.
 
-## 3. The frame scrolls one line on load, hiding the top heading
+## 3. The frame scrolls one line on load — FIXED 2026-08-08
 
-Reported: opening a document scrolls by one line, so the first heading is not
-visible until you scroll up.
+Leaving the diagnosis here because the shape of it is worth remembering.
 
-**I could not reproduce this headlessly.** At every viewport height from 20 to
-120 rows, `m.scroll` is 0 and the first rendered line is the `#` heading. So it
-is not the scroll offset, and it is not `clampScroll`.
+Reported as "opening a document scrolls one line, the first heading is not
+visible". It did not reproduce headlessly at any viewport height from 20 to 120
+rows: `m.scroll` was 0 and the first rendered line was the heading, every time.
+The model was never wrong.
 
-The likely candidate is a frame-height off-by-one that only manifests on a real
-terminal: `View()` emits the viewport slice, then `"\n\n  "` plus the footer. If
-that totals one line more than the terminal has rows, the terminal itself
-scrolls and the top line goes off the top — which looks exactly like this and is
-invisible to a test that inspects the string rather than a screen.
+A screenshot settled it. The first visible line was the opening *paragraph* and
+there was no focus bar anywhere on screen — focus was on the heading, above the
+viewport. So nothing had scrolled the model; the terminal itself had scrolled.
 
-To confirm: count the lines `View().Content` actually produces against `m.h`,
-for a document longer than the viewport. If it is `m.h` rather than `m.h - 1`,
-that is the bug.
+`View()` produced a frame of **exactly `m.h` lines**, and margin runs inline
+rather than in the alternate screen. An inline frame that fills the terminal
+scrolls it by one as the final newline lands, and the top line goes off the top.
+
+Fixed by reserving one row, so the frame is always at most `m.h - 1` lines.
+`TestFrameIsShorterThanTheTerminal` guards it by counting frame lines against
+several terminal heights — the only kind of test that could have caught this,
+since every piece of model state was correct while it was happening.
+
+**Still worth deciding: should margin use the alternate screen?**
+`tea.WithAltScreen()` would make this class of bug impossible rather than
+guarded against, and would restore the terminal's scrollback on exit instead of
+leaving the whole review in your history. The cost is that the terminal's own
+scrollback no longer scrolls the document — but SCROLL-03 wants an in-app wheel
+anyway, and in inline mode those two would fight each other. Felt, and not mine
+to decide.
