@@ -3,7 +3,7 @@
 Last updated: 2026-08-08 (EXPORT-05 done; first real review filed, queue has 5)
 
 **Active milestone:** M1 — Real documents
-**Awaiting review:** PARSE-02 — the first real-file baseline
+**Awaiting review:** *(none)*
 
 > `Awaiting review:` names the one felt leg the maintainer has not judged yet.
 > While it is set, only mechanical legs may be picked. Clear it when feedback
@@ -119,6 +119,11 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **PARSE-02** reviewed 2026-08-08 — a real document reads well at this
+      measure and the loop holds up on prose the reviewer did not write. Cleared
+      with defects filed rather than fixed inline: see the 2026-08-08 feedback
+      for tables, list truncation, heading hierarchy, block quotes and
+      line-level focus.
 - [x] **EXPORT-05** resolved threads excluded from the export by default,
       `--include-resolved` to bring them back (`internal/review/export.go`):
       `exportReview` gains an `includeResolved bool` parameter; an item stays
