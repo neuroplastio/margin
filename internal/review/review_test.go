@@ -907,3 +907,34 @@ func TestFrameIsShorterThanTheTerminal(t *testing.T) {
 		}
 	}
 }
+
+// TestFirstPaintBeforeSizeIsKnownDoesNotPoisonScroll is the regression for the
+// document's opening heading being invisible.
+//
+// Bubble Tea calls View once before the first WindowSizeMsg. View clamps
+// m.scroll as a side effect of rendering, so rendering against an unknown (zero)
+// terminal size clamped it to 1 — and nothing ever reset it, so the first line
+// of the document stayed hidden for the whole session.
+//
+// This is invisible to a test that renders once at a known size, which is why it
+// survived several rounds of probing: the model is only wrong after it has been
+// asked to render twice, the first time before it knew how big it was.
+func TestFirstPaintBeforeSizeIsKnownDoesNotPoisonScroll(t *testing.T) {
+	m := seedModel()
+
+	if got := m.View().Content; got != "" {
+		t.Errorf("View before the size is known rendered %d bytes, want nothing", len(got))
+	}
+	if m.scroll != 0 {
+		t.Fatalf("painting at an unknown size left scroll = %d, want 0", m.scroll)
+	}
+
+	m.w, m.h = 92, 26
+	m.View()
+	if m.scroll != 0 {
+		t.Errorf("scroll = %d once the size is known, want 0 — the document's first line is hidden", m.scroll)
+	}
+	if first := strings.SplitN(m.View().Content, "\n", 2)[0]; !strings.Contains(first, "Retry policy") {
+		t.Errorf("first rendered line is %q, want the document's opening heading", first)
+	}
+}

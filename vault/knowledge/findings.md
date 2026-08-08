@@ -205,3 +205,34 @@ cleanly has still only been tested in the environment that produced it.
 The patch is reachable at `claude.ai/code/artifact/<uuid>`, which can be fetched.
 The `claude.ai/api/organizations/.../files/.../contents` URL for the same content
 returns 403.
+
+## F10 — `View` mutates state, so the paint before `WindowSizeMsg` poisons it
+
+Bubble Tea calls `View()` once **before** the first `WindowSizeMsg`, while the
+terminal size is still zero. `View` clamps `m.scroll` as a side effect of
+rendering, and against a zero-height viewport that clamp landed on `1`. Nothing
+ever reset it, so the document's first line — its opening heading — stayed hidden
+for the rest of the session.
+
+`View` now returns nothing until `m.w` and `m.h` are known.
+
+**Why it survived several rounds of probing.** Every check rendered *once*, at a
+known size, and every one passed: `m.scroll` was 0, focus was on the first block,
+the first rendered line was the heading. The model is only wrong after being
+asked to render **twice, the first time before it knew how big it was** — a
+sequence no single-render test reproduces.
+
+Two lessons worth more than the fix:
+
+- **A render function that mutates state can be poisoned by its own first call.**
+  `clampScroll` has to run somewhere, but running it inside `View` means the
+  earliest, least-informed render sets a value every later one inherits. Treat
+  any assignment inside `View` as suspect.
+- **Reproduce the real call sequence, not just the real inputs.** Setting
+  `m.w, m.h` directly and calling `View` looks equivalent to what the program
+  does and is not: it skips the zero-size paint that Bubble Tea always performs.
+
+This is the third defect in this project that a passing test reported as fine
+(see F1, F8). The pattern is consistent: anything about *the frame as a whole* —
+its height, its offset, what actually reaches the screen — is invisible to tests
+that ask the model questions. A screenshot has now been decisive twice.

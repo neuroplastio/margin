@@ -916,6 +916,14 @@ func (m *model) View() tea.View {
 	if m.quitting {
 		return tea.NewView("")
 	}
+	// Bubble Tea calls View once before the first WindowSizeMsg, when the
+	// terminal size is still unknown. Rendering then is not merely wasted: View
+	// clamps m.scroll as a side effect, and against a zero-height viewport that
+	// clamp lands on 1 — an offset every later render inherits, which silently
+	// hides the document's first line for the rest of the session.
+	if m.w == 0 || m.h == 0 {
+		return tea.NewView("")
+	}
 	// Sample only on a frame the child's output actually triggered. Bubble Tea
 	// also renders immediately after the keypress itself, and counting that
 	// frame would report a latency of roughly zero.
