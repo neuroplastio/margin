@@ -162,6 +162,8 @@ func commentTarget(m *model) string {
 		return "heading"
 	case blockPara:
 		return "paragraph"
+	case blockQuote:
+		return "quote"
 	default:
 		return "block"
 	}

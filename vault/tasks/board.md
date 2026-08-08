@@ -1,11 +1,12 @@
 # Board
 
-Last updated: 2026-08-08 (heading-hierarchy feedback addressed; queue has 2)
+Last updated: 2026-08-08 (blockquote-rendering feedback addressed; queue has 1)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:**
 - RENDER-05 (heading hierarchy: weight + colour by depth) — journal
   2026-08-08.2
+- RENDER-04 (block quotes: rule down the left edge) — journal 2026-08-08.3
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -34,7 +35,6 @@ Last updated: 2026-08-08 (heading-hierarchy feedback addressed; queue has 2)
   to name is done — 2026-08-08.1 enabled goldmark's GFM extensions, so a table
   now arrives as a `blockRaw`, shown verbatim, rather than a paragraph. This
   task is now purely the visual treatment: what a table actually looks like.*
-- **RENDER-04** `[felt]` Render block quotes.
 - **RENDER-07** `[felt]` Frontmatter's visual treatment. PARSE-03 stopped it
   from corrupting the block model and made it invisible in the meantime, but
   invisible is a default, not a decision — the maintainer's feedback offered
@@ -119,6 +119,16 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-04** block quotes: a new `blockQuote` kind (`internal/review/
+      document.go`, `parse.go`) replaces the old verbatim `blockRaw`
+      treatment. `quoteLinesFor` strips each line's `>` marker; `wrapQuote`
+      (`review.go`) re-wraps the prose to the measure, preserving
+      paragraph breaks; render prepends a dim `"│ "` rule instead of the
+      source's `>`. Export's `quoteBlock` reuses the stripped lines to
+      reconstruct clean markdown on the way back out. Nested quotes and a
+      list/fence inside a quote deliberately left unhandled, per the
+      feedback's own "not worth designing for now". `[felt]` — see journal
+      2026-08-08.3 for the demo recipe — done 2026-08-08
 - [x] **RENDER-05** heading hierarchy: `headingStyle(level)` (`internal/
       review/review.go`) replaces the single `headStyle` with three,
       indexed by depth — bold/colour 212 at level 1, plain colour 183 at

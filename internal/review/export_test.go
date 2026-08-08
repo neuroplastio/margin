@@ -202,6 +202,35 @@ func TestExportPreservesListStructure(t *testing.T) {
 	}
 }
 
+// TestExportReconstructsBlockQuoteMarkup checks quoteBlock's blockQuote case
+// specifically: b.lines has already had its `>` markers stripped by
+// quoteLinesFor, so exporting must re-add exactly one `> ` per line, not
+// double it up by quoting the original raw source.
+func TestExportReconstructsBlockQuoteMarkup(t *testing.T) {
+	doc := parseDoc([]byte(sampleDoc))
+	var q block
+	for _, b := range doc {
+		if b.kind == blockQuote {
+			q = b
+		}
+	}
+	if q.anchor == "" {
+		t.Fatal("fixture has no block quote")
+	}
+	threads := map[string]*thread{q.anchor: {
+		anchor: q.anchor,
+		posted: []comment{{author: "toly", body: "testing this", at: time.Now()}},
+	}}
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+
+	if !strings.Contains(out, "> Breaker state is per-process.\n") {
+		t.Errorf("quote markup not reconstructed cleanly:\n%s", out)
+	}
+	if strings.Contains(out, ">>") || strings.Contains(out, "> >") {
+		t.Errorf("quote marker doubled up:\n%s", out)
+	}
+}
+
 func TestExportQuotesHeadingsAsMarkdown(t *testing.T) {
 	doc := parseDoc([]byte(sampleDoc))
 	var h block

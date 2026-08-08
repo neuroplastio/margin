@@ -32,6 +32,13 @@ const (
 	// Added last for the same reason blockFrontmatter was: existing kind
 	// ordinals must not shift under anchorFor's hash.
 	blockList
+	// blockQuote is a block quote. Split out from blockRaw (2026-08-08
+	// blockquote-rendering feedback): the `>` markers are markdown source, not
+	// a rendering, and the quoted text is prose that has to wrap like a
+	// paragraph does — the same reasoning that split blockList out earlier.
+	// Added last for the same reason: existing kind ordinals must not shift
+	// under anchorFor's hash.
+	blockQuote
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which
@@ -50,7 +57,10 @@ type block struct {
 	// lines holds the verbatim source of a blockRaw, which must not be
 	// re-wrapped — indentation and line breaks are the content. A blockList
 	// also carries it, purely so export's quoteBlock can keep reusing the
-	// verbatim path; the interactive renderer uses items instead.
+	// verbatim path; the interactive renderer uses items instead. A
+	// blockQuote carries its lines with the leading `>` markers already
+	// stripped, so both the renderer and quoteBlock can treat it as prose
+	// with paragraph breaks rather than as source to reproduce verbatim.
 	lines []string
 
 	// items holds a blockList's items, split out for independent wrapping.
@@ -90,13 +100,13 @@ const (
 // commentable reports whether a block can carry a thread. Headings can: "this
 // whole section is wrong" is a real comment, and it belongs on the heading.
 func (b block) commentable() bool {
-	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList
+	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote
 }
 
 // markable reports whether a block holds a review mark of its own. Headings do
 // not — they roll up their section, so the two can never disagree.
 func (b block) markable() bool {
-	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList
+	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote
 }
 
 // listItem is one item of a blockList, split out of the list's raw source so

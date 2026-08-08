@@ -52,7 +52,7 @@ func TestParseFindsTopLevelBlocks(t *testing.T) {
 		blockPara,    // The retry budget…
 		blockList,    // list
 		blockRaw,     // code fence
-		blockRaw,     // block quote
+		blockQuote,   // block quote
 		blockPara,    // Final paragraph.
 	}
 	if len(got) != len(want) {
@@ -94,6 +94,29 @@ func TestParseCollapsesParagraphsButNotRawBlocks(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(code.lines, "\n"), "    return nil") {
 		t.Errorf("code block lost its indentation: %q", code.lines)
+	}
+}
+
+// TestParseStripsQuoteMarkers is the parse-level regression test for the
+// 2026-08-08 blockquote-rendering feedback: quoteLinesFor must remove the
+// `>` (and its one optional space) from every line of a block quote, keeping
+// a blank source line as an empty line so a multi-paragraph quote's internal
+// breaks survive for wrapQuote to render as paragraph breaks.
+func TestParseStripsQuoteMarkers(t *testing.T) {
+	src := "> First paragraph,\n> still going.\n>\n> Second paragraph.\n"
+	blocks := parseDoc([]byte(src))
+	if len(blocks) != 1 || blocks[0].kind != blockQuote {
+		t.Fatalf("parsed %d block(s), want 1 blockQuote: %+v", len(blocks), blocks)
+	}
+	b := blocks[0]
+	want := []string{"First paragraph,", "still going.", "", "Second paragraph."}
+	if len(b.lines) != len(want) {
+		t.Fatalf("quote has %d lines, want %d: %q", len(b.lines), len(want), b.lines)
+	}
+	for i := range want {
+		if b.lines[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, b.lines[i], want[i])
+		}
 	}
 }
 

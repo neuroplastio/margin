@@ -20,8 +20,8 @@ import (
 // against. Only top-level nodes become blocks: nesting is a rendering concern,
 // and a reviewer comments on "that paragraph", not on an inline span.
 //
-// Headings, paragraphs and lists are understood. Everything else — code
-// fences, quotes, tables — is carried through as its own source lines and
+// Headings, paragraphs, lists and block quotes are understood. Everything
+// else — code fences, tables — is carried through as its own source lines and
 // rendered verbatim. That is deliberate for now: each of those is a felt
 // decision about how it should look, and guessing at several of them at once
 // is exactly what the review gate exists to prevent.
@@ -227,6 +227,15 @@ func blockFor(n ast.Node, src []byte) (block, bool) {
 	case *ast.ThematicBreak:
 		return block{}, false
 
+	case *ast.Blockquote:
+		lines := quoteLinesFor(raw)
+		if len(lines) == 0 {
+			return block{}, false
+		}
+		b := block{kind: blockQuote, text: raw, lines: lines, start: start, stop: stop}
+		b.anchor = anchorFor(b)
+		return b, true
+
 	case *ast.List:
 		items := listItemsFor(raw)
 		if len(items) == 0 {
@@ -385,6 +394,43 @@ func listItemsFor(raw string) []listItem {
 		last.text += " " + trimmed
 	}
 	return items
+}
+
+// quoteLineRE strips a block quote's leading `>` marker (and the one
+// optional space after it, per the CommonMark spec) from a source line.
+var quoteLineRE = regexp.MustCompile(`^\s*>\s?(.*)$`)
+
+// quoteLinesFor splits a block quote's raw source into its content lines
+// with the `>` markers removed, so the renderer and the export path can both
+// treat it as prose with paragraph breaks rather than as source to reproduce
+// verbatim (2026-08-08 blockquote-rendering feedback: a `>` on every line is
+// markdown source, not a rendered quote).
+//
+// It works line by line, the same way listItemsFor does, rather than
+// re-walking goldmark's paragraph children: a blank line inside the quote is
+// still `>` alone in the source, and stripping it by regex keeps that as a
+// blank line, which is what marks a paragraph break once the markers are
+// gone.
+//
+// A nested quote (`> > text`) only has its outer marker stripped — the inner
+// `>` is left in the text. Rendering that as a second rule is the obvious
+// next step if it comes up; not worth the machinery for a case that has not
+// been seen in practice yet. Likewise a quote containing a list or a fence
+// currently comes out as folded prose like any other paragraph text inside a
+// quote, losing that inner structure — the same tradeoff RENDER-04 accepted
+// for the common case (prose) rather than blocking on the rare one.
+func quoteLinesFor(raw string) []string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(raw, "\n"), "\n") {
+		if m := quoteLineRE.FindStringSubmatch(line); m != nil {
+			lines = append(lines, strings.TrimRight(m[1], " \t"))
+			continue
+		}
+		// A lazy continuation line (CommonMark permits omitting the `>` on a
+		// paragraph's later lines) — keep it as prose text.
+		lines = append(lines, strings.TrimSpace(line))
+	}
+	return lines
 }
 
 // anchorFor derives a block's id from its content. It is the fallback for a

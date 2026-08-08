@@ -809,7 +809,7 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
 					headingStyle(e.b.level).Render(e.b.text), "")
 
-		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList:
+		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
@@ -818,11 +818,15 @@ func (m *model) render() []string {
 			}
 			// A blockRaw is shown verbatim: for a code fence or a table, the
 			// indentation and the line breaks are the content, so re-wrapping
-			// it to the measure would destroy it. A blockList's items are
-			// prose, though, so they wrap like a paragraph does — just one
-			// item at a time, with a hanging indent that keeps the marker
-			// column clear (2026-08-08 rendering-bugs feedback, defect 2).
+			// it to the measure would destroy it. A blockList's items and a
+			// blockQuote's text are prose, though, so they wrap like a
+			// paragraph does — a list one item at a time with a hanging
+			// indent that keeps the marker column clear (2026-08-08
+			// rendering-bugs feedback, defect 2), a quote against a rule down
+			// the left edge instead of a `>` on every line (2026-08-08
+			// blockquote-rendering feedback).
 			var out []string
+			rule := ""
 			switch e.b.kind {
 			case blockPara:
 				out = wrap(e.b.text, w)
@@ -831,6 +835,9 @@ func (m *model) render() []string {
 				if mark != markOK {
 					body = rawStyle
 				}
+			case blockQuote:
+				rule = dimStyle.Render("│ ")
+				out = wrapQuote(e.b.lines, w-2)
 			default:
 				out = e.b.lines
 				if mark != markOK {
@@ -839,7 +846,7 @@ func (m *model) render() []string {
 			}
 			for _, l := range out {
 				lines = append(lines,
-					m.gutter(focused && m.at.comment == commentNone, mark, false)+body.Render(l))
+					m.gutter(focused && m.at.comment == commentNone, mark, false)+rule+body.Render(l))
 			}
 			if m.threads[e.b.anchor] == nil {
 				lines = append(lines, "")
@@ -1097,6 +1104,46 @@ func wrapList(items []listItem, w int) []string {
 				out = append(out, hang+l)
 			}
 		}
+	}
+	if len(out) == 0 {
+		return []string{""}
+	}
+	return out
+}
+
+// wrapQuote lays out a blockQuote's stripped lines (see quoteLinesFor) as
+// prose: consecutive non-blank lines are folded into one paragraph and
+// re-wrapped to w, the way collapse()+wrap() treats a regular paragraph,
+// while a blank line — the marker quoteLinesFor leaves behind for a `>`
+// alone in the source — becomes a paragraph break in the output. w is
+// already the measure minus the rule's own width; the caller (render)
+// prepends the rule to every line this returns, blank ones included, so the
+// rule reads as one continuous line down the quote rather than breaking for
+// its own paragraph gaps.
+func wrapQuote(lines []string, w int) []string {
+	var out []string
+	var para []string
+	flush := func() {
+		if len(para) == 0 {
+			return
+		}
+		out = append(out, wrap(strings.Join(para, " "), w)...)
+		para = nil
+	}
+	for _, l := range lines {
+		if strings.TrimSpace(l) == "" {
+			flush()
+			out = append(out, "")
+			continue
+		}
+		para = append(para, l)
+	}
+	flush()
+	// A trailing blank line inside the quote's source (rare, but a quote can
+	// end on a bare `>`) would otherwise show as a rule with nothing after
+	// it.
+	for len(out) > 0 && out[len(out)-1] == "" {
+		out = out[:len(out)-1]
 	}
 	if len(out) == 0 {
 		return []string{""}

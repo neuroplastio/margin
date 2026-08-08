@@ -542,6 +542,41 @@ func TestWrapListWrapsInsteadOfTruncating(t *testing.T) {
 	}
 }
 
+// TestWrapQuoteWrapsAndKeepsParagraphBreaks is the render-level regression
+// test for the 2026-08-08 blockquote-rendering feedback: a quote's prose has
+// to wrap like a paragraph, and a blank line inside the quote (a bare `>` in
+// the source, already stripped to "" by quoteLinesFor) must survive as a
+// paragraph break rather than being wrapped away or merged into one run.
+func TestWrapQuoteWrapsAndKeepsParagraphBreaks(t *testing.T) {
+	lines := []string{
+		"write to both stores, read from memory, and watch the fallback rate trend to zero as old sessions expire",
+		"",
+		"Second paragraph.",
+	}
+	w := 40
+	out := wrapQuote(lines, w)
+	if len(out) < 3 {
+		t.Fatalf("expected wrapping plus a paragraph break, got %d line(s): %v", len(out), out)
+	}
+	for _, l := range out {
+		if len(l) > w {
+			t.Errorf("line %q is %d bytes, wider than the measure %d", l, len(l), w)
+		}
+	}
+	var sawBreak bool
+	for _, l := range out {
+		if l == "" {
+			sawBreak = true
+		}
+	}
+	if !sawBreak {
+		t.Errorf("paragraph break went missing across the wrap: %v", out)
+	}
+	if !strings.Contains(strings.Join(out, " "), "Second paragraph.") {
+		t.Errorf("second paragraph's text went missing: %v", out)
+	}
+}
+
 func TestMarkParagraph(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
