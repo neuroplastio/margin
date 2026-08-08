@@ -1,12 +1,14 @@
 # Board
 
-Last updated: 2026-08-08 (blockquote-rendering feedback addressed; queue has 1)
+Last updated: 2026-08-08 (line-level-focus feedback addressed; queue empty)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:**
 - RENDER-05 (heading hierarchy: weight + colour by depth) — journal
   2026-08-08.2
 - RENDER-04 (block quotes: rule down the left edge) — journal 2026-08-08.3
+- Lists split into per-item blocks, from the line-level-focus feedback
+  (D12) — journal 2026-08-08.4
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -29,7 +31,6 @@ Last updated: 2026-08-08 (blockquote-rendering feedback addressed; queue has 1)
 - **RENDER-06** `[felt]` Inline markup — `**bold**`, `` `code` ``, links —
   currently shows as raw source, which is a large share of the reading-comfort
   gap on a real document.
-- **RENDER-01** `[felt]` Render lists. One block type, then stop and ask.
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables. *The parse prerequisite this note used
   to name is done — 2026-08-08.1 enabled goldmark's GFM extensions, so a table
@@ -119,6 +120,16 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-01** render lists: shipped in two parts, neither originally
+      filed under this id. Wrapping and hanging indent landed under the
+      2026-08-08 rendering-bugs feedback fix; splitting each item into its
+      own focusable, commentable, markable block (`blockListItem`, D12)
+      landed 2026-08-08 addressing the line-level-focus feedback. "One block
+      type, then stop and ask" — the task's original framing — is
+      superseded by D12's per-item split; marked done rather than rewritten,
+      since the actual want (lists render, and now render well) is met.
+      `[felt]` — see journal 2026-08-08.4 for the demo recipe — done
+      2026-08-08
 - [x] **RENDER-04** block quotes: a new `blockQuote` kind (`internal/review/
       document.go`, `parse.go`) replaces the old verbatim `blockRaw`
       treatment. `quoteLinesFor` strips each line's `>` marker; `wrapQuote`

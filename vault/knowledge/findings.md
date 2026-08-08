@@ -275,3 +275,40 @@ Fixed by splitting lists into their own kind (`blockList`, document.go) with
 their own layout (`wrapList`, review.go) rather than adding a special case
 inside `blockRaw`'s branch — a bucket is easier to keep honest when each member
 that behaves differently gets its own name.
+
+## F13 — `stampID`'s marker attaches to "whatever block was appended last," not to a byte position
+
+ID-01's marker recognition (`markerID`, parse.go) does not match a `<!--
+margin:^id-->` comment to the block it follows by position — it just sets the
+anchor on `blocks[len(blocks)-1]`, i.e. whatever `parseDoc`'s loop most
+recently appended. That is equivalent to matching by position *only* because,
+until now, every block came from a distinct top-level AST sibling with its own
+non-overlapping `[start,stop)` range, so "most recently appended" and
+"immediately preceding in the source" were always the same block.
+
+Splitting a list into one `blockListItem` per item (line-level-focus feedback,
+2026-08-08) broke that equivalence deliberately: every item in a list shares
+the *whole list's* range rather than getting one of its own (see
+`listItemBlocks`, parse.go — there is no cheap way to give a list item a real
+range that does not risk clipping a nested item or continuation line, and
+nothing needs it except stamping). Two consequences fall out of that, and both
+are worth knowing before anyone tries to design stamping for a sub-list
+position:
+
+- Stamping one item and reparsing does **not** give that item back its id —
+  the marker lands after the *whole list*, and `markerID` hands it to whichever
+  item was appended last, i.e. always the list's final item, regardless of
+  which item was actually stamped.
+- Stamping every item of a list in the same pass (what `stampAll` would do if
+  it did not special-case `blockListItem`) inserts N markers back-to-back
+  right after the list, and each subsequent one **overwrites** the previous
+  marker's attachment on that same last item — the earlier items never get
+  their own id at all, silently.
+
+`stampAll` sidesteps this by never stamping a `blockListItem` (see the guard in
+parse.go and blockListItem's doc comment in document.go) rather than trying to
+fix `markerID`'s position-blindness — that would need a real per-item byte
+range and a decision about what a marker inserted *inside* a list does to the
+list's own CommonMark parsing (an indented HTML comment risks becoming part of
+the preceding item's content; an unindented one risks closing the list
+early). Left for whoever designs durable sub-block anchoring.

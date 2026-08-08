@@ -117,3 +117,31 @@ Answers Q-0002. Extends D9's thread-file format rather than replacing it.
 Still felt and unsettled, tracked in `interaction.md`: whether a tombstone
 renders at all or only prevents the dangle, whether a resolved thread
 collapses, dims, or disappears, and which keys drive either.
+
+**D12 — A list item is its own block (`blockListItem`), not part of one
+`blockList` block.** Addresses the 2026-08-08 line-level-focus feedback's own
+preferred, smaller alternative to a general second focus level: "lists
+specifically may deserve to be real blocks rather than lines." `parseDoc`
+emits one `blockListItem` per item (nesting flattened into a wider prefix, as
+`listItemsFor` already did within a single list) instead of one `blockList`
+for the whole thing, so every item gets its own focus stop, comment thread and
+mark for free — `m.entries`, `stops()`, `sectionAnchors()` and export all
+already work per-`block`, so none of them needed to change to make that true.
+`blockList` the kind is left defined and unused rather than removed, so
+`blockQuote`'s ordinal (and `anchorFor`'s hash) does not shift.
+
+**Deliberately not decided here: durable ids for list items.** `stampID`
+inserts a marker at a block's byte range, and every item of a list shares the
+*whole list's* range rather than one of its own (see F13 in `findings.md` for
+why, and what goes wrong if `stampAll` is not made to skip them, which it now
+is). An item's anchor is content-derived only, exactly as any block's was
+before ID-01 — stable while the item's text is, not across a reword. That is
+no regression today: nothing in the running app calls `stampAll` yet, so no
+block of any kind survives a reword regardless. It becomes a real gap the
+moment ID-01/02 are wired into a live command, and designing a marker format
+for a sub-list position — without corrupting the list's own CommonMark
+parsing — is left for whoever does that.
+
+The general question the feedback also raised — line-level focus inside a
+code fence or table, and what an anchor on a *line* (not an item) means when
+the block is rewritten — is not addressed by this decision and remains open.

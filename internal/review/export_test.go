@@ -180,25 +180,33 @@ func TestExportNamesTheEnclosingSection(t *testing.T) {
 
 // The defect this replaces: a list was flattened onto one line and cut
 // mid-sentence, which is neither readable nor greppable.
+//
+// Since the 2026-08-08 line-level-focus feedback, a list item is its own
+// block (blockListItem) rather than the whole list being one — so the
+// property to check is narrower and better: commenting on one item quotes
+// exactly that item, not its siblings too.
 func TestExportPreservesListStructure(t *testing.T) {
 	doc := parseDoc([]byte(sampleDoc))
-	var list block
+	var item block
 	for _, b := range doc {
-		if b.kind == blockList && strings.Contains(b.text, "per-endpoint caps") {
-			list = b
+		if b.kind == blockListItem && strings.Contains(b.text, "per-endpoint caps") {
+			item = b
 		}
 	}
-	if list.anchor == "" {
-		t.Fatal("fixture has no list block")
+	if item.anchor == "" {
+		t.Fatal("fixture has no list item block")
 	}
-	threads := map[string]*thread{list.anchor: {
-		anchor: list.anchor,
+	threads := map[string]*thread{item.anchor: {
+		anchor: item.anchor,
 		posted: []comment{{author: "toly", body: "testing this", at: time.Now()}},
 	}}
 	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
 
-	if !strings.Contains(out, "> - per-endpoint caps\n> - a global ceiling") {
-		t.Errorf("list was flattened instead of quoted line by line:\n%s", out)
+	if !strings.Contains(out, "> - per-endpoint caps") {
+		t.Errorf("item was not quoted with its marker intact:\n%s", out)
+	}
+	if strings.Contains(out, "a global ceiling") {
+		t.Errorf("export quoted the sibling item too, not just the commented-on one:\n%s", out)
 	}
 }
 

@@ -46,14 +46,15 @@ func TestParseFindsTopLevelBlocks(t *testing.T) {
 		got = append(got, b.kind)
 	}
 	want := []blockKind{
-		blockHeading, // # Retry policy
-		blockPara,    // Each outbound call…
-		blockHeading, // ## Budgets
-		blockPara,    // The retry budget…
-		blockList,    // list
-		blockRaw,     // code fence
-		blockQuote,   // block quote
-		blockPara,    // Final paragraph.
+		blockHeading,  // # Retry policy
+		blockPara,     // Each outbound call…
+		blockHeading,  // ## Budgets
+		blockPara,     // The retry budget…
+		blockListItem, // - per-endpoint caps
+		blockListItem, // - a global ceiling
+		blockRaw,      // code fence
+		blockQuote,    // block quote
+		blockPara,     // Final paragraph.
 	}
 	if len(got) != len(want) {
 		for i, b := range blocks {
@@ -254,6 +255,15 @@ func TestStampIDRoundTrip(t *testing.T) {
 	before := parseSample(t)
 
 	for i, target := range before {
+		if target.kind == blockListItem {
+			// Every item of a list shares the whole list's byte range (see
+			// listItemBlocks), so a marker stamped for one item lands after
+			// the last item instead — the single-block round trip this test
+			// checks does not hold for these yet. stampAll knows the same
+			// thing and never stamps one (parse.go); this is that limit,
+			// not a bug in stampID.
+			continue
+		}
 		src := []byte(sampleDoc)
 		id := newBlockID()
 		stamped := stampID(src, target, id)
@@ -576,8 +586,17 @@ func TestStampEveryBlockSequentially(t *testing.T) {
 	orig := parseSample(t)
 	cur := []byte(sampleDoc)
 	want := map[int]string{}
+	stamped := 0
 
 	for i := len(orig) - 1; i >= 0; i-- {
+		if orig[i].kind == blockListItem {
+			// Every item of a list shares the whole list's byte range (see
+			// listItemBlocks), so stamping them one at a time in the same
+			// pass as everything else does not hold — stampAll excludes
+			// them for the same reason (parse.go). Covered on its own by
+			// TestStampIDRoundTrip's matching skip.
+			continue
+		}
 		blocks := parseDoc(cur)
 		if len(blocks) != len(orig) {
 			t.Fatalf("stamping block %d: block count drifted to %d, want %d", i, len(blocks), len(orig))
@@ -585,6 +604,7 @@ func TestStampEveryBlockSequentially(t *testing.T) {
 		id := newBlockID()
 		want[i] = id
 		cur = stampID(cur, blocks[i], id)
+		stamped++
 	}
 
 	final := parseDoc(cur)
@@ -592,6 +612,9 @@ func TestStampEveryBlockSequentially(t *testing.T) {
 		t.Fatalf("after stamping every block: %d blocks, want %d", len(final), len(orig))
 	}
 	for i := range orig {
+		if orig[i].kind == blockListItem {
+			continue
+		}
 		if final[i].text != orig[i].text {
 			t.Errorf("block %d text changed:\n  was %q\n  now %q", i, orig[i].text, final[i].text)
 		}
@@ -605,8 +628,8 @@ func TestStampEveryBlockSequentially(t *testing.T) {
 			t.Errorf("block %d is not flagged as stamped", i)
 		}
 	}
-	if n := strings.Count(string(cur), "<!--margin:"); n != len(orig) {
-		t.Errorf("%d markers in the source, stamped %d blocks", n, len(orig))
+	if n := strings.Count(string(cur), "<!--margin:"); n != stamped {
+		t.Errorf("%d markers in the source, stamped %d blocks", n, stamped)
 	}
 }
 
@@ -630,7 +653,14 @@ func TestStampAllStampsOnlyUnstampedBlocks(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
+	wantMarkers := 0
 	for i, b := range blocks {
+		if b.kind == blockListItem {
+			// stampAll deliberately never stamps these (parse.go) — see
+			// TestStampAllNeverStampsListItems.
+			continue
+		}
+		wantMarkers++
 		if !b.stamped {
 			t.Errorf("block %d was not stamped", i)
 		}
@@ -645,8 +675,37 @@ func TestStampAllStampsOnlyUnstampedBlocks(t *testing.T) {
 	if blocks[1].anchor != preID {
 		t.Errorf("stampAll gave the already-stamped block a new id: %s, want %s (untouched)", blocks[1].anchor, preID)
 	}
-	if n := strings.Count(string(out), "<!--margin:"); n != len(orig) {
-		t.Errorf("%d markers in the source, want one per block (%d)", n, len(orig))
+	if n := strings.Count(string(out), "<!--margin:"); n != wantMarkers {
+		t.Errorf("%d markers in the source, want one per stampable block (%d)", n, wantMarkers)
+	}
+}
+
+// TestStampAllNeverStampsListItems pins the exclusion directly: a list
+// item's anchor stays content-derived (unstamped) through stampAll, rather
+// than silently corrupting the list the way stamping it would (see
+// listItemBlocks' doc comment).
+func TestStampAllNeverStampsListItems(t *testing.T) {
+	src := []byte(sampleDoc)
+	out, blocks := stampAll(src, parseDoc(src))
+
+	var found bool
+	for _, b := range blocks {
+		if b.kind != blockListItem {
+			continue
+		}
+		found = true
+		if b.stamped {
+			t.Errorf("list item %q was stamped", b.text)
+		}
+	}
+	if !found {
+		t.Fatal("fixture has no list item to check")
+	}
+	// The list's own raw text must survive completely intact and unsplit —
+	// if a marker had landed between its two items (the bug this guards
+	// against), this exact substring would no longer appear.
+	if !strings.Contains(string(out), "- per-endpoint caps\n- a global ceiling") {
+		t.Errorf("stampAll wrote a marker inside the list:\n%s", out)
 	}
 }
 

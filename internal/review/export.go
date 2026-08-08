@@ -142,7 +142,7 @@ func quoteBlock(b block) string {
 		// greppable in the source.
 		lines = []string{strings.Repeat("#", max(b.level, 1)) + " " + b.text}
 
-	case blockRaw, blockList, blockQuote:
+	case blockRaw, blockList, blockQuote, blockListItem:
 		// A blockQuote's lines already have their `>` markers stripped (see
 		// quoteLinesFor), so re-adding "> " below reconstructs the original
 		// markup rather than doubling it up.

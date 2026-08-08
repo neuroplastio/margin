@@ -72,6 +72,14 @@ func parseDoc(src []byte) []block {
 				continue
 			}
 		}
+		if list, ok := n.(*ast.List); ok {
+			// A list is not one block but several — see blockListItem's
+			// doc comment for why. blockFor stays one-node-in, one-block-out,
+			// so this is handled here instead of inside it, the same way
+			// markerID and the frontmatter check already are.
+			blocks = append(blocks, listItemBlocks(list, src)...)
+			continue
+		}
 		b, ok := blockFor(n, src)
 		if !ok {
 			continue
@@ -177,7 +185,7 @@ func stampID(src []byte, b block, id string) []byte {
 // from it. It is what re-attachment (ID-02) actually relies on: a document
 // opened after several blocks acquired threads in an earlier session needs
 // all of them turned durable together, not one at a time with a reparse in
-// between.
+// between. blockListItem is the one exception — see the skip below.
 //
 // It walks from the end of the document backwards, which is the only order in
 // which stampID's guarantee — bytes before the stamped block are untouched —
@@ -187,6 +195,16 @@ func stampAll(src []byte, blocks []block) ([]byte, []block) {
 	out := src
 	for i := len(blocks) - 1; i >= 0; i-- {
 		if blocks[i].stamped {
+			continue
+		}
+		if blocks[i].kind == blockListItem {
+			// Every item of a list shares that list's byte range (see
+			// listItemBlocks) rather than a range of its own — stamping one
+			// would insert a marker line mid-list, corrupting it, and would
+			// collide with every sibling item's stamp landing at the same
+			// spot. Sub-list stamping needs its own on-disk marker format;
+			// left unstamped, with a content-derived anchor, until that is
+			// designed (see blockListItem's doc comment in document.go).
 			continue
 		}
 		out = stampID(out, blocks[i], newBlockID())
@@ -233,16 +251,6 @@ func blockFor(n ast.Node, src []byte) (block, bool) {
 			return block{}, false
 		}
 		b := block{kind: blockQuote, text: raw, lines: lines, start: start, stop: stop}
-		b.anchor = anchorFor(b)
-		return b, true
-
-	case *ast.List:
-		items := listItemsFor(raw)
-		if len(items) == 0 {
-			return block{}, false
-		}
-		lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
-		b := block{kind: blockList, text: raw, lines: lines, items: items, start: start, stop: stop}
 		b.anchor = anchorFor(b)
 		return b, true
 
@@ -364,9 +372,17 @@ func collapse(s string) string {
 // a marker (-, *, + or an ordered N. / N)), then its own text.
 var listItemRE = regexp.MustCompile(`^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$`)
 
-// listItemsFor splits a list block's raw source into its items, so each can
-// wrap independently at render time instead of being truncated at the
-// measure (2026-08-08 rendering-bugs feedback, defect 2).
+// listItemPos is a listItem plus the 0-based row, within the list's own raw
+// text, that it starts on — enough for listItemBlocks to give each item a
+// real line number without a second pass.
+type listItemPos struct {
+	listItem
+	row int
+}
+
+// listItemsWithPos does the actual splitting; listItemsFor and
+// listItemBlocks are its two callers, needing the text alone and the text
+// plus position respectively.
 //
 // It works line by line off the raw source rather than walking goldmark's
 // AST: every item, at any nesting depth, starts a line matching
@@ -378,12 +394,12 @@ var listItemRE = regexp.MustCompile(`^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$`)
 // soft-wrapped continuation of prose and folds into the current item's text
 // the same way collapse() folds a paragraph's line breaks away; a blank line
 // (the separator in a loose list) is simply skipped.
-func listItemsFor(raw string) []listItem {
-	var items []listItem
-	for _, line := range strings.Split(strings.TrimRight(raw, "\n"), "\n") {
+func listItemsWithPos(raw string) []listItemPos {
+	var items []listItemPos
+	for row, line := range strings.Split(strings.TrimRight(raw, "\n"), "\n") {
 		if m := listItemRE.FindStringSubmatch(line); m != nil {
 			prefix := m[1] + m[2] + " "
-			items = append(items, listItem{prefix: prefix, text: strings.TrimSpace(m[3])})
+			items = append(items, listItemPos{listItem{prefix: prefix, text: strings.TrimSpace(m[3])}, row})
 			continue
 		}
 		trimmed := strings.TrimSpace(line)
@@ -394,6 +410,58 @@ func listItemsFor(raw string) []listItem {
 		last.text += " " + trimmed
 	}
 	return items
+}
+
+// listItemsFor splits a list block's raw source into its items, so each can
+// wrap independently at render time instead of being truncated at the
+// measure (2026-08-08 rendering-bugs feedback, defect 2). See
+// listItemsWithPos for how the split itself works.
+func listItemsFor(raw string) []listItem {
+	pos := listItemsWithPos(raw)
+	items := make([]listItem, len(pos))
+	for i, p := range pos {
+		items[i] = p.listItem
+	}
+	return items
+}
+
+// listItemBlocks turns a *ast.List node into one blockListItem per item
+// (2026-08-08 line-level-focus feedback) — see blockListItem's doc comment
+// for why a list is several blocks rather than one carrying an items slice.
+//
+// Every item shares the whole list's byte range rather than getting one of
+// its own: the range is only ever used for two things elsewhere, and neither
+// needs a real per-item range. b.line is computed directly from row instead.
+// stampID needs one, but stampAll skips blockListItem entirely (see below),
+// so the shared, overlapping range is inert rather than a latent corruption
+// — nothing calls stampID on one of these blocks today.
+func listItemBlocks(n ast.Node, src []byte) []block {
+	start, stop := extent(n, src)
+	if start < 0 {
+		return nil
+	}
+	pos := listItemsWithPos(string(src[start:stop]))
+	if len(pos) == 0 {
+		return nil
+	}
+	listLine := 1 + bytes.Count(src[:start], []byte{'\n'})
+	blocks := make([]block, len(pos))
+	for i, p := range pos {
+		text := p.prefix + p.text
+		b := block{
+			kind:    blockListItem,
+			text:    text,
+			lines:   []string{text},
+			items:   []listItem{p.listItem},
+			listEnd: i == len(pos)-1,
+			line:    listLine + p.row,
+			start:   start,
+			stop:    stop,
+		}
+		b.anchor = anchorFor(b)
+		blocks[i] = b
+	}
+	return blocks
 }
 
 // quoteLineRE strips a block quote's leading `>` marker (and the one

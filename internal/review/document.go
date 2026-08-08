@@ -39,6 +39,30 @@ const (
 	// Added last for the same reason: existing kind ordinals must not shift
 	// under anchorFor's hash.
 	blockQuote
+	// blockListItem is one item of a list, replacing blockList as of the
+	// 2026-08-08 line-level-focus feedback: "a list of six items is six
+	// things, not one." parseDoc now emits one blockListItem per item
+	// (nesting flattened, same as listItemsFor already did within a single
+	// blockList) instead of one blockList for the whole thing, so each item
+	// gets its own focus stop, comment thread and mark for free — the
+	// existing per-block machinery (m.entries, stops(), sectionAnchors())
+	// needs no change to make that true. blockList itself is left defined,
+	// not reused, so its ordinal (and blockQuote's after it) does not shift
+	// under anchorFor's hash. Added last for the same reason as the others.
+	//
+	// Not solved here: a stamped, durable id for an item. stampID inserts a
+	// marker at a block's byte range, and that mechanism has only ever
+	// operated on top-level siblings of the document root — a list item's
+	// range sits inside the list's own range, so naively stamping it would
+	// insert a marker mid-list and corrupt it. stampAll skips blockListItem
+	// for exactly this reason (see parse.go); an item's anchor is always
+	// content-derived, same as any block was before ID-01, and does not yet
+	// survive the item being reworded. That is no regression today — nothing
+	// in the running app calls stampAll yet, so no block's anchor survives a
+	// reword regardless of kind — but it is a real gap once ID-01/02 do get
+	// wired in, and designing the on-disk marker format for a sub-list
+	// position is deliberately left for whoever does that.
+	blockListItem
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which
@@ -63,9 +87,17 @@ type block struct {
 	// with paragraph breaks rather than as source to reproduce verbatim.
 	lines []string
 
-	// items holds a blockList's items, split out for independent wrapping.
-	// Nil for every other kind.
+	// items holds a blockListItem's own item, wrapped in a one-element slice
+	// so wrapList (built for a whole blockList's items) can render it
+	// unchanged. Nil for every other kind.
 	items []listItem
+
+	// listEnd is true for the last blockListItem split out of a given list.
+	// Render uses it to add the usual blank line after the list as a whole
+	// rather than after every item, so a six-item list still reads as one
+	// list, not six blocks with gaps between them. Meaningless for any other
+	// kind.
+	listEnd bool
 
 	level       int // heading level
 	line        int // 1-based line the block starts on; 0 when unknown
@@ -100,13 +132,13 @@ const (
 // commentable reports whether a block can carry a thread. Headings can: "this
 // whole section is wrong" is a real comment, and it belongs on the heading.
 func (b block) commentable() bool {
-	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote
+	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem
 }
 
 // markable reports whether a block holds a review mark of its own. Headings do
 // not — they roll up their section, so the two can never disagree.
 func (b block) markable() bool {
-	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote
+	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem
 }
 
 // listItem is one item of a blockList, split out of the list's raw source so

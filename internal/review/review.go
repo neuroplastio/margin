@@ -809,7 +809,7 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
 					headingStyle(e.b.level).Render(e.b.text), "")
 
-		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote:
+		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
@@ -830,7 +830,7 @@ func (m *model) render() []string {
 			switch e.b.kind {
 			case blockPara:
 				out = wrap(e.b.text, w)
-			case blockList:
+			case blockList, blockListItem:
 				out = wrapList(e.b.items, w)
 				if mark != markOK {
 					body = rawStyle
@@ -848,7 +848,13 @@ func (m *model) render() []string {
 				lines = append(lines,
 					m.gutter(focused && m.at.comment == commentNone, mark, false)+rule+body.Render(l))
 			}
-			if m.threads[e.b.anchor] == nil {
+			// A blockListItem gets its trailing blank line only once, after
+			// the list's last item, so a six-item list still reads as one
+			// list with one gap after it rather than six blocks each with
+			// their own — the split into per-item blocks (2026-08-08
+			// line-level-focus feedback) is for focus and comments, not for
+			// spacing.
+			if m.threads[e.b.anchor] == nil && (e.b.kind != blockListItem || e.b.listEnd) {
 				lines = append(lines, "")
 			}
 
