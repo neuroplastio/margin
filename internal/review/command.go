@@ -124,6 +124,16 @@ var commands = []command{
 		Run:         func(m *model) tea.Cmd { m.cycleMark(); return nil },
 	},
 	{
+		ID:          "thread.resolve",
+		Description: "Resolve or unresolve the focused thread",
+		Applicable: func(m *model) bool {
+			a := m.anchorAt()
+			return a != "" && m.threads[a] != nil
+		},
+		Target: resolveTarget,
+		Run:    func(m *model) tea.Cmd { m.toggleResolved(); return nil },
+	},
+	{
 		ID:          "review.export",
 		Description: "Copy the whole review to the clipboard",
 		Applicable:  func(m *model) bool { return true },
@@ -198,6 +208,21 @@ func editTarget(m *model) string {
 	return ""
 }
 
+// resolveTarget names what thread.resolve is about to do — "Resolve" or
+// "Unresolve" — so the palette (once it exists) reads as an action, not a
+// toggle the user has to already know the state to interpret. Applicable
+// already guarantees a thread exists at focus.
+func resolveTarget(m *model) string {
+	t := m.threads[m.anchorAt()]
+	if t == nil {
+		return ""
+	}
+	if t.resolved {
+		return "unresolve"
+	}
+	return "resolve"
+}
+
 // markTarget names what a mark command would act on: a single block, or the
 // whole section when focus sits on a heading. Shares sectionLabel (review.go)
 // with toggleMark and cycleMark's own status messages, so the palette's title
@@ -224,6 +249,7 @@ var keymap = map[string]string{
 	"r":     "mark.reviewed",
 	"f":     "mark.flagged",
 	"space": "mark.cycle", " ": "mark.cycle",
+	"R": "thread.resolve",
 	"Y": "review.export",
 	"q": "app.quit", "ctrl+c": "app.quit",
 }

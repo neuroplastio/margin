@@ -1,8 +1,10 @@
 # Board
 
-Last updated: 2026-08-08 (RENDER-07 landed — frontmatter renders as a dimmed key/value block)
+Last updated: 2026-08-08 (THREAD-02 landed — resolved threads get a checkmark
+marker and a badge; M1's backlog has been empty since RENDER-07, so the
+active milestone moves to M2)
 
-**Active milestone:** M1 — Real documents
+**Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
 - RENDER-05 (heading hierarchy: weight + colour by depth) — journal
   2026-08-08.2
@@ -17,6 +19,8 @@ Last updated: 2026-08-08 (RENDER-07 landed — frontmatter renders as a dimmed k
   journal 2026-08-08.7
 - RENDER-07 (frontmatter: dimmed key/value block ahead of the document) —
   journal 2026-08-08.8
+- THREAD-02 (resolved threads: checkmark marker collapsed, badge expanded,
+  `R` to toggle) — journal 2026-08-08.9
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -40,9 +44,6 @@ Last updated: 2026-08-08 (RENDER-07 landed — frontmatter renders as a dimmed k
 
 ## Backlog — M2
 
-- **THREAD-02** `[felt]` What resolving *looks* like — which key, whether a
-  resolved thread dims, collapses, or disappears, and whether resolving is
-  reachable from the collapsed line or only the expanded thread.
 - **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
   reply already in the thread makes "delete the thread" less obviously the
   reviewer's alone to do. THREAD-03 landed the tombstone data model and
@@ -98,6 +99,27 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **THREAD-02** what resolving looks like: a new `thread.resolve` command
+      (`internal/review/command.go`), bound to `R`, toggles `t.resolved` (D11)
+      on the thread anchored to the focused block — reachable whether that
+      thread is currently collapsed or expanded, since Applicable only
+      requires a thread to exist, the same test `comment.edit` already uses.
+      `toggleResolved` (`internal/review/review.go`) persists the flip
+      immediately through `m.store.save`, the same path a posted comment
+      takes in `dismiss`, rather than waiting for some other save point.
+      Visually: a resolved thread's **collapsed** line swaps the plain dim
+      `│` rule for a dim green `✓` (new `resolvedTxt` style) without touching
+      the draft/pending-edit colour underneath it, since unsaved text stays
+      the more urgent signal; a resolved thread **expanded** gets a two-line
+      `✓ resolved` badge ahead of the comments rather than the comments
+      dimming, collapsing, or disappearing — resolving says "handled", not
+      "no longer matters", and the conversation is still what the reviewer
+      came to read. `resolveTarget` (`command.go`) names the palette action as
+      "resolve" or "unresolve" rather than a bare toggle. This was the only
+      remaining M1 item's neighbour still sitting in M2's backlog after
+      RENDER-07 emptied M1 — the board's active milestone moves to M2 with
+      this leg. `[felt]` — see journal 2026-08-08.9 for the demo recipe —
+      done 2026-08-08
 - [x] **RENDER-07** frontmatter's visual treatment: a new `renderFrontmatter`
       (`internal/review/review.go`) draws a `blockFrontmatter` block as a
       dimmed key/value block ahead of the document, picking the maintainer's

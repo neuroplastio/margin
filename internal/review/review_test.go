@@ -926,6 +926,43 @@ func TestCollapsedThreadIsOneLine(t *testing.T) {
 	}
 }
 
+// TestCollapsedResolvedThreadShowsCheckmark: THREAD-02's marker swap — a
+// resolved thread's collapsed line trades the plain "│" rule for a
+// checkmark, still one line, no box.
+func TestCollapsedResolvedThreadShowsCheckmark(t *testing.T) {
+	m := newTestModel(t)
+	m.threads[convoAnchor].resolved = true
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+	lines := m.render()
+
+	i := entryFor(t, m, convoAnchor)
+	line := lines[m.spans[i].start]
+	if !strings.Contains(line, "✓") {
+		t.Errorf("collapsed resolved thread line = %q, want a checkmark", line)
+	}
+}
+
+// TestExpandedResolvedThreadSpansStayInsideTheirThread: THREAD-02's expanded
+// badge adds lines ahead of the comments — a regression here would leak a
+// comment's span out of its thread's outer span, the same failure
+// TestCommentSpansSitInsideTheirThread guards for the unresolved case.
+func TestExpandedResolvedThreadSpansStayInsideTheirThread(t *testing.T) {
+	m := newTestModel(t)
+	m.threads[convoAnchor].resolved = true
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+	m.render()
+
+	if len(m.subspans) != len(m.threads[convoAnchor].posted) {
+		t.Fatalf("%d comment spans for %d comments", len(m.subspans), len(m.threads[convoAnchor].posted))
+	}
+	outer := m.spans[m.at.entry]
+	for c, s := range m.subspans {
+		if s.start < outer.start || s.end > outer.end {
+			t.Errorf("comment %+v span %+v escapes its resolved thread span %+v", c, s, outer)
+		}
+	}
+}
+
 // TestSpansTileTheDocument: hit-testing, the cursor and scrolling all read from
 // spans, so a gap or an overlap silently misroutes clicks.
 func TestSpansTileTheDocument(t *testing.T) {

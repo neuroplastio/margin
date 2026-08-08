@@ -385,6 +385,30 @@ func (m *model) toggleMark(want reviewMark) {
 	}
 }
 
+// toggleResolved flips the resolved flag on the thread anchored to the
+// focused block (D11: a plain boolean, settable and clearable by either
+// party) and persists the change immediately, the same way a posted comment
+// is saved in dismiss — resolving is a small enough action that making it
+// wait for some other save point would be surprising. Reachable whether the
+// thread is collapsed or expanded: resolving is about the thread, not about
+// whatever state it happens to be rendered in right now.
+func (m *model) toggleResolved() {
+	t := m.threads[m.anchorAt()]
+	if t == nil {
+		m.status = "no thread here to resolve"
+		return
+	}
+	t.resolved = !t.resolved
+	if t.resolved {
+		m.status = "resolved"
+	} else {
+		m.status = "unresolved"
+	}
+	if err := m.store.save(t); err != nil {
+		m.status += " (not saved to disk: " + err.Error() + ")"
+	}
+}
+
 // sectionLabel names what a mark command is about to act on: a single block,
 // or the whole section when focus sits on a heading — the same distinction
 // sectionAnchors already draws. Shared by toggleMark, cycleMark and the mark
@@ -742,6 +766,7 @@ var (
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	flagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	resolvedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("108"))
 	rawStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("109"))
 	codeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("216"))
 	linkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Underline(true)
@@ -933,17 +958,35 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 
 	// Collapsed: literally one line, no box. A bordered one-liner costs three
 	// rows, and with a thread every few paragraphs that crowds out the document
-	// — which is what the reader came for.
+	// — which is what the reader came for. A resolved thread swaps the plain
+	// rule for a dim green checkmark: still one line, still no box, but a
+	// glance down the gutter now tells collapsed-and-done apart from
+	// collapsed-and-open without expanding either. It does not also mute the
+	// draft/pending-edit colour below — unsaved text is the more urgent signal
+	// of the two and should not go quiet just because the thread was resolved
+	// around it.
 	if !focused {
+		marker := dimStyle.Render("│ ")
+		if t.resolved {
+			marker = resolvedTxt.Render("✓ ")
+		}
 		style := dimStyle
 		if t.draft(newCommentSlot) != "" || t.pendingEdit() >= 0 {
 			style = draftStyle
 		}
-		return []string{strings.Repeat(" ", gutterW) + dimStyle.Render("│ ") + style.Render(t.summary())}
+		return []string{strings.Repeat(" ", gutterW) + marker + style.Render(t.summary())}
 	}
 
 	// Expanded: the whole exchange, ready to read. Comments are separately
-	// focusable so `e` knows which one to open.
+	// focusable so `e` knows which one to open. A resolved thread gets a
+	// two-line badge ahead of the comments rather than hiding or dimming
+	// them — resolving says "this is handled", not "this no longer matters";
+	// the conversation that led there is still what the reviewer came to
+	// read.
+	resolvedOffset := 0
+	if t.resolved {
+		resolvedOffset = 2
+	}
 	var body []string
 	mark := func(j int) string {
 		if m.at.comment == j {
@@ -953,7 +996,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	}
 	for j, c := range t.posted {
 		// +1 for the box's top border, which Render adds around this content.
-		commentStart := base + borderW + len(body)
+		commentStart := base + borderW + resolvedOffset + len(body)
 		head := mark(j) + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
 		if d := t.draft(j); d != "" {
 			head += draftStyle.Render("  ✎ edited, unsaved")
@@ -967,7 +1010,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 			body = append(body, "  "+l)
 		}
 		m.subspans[cursor{entry: i, comment: j}] = span{
-			start: commentStart, end: base + borderW + len(body) - 1,
+			start: commentStart, end: base + borderW + resolvedOffset + len(body) - 1,
 		}
 		if j < len(t.posted)-1 {
 			body = append(body, "")
@@ -984,6 +1027,9 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	}
 	if len(body) == 0 {
 		body = []string{"  " + dimStyle.Render("no comments yet — c to write one")}
+	}
+	if t.resolved {
+		body = append([]string{resolvedTxt.Render("✓ resolved"), ""}, body...)
 	}
 	return indent(strings.Split(box.Render(strings.Join(body, "\n")), "\n"))
 }

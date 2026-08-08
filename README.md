@@ -55,6 +55,7 @@ detectably orphaned rather than silently misplaced.
 | `e` | Edit the focused comment or draft (opens in normal mode) |
 | `space` | Cycle the mark: unmarked → reviewed → flagged |
 | `r` / `f` | Set reviewed / flagged directly |
+| `R` | Resolve / unresolve the focused thread |
 | `Y` | Copy the whole review to the clipboard |
 | `q` | Quit |
 

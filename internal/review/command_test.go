@@ -80,6 +80,57 @@ func TestMarkKeysRouteThroughTheRegistry(t *testing.T) {
 	}
 }
 
+// TestResolveKeyRoutesThroughTheRegistry: R resolves to thread.resolve and
+// toggles, the same way r/f toggle a mark.
+func TestResolveKeyRoutesThroughTheRegistry(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'R', Text: "R"}))
+	if !m.threads[convoAnchor].resolved {
+		t.Fatal("R did not resolve the thread")
+	}
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'R', Text: "R"}))
+	if m.threads[convoAnchor].resolved {
+		t.Fatal("re-pressing R did not unresolve the thread")
+	}
+}
+
+// TestResolveOnBlockWithNoThreadIsANoop: thread.resolve's Applicable requires
+// a thread to already exist — R on a bare paragraph must not create one just
+// to resolve it.
+func TestResolveOnBlockWithNoThreadIsANoop(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+	m.toggleResolved()
+	if m.threads[freshAnchor] != nil {
+		t.Fatal("toggleResolved created a thread where none existed")
+	}
+	if m.status == "" {
+		t.Fatal("expected a status message explaining nothing happened")
+	}
+}
+
+// TestResolveTargetNamesTheAction: the palette title should read as an
+// action ("resolve"/"unresolve"), not a bare state the user has to already
+// know how to interpret.
+func TestResolveTargetNamesTheAction(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+	if got, want := resolveTarget(m), "resolve"; got != want {
+		t.Errorf("resolveTarget on an open thread = %q, want %q", got, want)
+	}
+	m.threads[convoAnchor].resolved = true
+	if got, want := resolveTarget(m), "unresolve"; got != want {
+		t.Errorf("resolveTarget on a resolved thread = %q, want %q", got, want)
+	}
+
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+	if got := resolveTarget(m); got != "" {
+		t.Errorf("resolveTarget on a block with no thread = %q, want \"\"", got)
+	}
+}
+
 // TestQuitKeysRouteThroughTheRegistry: q and ctrl+c both resolve to
 // app.quit.
 func TestQuitKeysRouteThroughTheRegistry(t *testing.T) {
