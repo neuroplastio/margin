@@ -814,7 +814,7 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
 					headingStyle(e.b.level).Render(e.b.text), "")
 
-		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode:
+		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
@@ -855,6 +855,14 @@ func (m *model) render() []string {
 				// code and links: markup renders as markup, not as prose
 				// that happens to dim once reviewed.
 				out = highlightCode(e.b.lines, e.b.lang)
+				preStyled = true
+			case blockTable:
+				// A table is data, not markup, so it dims on review the same
+				// way a paragraph or a quote's text does — body already
+				// carries that (reviewedTxt above), and renderTable's header
+				// row builds on it with .Bold(true), the same "build on top
+				// of body" call RENDER-06 made for a paragraph's bold runs.
+				out = renderTable(e.b.table, w, body)
 				preStyled = true
 			default:
 				out = e.b.lines
@@ -1305,6 +1313,168 @@ func highlightCode(lines []string, lang string) []string {
 		return lines
 	}
 	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+}
+
+// tableColumnSpacing is the gap between two adjacent columns. No vertical
+// bar: RENDER-04 already chose a rule over a literal `>` for block quotes on
+// the grounds that markdown's own delimiter is source syntax, not a
+// rendering, and a `|` on every row is the same call for a table. Two spaces
+// reads as a column break without spending a whole glyph column on it.
+const tableColumnSpacing = "  "
+
+// renderTable lays out a blockTable as aligned columns: a bold header row, a
+// dim rule under it, then one row per line, colours all resolved against
+// body so a reviewed table dims exactly like the paragraph and quote text
+// beside it. Column widths come from the content itself (tableColumnWidths)
+// so a narrow table (most of them) is not stretched to the full measure.
+func renderTable(tb *tableBlock, w int, body lipgloss.Style) []string {
+	if tb == nil {
+		return nil
+	}
+	cols := tableColumns(tb)
+	if cols == 0 {
+		return nil
+	}
+	widths := tableColumnWidths(tableNaturalWidths(tb, cols), w)
+
+	lines := make([]string, 0, 2+len(tb.rows))
+	lines = append(lines, tableRowLine(tb.header, widths, tb.aligns, body.Bold(true)))
+	lines = append(lines, dimStyle.Render(tableRuleLine(widths)))
+	for _, row := range tb.rows {
+		lines = append(lines, tableRowLine(row, widths, tb.aligns, body))
+	}
+	return lines
+}
+
+// tableColumns is the widest of the header, the alignment row, and every body
+// row — a source table can be ragged (a short row, or no explicit alignment),
+// and every reader (cellAt, tableAlignAt) treats a short slice as trailing
+// empty/unaligned cells rather than a mismatch to fail on.
+func tableColumns(tb *tableBlock) int {
+	n := len(tb.header)
+	if len(tb.aligns) > n {
+		n = len(tb.aligns)
+	}
+	for _, row := range tb.rows {
+		if len(row) > n {
+			n = len(row)
+		}
+	}
+	return n
+}
+
+// tableNaturalWidths is each column's content width before any narrowing —
+// the widest cell (header included) in that column, in runes rather than
+// bytes so a multi-byte cell does not read as artificially wide.
+func tableNaturalWidths(tb *tableBlock, cols int) []int {
+	widths := make([]int, cols)
+	for i := range widths {
+		widths[i] = len([]rune(cellAt(tb.header, i)))
+	}
+	for _, row := range tb.rows {
+		for i := range widths {
+			if l := len([]rune(cellAt(row, i))); l > widths[i] {
+				widths[i] = l
+			}
+		}
+	}
+	return widths
+}
+
+// tableColumnWidths narrows natural column widths to fit w, when they do not
+// already. It repeatedly shaves one rune off the currently-widest column
+// above a 3-rune floor (enough room for truncate's own ellipsis) until the
+// row fits or every column has hit the floor — an even, proportional
+// narrowing rather than truncating one column down to nothing while its
+// neighbours stay full width. A row so packed with columns that even the
+// floor does not fit is left over-width rather than unreadable; that is a
+// terminal too narrow for this table, not a bug in the algorithm.
+func tableColumnWidths(natural []int, w int) []int {
+	const floor = 3
+	widths := append([]int(nil), natural...)
+	spacing := len(tableColumnSpacing) * (len(widths) - 1)
+	total := func() int {
+		sum := spacing
+		for _, x := range widths {
+			sum += x
+		}
+		return sum
+	}
+	for total() > w {
+		widest := -1
+		for i, x := range widths {
+			if x > floor && (widest < 0 || x > widths[widest]) {
+				widest = i
+			}
+		}
+		if widest < 0 {
+			break
+		}
+		widths[widest]--
+	}
+	return widths
+}
+
+// cellAt returns row's i'th cell, or "" past its end — the ragged-row
+// tolerance tableColumns' doc comment describes.
+func cellAt(row []string, i int) string {
+	if i < 0 || i >= len(row) {
+		return ""
+	}
+	return row[i]
+}
+
+// tableAlignAt returns column i's alignment, or alignNone (flush-left, no
+// padding preference) past the end of aligns.
+func tableAlignAt(aligns []tableAlign, i int) tableAlign {
+	if i < 0 || i >= len(aligns) {
+		return alignNone
+	}
+	return aligns[i]
+}
+
+// padCell truncates s to width (via truncate, the same rune-aware ellipsis
+// thread summaries already use) and pads it out to width according to align.
+func padCell(s string, width int, align tableAlign) string {
+	if width > 0 {
+		s = truncate(s, width)
+	}
+	pad := width - len([]rune(s))
+	if pad < 0 {
+		pad = 0
+	}
+	switch align {
+	case alignRight:
+		return strings.Repeat(" ", pad) + s
+	case alignCenter:
+		left := pad / 2
+		return strings.Repeat(" ", left) + s + strings.Repeat(" ", pad-left)
+	default:
+		return s + strings.Repeat(" ", pad)
+	}
+}
+
+// tableRowLine renders one row (header or body) as a single already-styled
+// line: every cell padded to its column's width and alignment, then style
+// applied per cell before joining — so the padding spaces themselves carry no
+// colour, which matters for alignRight and alignCenter's leading spaces.
+func tableRowLine(row []string, widths []int, aligns []tableAlign, style lipgloss.Style) string {
+	cells := make([]string, len(widths))
+	for i, width := range widths {
+		cells[i] = style.Render(padCell(cellAt(row, i), width, tableAlignAt(aligns, i)))
+	}
+	return strings.Join(cells, tableColumnSpacing)
+}
+
+// tableRuleLine draws the dim rule between the header and the body, one dash
+// run per column, the same widths the rows above and below it use, so the
+// rule lines up under the header exactly rather than approximating it.
+func tableRuleLine(widths []int) string {
+	cells := make([]string, len(widths))
+	for i, width := range widths {
+		cells[i] = strings.Repeat("─", width)
+	}
+	return strings.Join(cells, tableColumnSpacing)
 }
 
 // reportLatency prints the keypress-to-frame round trip, so "feels sluggish"

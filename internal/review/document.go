@@ -69,6 +69,14 @@ const (
 	// showing it as plain source. Added last for the same reason as the
 	// others: existing kind ordinals must not shift under anchorFor's hash.
 	blockCode
+	// blockTable is a GFM table. Split out from blockRaw (RENDER-03): a
+	// table's rows and columns are structured data, not lines to show
+	// verbatim, so it carries a parsed table (see the table field) the
+	// renderer can lay out with real column widths and alignment instead of
+	// printing the source's `|` pipes as-is. Added last for the same reason
+	// as the others: existing kind ordinals must not shift under
+	// anchorFor's hash.
+	blockTable
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which
@@ -94,11 +102,22 @@ type block struct {
 	// blockCode carries its lines with the opening/closing ``` fence already
 	// stripped — the highlighter and quoteBlock both work on the code
 	// itself, and lang carries what the fence said back for either to use.
+	// A blockTable carries its raw source lines too, for exactly the
+	// blockList reason above: quoteBlock reproduces the original `|` markup
+	// verbatim on export, while the interactive renderer uses table instead.
 	lines []string
 
 	// lang is a blockCode's fence info string (e.g. "go"), used to pick a
 	// chroma lexer. Empty for a fence with no language, or any other kind.
 	lang string
+
+	// table holds a blockTable's parsed rows and columns, nil for every
+	// other kind. Cell text has already had RENDER-06's inline markup
+	// stripped (see cellText in parse.go) — a table cell is prose too, but
+	// styling it in place would tangle column-width math with ANSI byte
+	// counts, so this first pass renders plain text and defers colour
+	// inside cells the same way RENDER-06 deferred lists and quotes.
+	table *tableBlock
 
 	// items holds a blockListItem's own item, wrapped in a one-element slice
 	// so wrapList (built for a whole blockList's items) can render it
@@ -145,13 +164,13 @@ const (
 // commentable reports whether a block can carry a thread. Headings can: "this
 // whole section is wrong" is a real comment, and it belongs on the heading.
 func (b block) commentable() bool {
-	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode
+	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode || b.kind == blockTable
 }
 
 // markable reports whether a block holds a review mark of its own. Headings do
 // not — they roll up their section, so the two can never disagree.
 func (b block) markable() bool {
-	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode
+	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode || b.kind == blockTable
 }
 
 // listItem is one item of a blockList, split out of the list's raw source so
@@ -162,6 +181,29 @@ func (b block) markable() bool {
 type listItem struct {
 	prefix string // e.g. "- ", "  - ", "1. ", printed before the item's first line
 	text   string // the item's own prose, collapsed, ready to re-wrap
+}
+
+// tableAlign is a column's alignment, carried over from GFM's delimiter row
+// (`:---`, `---:`, `:---:`) so the renderer can pad each column the way the
+// source asked for rather than always flush-left.
+type tableAlign int
+
+const (
+	alignNone tableAlign = iota
+	alignLeft
+	alignRight
+	alignCenter
+)
+
+// tableBlock is a blockTable's parsed structure: one row of header cells,
+// zero or more rows of body cells, and one alignment per column. header and
+// each row can be shorter than aligns — a ragged source table, or one with
+// no explicit alignment row — so every reader goes through cellAt (review.go)
+// rather than indexing directly.
+type tableBlock struct {
+	header []string
+	rows   [][]string
+	aligns []tableAlign
 }
 
 // next returns the mark one step around the cycle: unmarked, reviewed, flagged.

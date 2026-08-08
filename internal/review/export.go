@@ -142,10 +142,13 @@ func quoteBlock(b block) string {
 		// greppable in the source.
 		lines = []string{strings.Repeat("#", max(b.level, 1)) + " " + b.text}
 
-	case blockRaw, blockList, blockQuote, blockListItem:
+	case blockRaw, blockList, blockQuote, blockListItem, blockTable:
 		// A blockQuote's lines already have their `>` markers stripped (see
 		// quoteLinesFor), so re-adding "> " below reconstructs the original
-		// markup rather than doubling it up.
+		// markup rather than doubling it up. A blockTable's lines are the
+		// raw `|` source untouched (see the field's doc comment) — quoted
+		// verbatim, an agent gets back the exact table it would have seen in
+		// the file, not a re-layout of the parsed one.
 		lines = b.lines
 		if len(lines) > maxQuoteLines {
 			lines, truncated = lines[:maxQuoteLines], true

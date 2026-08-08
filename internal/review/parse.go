@@ -13,6 +13,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
+	eastast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -20,22 +21,23 @@ import (
 // against. Only top-level nodes become blocks: nesting is a rendering concern,
 // and a reviewer comments on "that paragraph", not on an inline span.
 //
-// Headings, paragraphs, lists and block quotes are understood. Everything
-// else — code fences, tables — is carried through as its own source lines and
-// rendered verbatim. That is deliberate for now: each of those is a felt
-// decision about how it should look, and guessing at several of them at once
-// is exactly what the review gate exists to prevent.
+// Headings, paragraphs, lists, block quotes, code fences and tables are all
+// understood. Everything else is carried through as its own source lines and
+// rendered verbatim, kind blockRaw — a felt decision about how it should look
+// that has not been made yet, and guessing at several of them at once is
+// exactly what the review gate exists to prevent.
 //
 // GFM extensions are enabled (tables, strikethrough, autolinks, task lists):
 // without them a table is invisible to goldmark as a table at all — it parses
 // as an *ast.Paragraph, and collapse() then does to it exactly what a
 // paragraph's line breaks are supposed to get, joining rows into one wrapped
 // mess (2026-08-08 rendering-bugs feedback). With the extension it is an
-// *ast.Table, which lands in the blockRaw bucket below and is at least shown
-// verbatim; making it look like a table is RENDER-03. The other three
-// extensions are inline-only — they change what a paragraph's text contains,
-// never what kind of block it is — so enabling them alongside costs nothing
-// here and heads off the same defect turning up again for a task list.
+// *ast.Table (github.com/yuin/goldmark/extension/ast, aliased eastast below —
+// not to be confused with the core ast package), which RENDER-03 gives its
+// own blockTable kind and a real column layout. The other three extensions
+// are inline-only — they change what a paragraph's text contains, never what
+// kind of block it is — so enabling them alongside costs nothing here and
+// heads off the same defect turning up again for a task list.
 //
 // A leading YAML frontmatter block is recognised and pulled out before goldmark
 // ever sees it as prose (see frontmatterExtent) — left to goldmark it misparses
@@ -251,6 +253,16 @@ func blockFor(n ast.Node, src []byte) (block, bool) {
 			return block{}, false
 		}
 		b := block{kind: blockQuote, text: raw, lines: lines, start: start, stop: stop}
+		b.anchor = anchorFor(b)
+		return b, true
+
+	case *eastast.Table:
+		// b.lines keeps the raw `|` source around purely so quoteBlock can
+		// reproduce it verbatim on export — the same reason blockList carries
+		// lines it never renders from (see the field's doc comment). table
+		// is what the interactive renderer actually reads.
+		lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
+		b := block{kind: blockTable, text: raw, lines: lines, table: tableFor(t, src), start: start, stop: stop}
 		b.anchor = anchorFor(b)
 		return b, true
 
@@ -553,6 +565,78 @@ func codeLinesFor(n *ast.FencedCodeBlock, src []byte) []string {
 		return nil
 	}
 	return strings.Split(content, "\n")
+}
+
+// tableFor walks a *eastast.Table's rows into a tableBlock: one header row
+// (goldmark always parses GFM's required delimiter row into a TableHeader,
+// never a plain TableRow, so the two are told apart by node type rather than
+// position), then every remaining row as a body row, in source order.
+func tableFor(t *eastast.Table, src []byte) *tableBlock {
+	tb := &tableBlock{aligns: make([]tableAlign, len(t.Alignments))}
+	for i, a := range t.Alignments {
+		tb.aligns[i] = convertAlign(a)
+	}
+	for r := t.FirstChild(); r != nil; r = r.NextSibling() {
+		cells := tableCellsFor(r, src)
+		if _, ok := r.(*eastast.TableHeader); ok {
+			tb.header = cells
+			continue
+		}
+		tb.rows = append(tb.rows, cells)
+	}
+	return tb
+}
+
+// tableCellsFor reads one table row's cells, each stripped of its inline
+// markup by cellText the same way parseInline strips a paragraph's — a table
+// cell is prose too, just prose that has to fit a column instead of wrap.
+func tableCellsFor(row ast.Node, src []byte) []string {
+	var cells []string
+	for c := row.FirstChild(); c != nil; c = c.NextSibling() {
+		cells = append(cells, cellText(cellRaw(c, src)))
+	}
+	return cells
+}
+
+// cellRaw concatenates a table cell's own line segments — goldmark gives a
+// cell's Lines() the cell's raw markdown text directly, unlike a block's
+// wider extent(), so no fence- or marker-stripping is needed here.
+func cellRaw(n ast.Node, src []byte) string {
+	var buf strings.Builder
+	lines := n.Lines()
+	for i := 0; i < lines.Len(); i++ {
+		seg := lines.At(i)
+		buf.Write(seg.Value(src))
+	}
+	return buf.String()
+}
+
+// cellText strips a cell's inline markup down to plain text via parseInline,
+// discarding the styling: RENDER-06's bold/code/link colours are deliberately
+// not carried into a table cell yet (see tableBlock's field comment) — this
+// first pass wants only the words a column-width layout has to fit.
+func cellText(raw string) string {
+	var buf strings.Builder
+	for _, run := range parseInline(raw) {
+		buf.WriteString(run.text)
+	}
+	return strings.TrimSpace(buf.String())
+}
+
+// convertAlign maps goldmark's own alignment enum onto tableAlign, so
+// document.go need not import the extension ast package just to name a
+// column's alignment.
+func convertAlign(a eastast.Alignment) tableAlign {
+	switch a {
+	case eastast.AlignLeft:
+		return alignLeft
+	case eastast.AlignRight:
+		return alignRight
+	case eastast.AlignCenter:
+		return alignCenter
+	default:
+		return alignNone
+	}
 }
 
 // quoteLineRE strips a block quote's leading `>` marker (and the one

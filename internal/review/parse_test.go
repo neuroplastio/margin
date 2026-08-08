@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -170,9 +171,10 @@ func TestParseSkipsEmptyAndThematicBreaks(t *testing.T) {
 // the 2026-08-08 rendering-bugs feedback: with no goldmark extensions
 // enabled, a table has no *ast.Table to become — it parses as an
 // *ast.Paragraph, and collapse() then joins its rows into one wrapped mess.
-// Enabling extension.GFM (see parseDoc) makes it an *ast.Table instead, which
-// lands in the blockRaw bucket and is at least shown verbatim; making it look
-// like a table is RENDER-03, not this.
+// Enabling extension.GFM (see parseDoc) makes it an *ast.Table instead. It
+// was blockRaw, shown verbatim, until RENDER-03 gave it its own blockTable
+// kind with a real parsed structure — updated here rather than left to rot,
+// the same way RENDER-02 retired this test's fenced-code sibling.
 func TestTableExtensionKeepsRowsIntact(t *testing.T) {
 	src := "| Component | Before |\n| --- | --- |\n| Session read | in-process map |\n"
 	blocks := parseDoc([]byte(src))
@@ -180,11 +182,39 @@ func TestTableExtensionKeepsRowsIntact(t *testing.T) {
 		t.Fatalf("table parsed into %d blocks, want 1: %+v", len(blocks), blocks)
 	}
 	b := blocks[0]
-	if b.kind == blockPara {
-		t.Fatalf("table parsed as a paragraph, want blockRaw (kind=%d): %q", b.kind, b.text)
+	if b.kind != blockTable {
+		t.Fatalf("table parsed as kind=%d, want blockTable: %q", b.kind, b.text)
 	}
 	if len(b.lines) != 3 {
-		t.Errorf("table has %d verbatim lines, want its 3 source rows kept apart: %q", len(b.lines), b.lines)
+		t.Errorf("table has %d verbatim source lines, want its 3 rows kept apart: %q", len(b.lines), b.lines)
+	}
+	if b.table == nil {
+		t.Fatal("blockTable has no parsed table")
+	}
+	if want := []string{"Component", "Before"}; !reflect.DeepEqual(b.table.header, want) {
+		t.Errorf("header = %v, want %v", b.table.header, want)
+	}
+	if len(b.table.rows) != 1 || !reflect.DeepEqual(b.table.rows[0], []string{"Session read", "in-process map"}) {
+		t.Errorf("rows = %v, want [[Session read in-process map]]", b.table.rows)
+	}
+}
+
+// TestTableCellsStripInlineMarkupAndRespectAlignment pins tableFor's two other
+// jobs: a cell's own inline markup is stripped down to plain text (cellText),
+// and each column's alignment carries over from the delimiter row.
+func TestTableCellsStripInlineMarkupAndRespectAlignment(t *testing.T) {
+	src := "| Name | Age | Notes |\n| :--- | ---: | :---: |\n| Alice | 30 | Likes **bold** things |\n"
+	blocks := parseDoc([]byte(src))
+	if len(blocks) != 1 || blocks[0].kind != blockTable {
+		t.Fatalf("parsed %d block(s), want 1 blockTable: %+v", len(blocks), blocks)
+	}
+	tb := blocks[0].table
+	wantAligns := []tableAlign{alignLeft, alignRight, alignCenter}
+	if !reflect.DeepEqual(tb.aligns, wantAligns) {
+		t.Errorf("aligns = %v, want %v", tb.aligns, wantAligns)
+	}
+	if len(tb.rows) != 1 || tb.rows[0][2] != "Likes bold things" {
+		t.Errorf("row = %v, want the Notes cell markup-stripped to %q", tb.rows, "Likes bold things")
 	}
 }
 

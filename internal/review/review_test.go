@@ -723,6 +723,70 @@ func TestHighlightCodeDegradesForAnUnknownLanguage(t *testing.T) {
 	}
 }
 
+// TestRenderTableAlignsColumnsAndStaysInMeasure pins renderTable's basic
+// shape: header above a rule above the rows, every line the same
+// de-styled width (columns line up), and alignment honoured per column.
+func TestRenderTableAlignsColumnsAndStaysInMeasure(t *testing.T) {
+	tb := &tableBlock{
+		header: []string{"Name", "Age"},
+		rows:   [][]string{{"Alice", "30"}, {"Bob", "5"}},
+		aligns: []tableAlign{alignLeft, alignRight},
+	}
+	out := renderTable(tb, 40, textStyle)
+	if len(out) != 4 {
+		t.Fatalf("renderTable returned %d line(s), want 4 (header, rule, 2 rows): %q", len(out), out)
+	}
+	widths := map[int]int{}
+	for i, l := range out {
+		widths[i] = len([]rune(ansiRe.ReplaceAllString(l, "")))
+	}
+	for i, w := range widths {
+		if w != widths[0] {
+			t.Errorf("line %d is %d runes wide once de-styled, want %d like every other row (columns should line up): %q", i, w, widths[0], out)
+		}
+	}
+	plainRule := ansiRe.ReplaceAllString(out[1], "")
+	if !strings.Contains(plainRule, "─") {
+		t.Errorf("row 1 = %q, want the dim rule between header and body", plainRule)
+	}
+	plainAge := ansiRe.ReplaceAllString(out[2], "")
+	if !strings.HasSuffix(strings.TrimRight(plainAge, " "), "30") {
+		t.Errorf("Age column not right-aligned in %q", plainAge)
+	}
+}
+
+// TestTableColumnWidthsNarrowsToFit exercises tableColumnWidths directly: a
+// table wider than the measure narrows to fit rather than running off it,
+// down to its 3-rune floor per column.
+func TestTableColumnWidthsNarrowsToFit(t *testing.T) {
+	natural := []int{40, 40}
+	w := 20
+	widths := tableColumnWidths(natural, w)
+	total := len(tableColumnSpacing)
+	for _, x := range widths {
+		total += x
+	}
+	if total > w {
+		t.Errorf("narrowed widths %v (+spacing) sum to %d, wider than the measure %d", widths, total, w)
+	}
+	for i, x := range widths {
+		if x < 3 {
+			t.Errorf("column %d narrowed to %d, below the 3-rune floor", i, x)
+		}
+	}
+}
+
+// TestTableColumnWidthsLeavesRoomWhenItFits is the non-narrowing half of the
+// same contract: a table that already fits keeps its natural widths exactly,
+// rather than always shrinking to the measure.
+func TestTableColumnWidthsLeavesRoomWhenItFits(t *testing.T) {
+	natural := []int{4, 3}
+	got := tableColumnWidths(natural, 40)
+	if got[0] != 4 || got[1] != 3 {
+		t.Errorf("widths = %v, want the natural widths %v unchanged (table already fits)", got, natural)
+	}
+}
+
 func TestMarkParagraph(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}

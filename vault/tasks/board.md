@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-08 (RENDER-02 landed — fenced code blocks now chroma-highlighted)
+Last updated: 2026-08-08 (RENDER-03 landed — tables now render as aligned columns)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:**
@@ -13,6 +13,8 @@ Last updated: 2026-08-08 (RENDER-02 landed — fenced code blocks now chroma-hig
   2026-08-08.5
 - RENDER-02 (fenced code blocks: chroma/monokai syntax highlighting) —
   journal 2026-08-08.6
+- RENDER-03 (tables: aligned columns, dim header rule, no vertical bars) —
+  journal 2026-08-08.7
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -28,7 +30,7 @@ Last updated: 2026-08-08 (RENDER-02 landed — fenced code blocks now chroma-hig
 
 ## In progress
 
-- **RENDER-03** claimed 2026-08-08 (agent) — render tables.
+*(none)*
 
 ## Backlog — M1
 
@@ -116,6 +118,24 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-03** render tables: a new `blockTable` kind (`internal/
+      review/document.go`, `parse.go`) replaces the old verbatim `blockRaw`
+      treatment, carrying a parsed `*tableBlock` (header, rows, per-column
+      alignment) built by `tableFor` from goldmark's `*eastast.Table`.
+      `renderTable` (`review.go`) lays it out as a bold header row, a dim
+      `─` rule, then aligned body rows — two-space column separation, no
+      vertical bars, per RENDER-04's precedent that markdown's own delimiter
+      (`|`, like `>`) is source syntax, not a rendering. Column widths
+      narrow evenly toward a 3-rune floor (`tableColumnWidths`) when the
+      natural layout would exceed the measure, rather than truncating one
+      column to nothing. A cell's inline markup is stripped to plain text
+      via `cellText` (RENDER-06's `parseInline`, reused unchanged) but not
+      styled — styling would tangle column-width math with ANSI byte
+      counts, deferred rather than solved. Colours resolve against `body`
+      (`textStyle`/`reviewedTxt`) so a reviewed table dims like any other
+      prose block; export's `quoteBlock` reproduces the original `|` source
+      verbatim, unchanged from the old `blockRaw` path. `[felt]` — see
+      journal 2026-08-08.7 for the demo recipe — done 2026-08-08
 - [x] **RENDER-02** fenced code blocks: a new `blockCode` kind (`internal/
       review/document.go`, `parse.go`) replaces the old verbatim `blockRaw`
       treatment, carrying the fence's language (`t.Language(src)`) and

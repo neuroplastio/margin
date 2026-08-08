@@ -312,3 +312,21 @@ range and a decision about what a marker inserted *inside* a list does to the
 list's own CommonMark parsing (an indented HTML comment risks becoming part of
 the preceding item's content; an unindented one risks closing the list
 early). Left for whoever designs durable sub-block anchoring.
+
+## F14 — a GFM table cell's `Lines()` is its own raw text, not a range needing `extent()`
+
+Every other node type this package reads (`ast.Paragraph`, `ast.Blockquote`,
+`ast.FencedCodeBlock`, the table itself) needs `extent()` to get a usable byte
+range: `n.Lines()` on those either excludes delimiters that matter for
+stamping (a fence's ` ``` `) or is empty for a container node whose content
+lives on its children.
+
+`*eastast.TableCell` (`github.com/yuin/goldmark/extension/ast`) is the
+exception: `cell.Lines()` returns the cell's own raw markdown directly — for
+`| Likes **bold** things |` the cell's `Lines()` gives back `"Likes **bold**
+things"` byte-for-byte, markup and all, with no need to walk its inline
+children or call `extent()`. That is what let `cellRaw` (parse.go) be a plain
+segment-concatenation loop, the same shape as `codeLinesFor`, and is also what
+let a table cell reuse `parseInline` (RENDER-06's paragraph-markup stripper)
+unchanged in `cellText` — the input is already exactly what `parseInline`
+expects a paragraph's raw text to look like.
