@@ -1,8 +1,8 @@
 # Board
 
-Last updated: 2026-08-08 (THREAD-02 landed — resolved threads get a checkmark
-marker and a badge; M1's backlog has been empty since RENDER-07, so the
-active milestone moves to M2)
+Last updated: 2026-08-08 (fixed: `**bold**` inside list items and quotes was
+showing literal asterisks — wrapList/wrapQuote now wrap through wrapInline
+like paragraphs do; feedback item addressed and deleted)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -99,6 +99,15 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** inline markup inside list items and quotes:
+      `wrapList`/`wrapQuote` (`internal/review/review.go`) now wrap through
+      `wrapInline` instead of the plain `wrap()`, so `**bold**`, `` `code` ``
+      and `[links](url)` inside a list item or a block quote render the same
+      way RENDER-06 already made them render inside a paragraph, instead of
+      showing their raw markup characters. Not a new visual decision —
+      RENDER-06 already settled the styling; this closes the gap its own
+      journal entry flagged as unfinished. `[mech]` — see journal
+      2026-08-08.10 — done 2026-08-08
 - [x] **THREAD-02** what resolving looks like: a new `thread.resolve` command
       (`internal/review/command.go`), bound to `R`, toggles `t.resolved` (D11)
       on the thread anchored to the focused block — reachable whether that

@@ -863,7 +863,12 @@ func (m *model) render() []string {
 			// indent that keeps the marker column clear (2026-08-08
 			// rendering-bugs feedback, defect 2), a quote against a rule down
 			// the left edge instead of a `>` on every line (2026-08-08
-			// blockquote-rendering feedback).
+			// blockquote-rendering feedback). Both also carry RENDER-06's
+			// inline markup now — **bold** inside a list item or a quote
+			// used to reach the screen as literal asterisks, since
+			// wrapList/wrapQuote wrapped with plain wrap() and left the
+			// caller to flatten the block to one uniform body.Render
+			// (2026-08-08 markdown-rendering feedback).
 			var out []string
 			rule := ""
 			// preStyled marks output already carrying its own ANSI styling
@@ -876,13 +881,15 @@ func (m *model) render() []string {
 				out = wrapInline(e.b.text, w, body)
 				preStyled = true
 			case blockList, blockListItem:
-				out = wrapList(e.b.items, w)
 				if mark != markOK {
 					body = rawStyle
 				}
+				out = wrapList(e.b.items, w, body)
+				preStyled = true
 			case blockQuote:
 				rule = dimStyle.Render("│ ")
-				out = wrapQuote(e.b.lines, w-2)
+				out = wrapQuote(e.b.lines, w-2, body)
+				preStyled = true
 			case blockCode:
 				// Chroma's own colours are the highlighting, regardless of
 				// review state — the same call RENDER-06 made for inline
@@ -1284,15 +1291,18 @@ func wrapInline(s string, w int, body lipgloss.Style) []string {
 }
 
 // wrapList lays out a blockList's items one at a time: each item's own prose
-// wraps to the measure at wrap does for a paragraph, minus its prefix's
-// width, and every line after the first is indented to that same width so
-// continuation text lines up under the item's own text rather than under its
-// marker.
-func wrapList(items []listItem, w int) []string {
+// wraps to the measure the way wrapInline wraps a paragraph, minus its
+// prefix's width, and every line after the first is indented to that same
+// width so continuation text lines up under the item's own text rather than
+// under its marker. It shares wrapInline rather than wrap so an item's own
+// **bold**, `code` and [links](url) render instead of showing their raw
+// markup (2026-08-08 markdown-rendering feedback) — the prefix and hang
+// themselves are plain, unstyled indentation, never part of the source text.
+func wrapList(items []listItem, w int, body lipgloss.Style) []string {
 	var out []string
 	for _, item := range items {
 		hang := strings.Repeat(" ", len(item.prefix))
-		for j, l := range wrap(item.text, w-len(item.prefix)) {
+		for j, l := range wrapInline(item.text, w-len(item.prefix), body) {
 			if j == 0 {
 				out = append(out, item.prefix+l)
 			} else {
@@ -1308,21 +1318,23 @@ func wrapList(items []listItem, w int) []string {
 
 // wrapQuote lays out a blockQuote's stripped lines (see quoteLinesFor) as
 // prose: consecutive non-blank lines are folded into one paragraph and
-// re-wrapped to w, the way collapse()+wrap() treats a regular paragraph,
-// while a blank line — the marker quoteLinesFor leaves behind for a `>`
-// alone in the source — becomes a paragraph break in the output. w is
-// already the measure minus the rule's own width; the caller (render)
-// prepends the rule to every line this returns, blank ones included, so the
-// rule reads as one continuous line down the quote rather than breaking for
-// its own paragraph gaps.
-func wrapQuote(lines []string, w int) []string {
+// re-wrapped to w via wrapInline — the way collapse()+wrapInline() treats a
+// regular paragraph, so a quote's own **bold**, `code` and [links](url)
+// render instead of showing their raw markup (2026-08-08
+// markdown-rendering feedback) — while a blank line — the marker
+// quoteLinesFor leaves behind for a `>` alone in the source — becomes a
+// paragraph break in the output. w is already the measure minus the rule's
+// own width; the caller (render) prepends the rule to every line this
+// returns, blank ones included, so the rule reads as one continuous line
+// down the quote rather than breaking for its own paragraph gaps.
+func wrapQuote(lines []string, w int, body lipgloss.Style) []string {
 	var out []string
 	var para []string
 	flush := func() {
 		if len(para) == 0 {
 			return
 		}
-		out = append(out, wrap(strings.Join(para, " "), w)...)
+		out = append(out, wrapInline(strings.Join(para, " "), w, body)...)
 		para = nil
 	}
 	for _, l := range lines {

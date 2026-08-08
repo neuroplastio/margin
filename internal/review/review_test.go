@@ -522,23 +522,44 @@ func TestClickInsidePaneDoesNotBlur(t *testing.T) {
 func TestWrapListWrapsInsteadOfTruncating(t *testing.T) {
 	item := listItem{prefix: "- ", text: "write to both stores, read from memory, and watch the fallback rate trend to zero as old sessions expire"}
 	w := 40
-	out := wrapList([]listItem{item}, w)
+	out := wrapList([]listItem{item}, w, textStyle)
 	if len(out) < 2 {
 		t.Fatalf("item did not wrap at width %d, got %d line(s): %v", w, len(out), out)
 	}
 	for _, l := range out {
-		if len(l) > w {
-			t.Errorf("line %q is %d bytes, wider than the measure %d", l, len(l), w)
+		if width := len(ansiRe.ReplaceAllString(l, "")); width > w {
+			t.Errorf("line %q is %d columns wide, wider than the measure %d", l, width, w)
 		}
 	}
-	if !strings.Contains(out[1], "  ") || strings.HasPrefix(out[1], "-") {
-		t.Errorf("continuation line %q is not hanging-indented under the text, not the marker", out[1])
+	plainSecond := ansiRe.ReplaceAllString(out[1], "")
+	if !strings.Contains(plainSecond, "  ") || strings.HasPrefix(plainSecond, "-") {
+		t.Errorf("continuation line %q is not hanging-indented under the text, not the marker", plainSecond)
 	}
-	joined := strings.Join(out, " ")
+	joined := ansiRe.ReplaceAllString(strings.Join(out, " "), "")
 	for _, word := range strings.Fields(item.text) {
 		if !strings.Contains(joined, word) {
 			t.Errorf("word %q from the item went missing across the wrap: %v", word, out)
 		}
+	}
+}
+
+// TestWrapListRendersInlineMarkup is the render-level regression test for the
+// 2026-08-08 markdown-rendering feedback: a list item's **bold** used to
+// reach the screen as literal asterisks because wrapList wrapped with plain
+// wrap() and the caller flattened the whole block to one uniform style.
+func TestWrapListRendersInlineMarkup(t *testing.T) {
+	item := listItem{prefix: "- ", text: "**Week 1** ships the parser"}
+	out := wrapList([]listItem{item}, 60, textStyle)
+	joined := strings.Join(out, " ")
+	if strings.Contains(joined, "**") {
+		t.Errorf("raw ** markup survived into rendered output: %q", joined)
+	}
+	plain := ansiRe.ReplaceAllString(joined, "")
+	if !strings.Contains(plain, "Week 1") {
+		t.Errorf("bold text went missing across the wrap: %q", plain)
+	}
+	if !ansiRe.MatchString(joined) {
+		t.Errorf("bold run carries no ANSI styling: %q", joined)
 	}
 }
 
@@ -554,13 +575,13 @@ func TestWrapQuoteWrapsAndKeepsParagraphBreaks(t *testing.T) {
 		"Second paragraph.",
 	}
 	w := 40
-	out := wrapQuote(lines, w)
+	out := wrapQuote(lines, w, textStyle)
 	if len(out) < 3 {
 		t.Fatalf("expected wrapping plus a paragraph break, got %d line(s): %v", len(out), out)
 	}
 	for _, l := range out {
-		if len(l) > w {
-			t.Errorf("line %q is %d bytes, wider than the measure %d", l, len(l), w)
+		if width := len(ansiRe.ReplaceAllString(l, "")); width > w {
+			t.Errorf("line %q is %d columns wide, wider than the measure %d", l, width, w)
 		}
 	}
 	var sawBreak bool
@@ -572,8 +593,28 @@ func TestWrapQuoteWrapsAndKeepsParagraphBreaks(t *testing.T) {
 	if !sawBreak {
 		t.Errorf("paragraph break went missing across the wrap: %v", out)
 	}
-	if !strings.Contains(strings.Join(out, " "), "Second paragraph.") {
+	if !strings.Contains(ansiRe.ReplaceAllString(strings.Join(out, " "), ""), "Second paragraph.") {
 		t.Errorf("second paragraph's text went missing: %v", out)
+	}
+}
+
+// TestWrapQuoteRendersInlineMarkup is the render-level regression test for
+// the 2026-08-08 markdown-rendering feedback: a quote's **bold** used to
+// reach the screen as literal asterisks because wrapQuote wrapped with plain
+// wrap() and the caller flattened the whole block to one uniform style.
+func TestWrapQuoteRendersInlineMarkup(t *testing.T) {
+	lines := []string{"**Open question.** Should this block on review?"}
+	out := wrapQuote(lines, 60, textStyle)
+	joined := strings.Join(out, " ")
+	if strings.Contains(joined, "**") {
+		t.Errorf("raw ** markup survived into rendered output: %q", joined)
+	}
+	plain := ansiRe.ReplaceAllString(joined, "")
+	if !strings.Contains(plain, "Open question.") {
+		t.Errorf("bold text went missing across the wrap: %q", plain)
+	}
+	if !ansiRe.MatchString(joined) {
+		t.Errorf("bold run carries no ANSI styling: %q", joined)
 	}
 }
 

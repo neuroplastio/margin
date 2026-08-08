@@ -412,10 +412,11 @@ func collapse(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// inlineRun is a run of a paragraph's text carrying one inline style — the
-// unstyled default, bold, code, or a link's visible text. Consecutive
-// unstyled characters are folded into one run so wrapInline (review.go) does
-// not deal with markup one byte at a time.
+// inlineRun is a run of prose text carrying one inline style — the unstyled
+// default, bold, code, or a link's visible text. Consecutive unstyled
+// characters are folded into one run so wrapInline (review.go) does not deal
+// with markup one byte at a time. Used for paragraphs, list items and quotes
+// alike — all three wrap through wrapInline.
 type inlineRun struct {
 	text             string
 	bold, code, link bool
