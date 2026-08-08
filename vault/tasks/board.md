@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-07 (EXPORT-05 done)
+Last updated: 2026-08-08 (EXPORT-05 done; first real review filed, queue has 5)
 
 **Active milestone:** M1 — Real documents
 **Awaiting review:** PARSE-02 — the first real-file baseline
@@ -31,7 +31,9 @@ Last updated: 2026-08-07 (EXPORT-05 done)
   gap on a real document.
 - **RENDER-01** `[felt]` Render lists. One block type, then stop and ask.
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
-- **RENDER-03** `[felt]` Render tables.
+- **RENDER-03** `[felt]` Render tables. *Note: the parse must be fixed first —
+  goldmark has no table extension enabled, so a table currently arrives as a
+  paragraph. See the 2026-08-08 rendering-bugs feedback.*
 - **RENDER-04** `[felt]` Render block quotes.
 - **RENDER-07** `[felt]` Frontmatter's visual treatment. PARSE-03 stopped it
   from corrupting the block model and made it invisible in the meantime, but
@@ -98,7 +100,12 @@ document, regardless of the order the tree-view work itself lands in.
   left where it is, since that is how a wheel behaves everywhere — but that makes
   it deliberately inconsistent with SCROLL-02, which is worth deciding on purpose
   rather than by accident. Also: a wheel over an open composer should probably
-  scroll the comment rather than the document.
+  scroll the comment rather than the document. *Asked for again 2026-08-08 after
+  a real review — scrolling is otherwise fine, the wheel is what is missing.*
+- **SCROLL-04** `[felt]` Mouse hover effects — highlight the block under the
+  pointer without moving focus. Explicitly "a stretch"; do not take it ahead of
+  the wheel, and note it sits awkwardly against the rule that the mouse only
+  moves focus on click.
 
 ## Blocked
 
