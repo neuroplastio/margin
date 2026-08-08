@@ -156,8 +156,7 @@ make run
 ```
 
 Git identity: `Anatoly Rugalev <anatoly.rugalev@gmail.com>` (set repo-locally).
-End commit messages with the standard `Co-Authored-By` trailer, and — when the
-commit comes from an unsupervised run — a `Claude-Session: <url>` trailer too.
+End commit messages with the standard `Co-Authored-By` trailer.
 
 A stop hook in cloud sessions will flag this authorship and ask you to amend it.
 **Do not.** See D8 in `vault/knowledge/decisions.md`: the hook is a platform-side
