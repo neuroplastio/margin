@@ -731,7 +731,6 @@ func (m *model) hitTest(line int) (cursor, bool) {
 var (
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	textStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	headStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true)
 	authorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	draftStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
 	focusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
@@ -740,6 +739,34 @@ var (
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	rawStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("109"))
 )
+
+// headingStyles carries the visual weight for each heading depth: bold and
+// brightest at level 1, plain-but-coloured at level 2, dim at level 3 and
+// deeper. A terminal has no font-size axis, so weight and colour are what is
+// left to show depth while scanning (RENDER-05, feedback/2026-08-08-2-
+// heading-hierarchy.md) — chosen over left-padding indentation (costs
+// measure width) or a gutter glyph (the gutter is already full with the
+// focus bar and the section's review mark).
+var headingStyles = []lipgloss.Style{
+	lipgloss.NewStyle().Foreground(lipgloss.Color("212")).Bold(true),  // level 1
+	lipgloss.NewStyle().Foreground(lipgloss.Color("183")).Bold(false), // level 2
+	lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(false), // level 3+
+}
+
+// headingStyle picks the style for a heading's depth, clamping anything
+// deeper than the styles defined above to the deepest one — margin's own
+// documents rarely go past level 3, and a document that does should still
+// render rather than panic.
+func headingStyle(level int) lipgloss.Style {
+	i := level - 1
+	if i < 0 {
+		i = 0
+	}
+	if i >= len(headingStyles) {
+		i = len(headingStyles) - 1
+	}
+	return headingStyles[i]
+}
 
 // gutter draws the focus bar and the review glyph in a fixed-width column, so
 // marks line up down the page and can be scanned without reading the prose.
@@ -780,7 +807,7 @@ func (m *model) render() []string {
 			mark, partial := rollUp(m.marksFor(m.sectionAnchors(i)))
 			lines = append(lines,
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
-					headStyle.Render(e.b.text), "")
+					headingStyle(e.b.level).Render(e.b.text), "")
 
 		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList:
 			mark := m.marks[e.b.anchor]

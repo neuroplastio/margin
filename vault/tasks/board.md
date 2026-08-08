@@ -1,9 +1,11 @@
 # Board
 
-Last updated: 2026-08-08 (rendering-bugs feedback addressed; queue has 3)
+Last updated: 2026-08-08 (heading-hierarchy feedback addressed; queue has 2)
 
 **Active milestone:** M1 — Real documents
-**Needs a look:** *(nothing outstanding)*
+**Needs a look:**
+- RENDER-05 (heading hierarchy: weight + colour by depth) — journal
+  2026-08-08.2
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -23,10 +25,6 @@ Last updated: 2026-08-08 (rendering-bugs feedback addressed; queue has 3)
 
 ## Backlog — M1
 
-- **RENDER-05** `[felt]` Heading hierarchy. Levels are parsed and carried on the
-  block but unused by the renderer, so `#` and `###` look identical. A terminal
-  has no font sizes, so this needs a real decision: indentation, rules, colour
-  weight, or a visible prefix.
 - **RENDER-06** `[felt]` Inline markup — `**bold**`, `` `code` ``, links —
   currently shows as raw source, which is a large share of the reading-comfort
   gap on a real document.
@@ -121,6 +119,18 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-05** heading hierarchy: `headingStyle(level)` (`internal/
+      review/review.go`) replaces the single `headStyle` with three,
+      indexed by depth — bold/colour 212 at level 1, plain colour 183 at
+      level 2, dim 245 at level 3+ — clamped so a level-4+ heading falls
+      back to the deepest style rather than panicking. Confirmed first that
+      a real parsed heading's `block.text` already excludes the markdown
+      `#` markers (goldmark's `Heading.Lines()` covers content only), so
+      only the styling was missing, not syntax-stripping. Left-padding
+      indentation and a gutter level hint — the feedback's other two ideas
+      — deliberately not attempted: both cost room the feedback itself
+      flags as needing its own look. `[felt]` — see journal 2026-08-08.2 for
+      the demo recipe — done 2026-08-08
 - [x] **PARSE-02** reviewed 2026-08-08 — a real document reads well at this
       measure and the loop holds up on prose the reviewer did not write. Cleared
       with defects filed rather than fixed inline: see the 2026-08-08 feedback
