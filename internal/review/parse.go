@@ -254,6 +254,17 @@ func blockFor(n ast.Node, src []byte) (block, bool) {
 		b.anchor = anchorFor(b)
 		return b, true
 
+	case *ast.FencedCodeBlock:
+		// t.Lines() covers the fence's content only — the ``` delimiters are
+		// syntax, not code, the same distinction extent() already draws for
+		// stampID. Reading it directly here (rather than trimming raw, which
+		// extent() has widened to include the fences for anchoring) is what
+		// keeps the highlighter and quoteBlock working on code alone.
+		lines := codeLinesFor(t, src)
+		b := block{kind: blockCode, text: raw, lines: lines, lang: string(t.Language(src)), start: start, stop: stop}
+		b.anchor = anchorFor(b)
+		return b, true
+
 	default:
 		lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
 		if len(lines) == 1 && strings.TrimSpace(lines[0]) == "" {
@@ -524,6 +535,24 @@ func listItemBlocks(n ast.Node, src []byte) []block {
 		blocks[i] = b
 	}
 	return blocks
+}
+
+// codeLinesFor reads a fenced code block's content lines straight from
+// goldmark's own line segments, which already exclude the ``` delimiters —
+// unlike raw, which extent() has widened to include them for stampID's sake.
+// An empty fence yields nil, the same convention every other line splitter
+// here uses for "nothing here."
+func codeLinesFor(n *ast.FencedCodeBlock, src []byte) []string {
+	var buf strings.Builder
+	for i := 0; i < n.Lines().Len(); i++ {
+		seg := n.Lines().At(i)
+		buf.Write(seg.Value(src))
+	}
+	content := strings.TrimRight(buf.String(), "\n")
+	if content == "" {
+		return nil
+	}
+	return strings.Split(content, "\n")
 }
 
 // quoteLineRE strips a block quote's leading `>` marker (and the one

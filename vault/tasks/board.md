@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-08 (RENDER-06 landed for paragraphs; queue empty)
+Last updated: 2026-08-08 (RENDER-02 landed — fenced code blocks now chroma-highlighted)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:**
@@ -11,6 +11,8 @@ Last updated: 2026-08-08 (RENDER-06 landed for paragraphs; queue empty)
   (D12) — journal 2026-08-08.4
 - RENDER-06 (inline markup — bold, code, links — for paragraphs) — journal
   2026-08-08.5
+- RENDER-02 (fenced code blocks: chroma/monokai syntax highlighting) —
+  journal 2026-08-08.6
 
 > A running list of felt legs the maintainer has not judged yet — a log, not a
 > gate. Nothing waits on it. Agents append a line with the leg id and its journal
@@ -30,7 +32,6 @@ Last updated: 2026-08-08 (RENDER-06 landed for paragraphs; queue empty)
 
 ## Backlog — M1
 
-- **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
 - **RENDER-03** `[felt]` Render tables. *The parse prerequisite this note used
   to name is done — 2026-08-08.1 enabled goldmark's GFM extensions, so a table
   now arrives as a `blockRaw`, shown verbatim, rather than a paragraph. This
@@ -119,6 +120,27 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **RENDER-02** fenced code blocks: a new `blockCode` kind (`internal/
+      review/document.go`, `parse.go`) replaces the old verbatim `blockRaw`
+      treatment, carrying the fence's language (`t.Language(src)`) and
+      content lines read straight from goldmark's own `Lines()` — which
+      excludes the ``` delimiters, unlike `extent()`'s widened range used for
+      anchoring/stamping — so the highlighter and export both work on the
+      code alone. `highlightCode` (`review.go`) runs it through
+      `chroma/v2/quick.Highlight` (`"go get github.com/alecthomas/chroma/v2"`
+      — new dependency) with the `monokai` style at `terminal256` depth,
+      returning pre-styled lines the shared render loop's existing
+      `preStyled` path (RENDER-06) already knows how to draw without
+      re-wrapping them in a uniform style. An unrecognised or empty language
+      falls back to chroma's own guess-then-plaintext path rather than
+      erroring, so nothing on screen breaks for a language chroma does not
+      know. Export's `quoteBlock` gained its own `blockCode` case,
+      reconstructing a real fenced quote (```` ```lang ```` … ` ``` `) instead
+      of a flattened blockquote, so an agent reading the export still sees
+      real code. Highlighting is fixed regardless of review state, same
+      reasoning RENDER-06 applied to inline code and links: markup is
+      markup, not prose that dims. `[felt]` — see journal 2026-08-08.6 for
+      the demo recipe — done 2026-08-08
 - [x] **RENDER-06** inline markup for paragraphs: a hand-rolled scanner
       (`parseInline`, `internal/review/parse.go`) recognises `**bold**`,
       `` `code` `` and `[text](url)`, stripping the markup and tagging each

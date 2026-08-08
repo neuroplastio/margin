@@ -63,6 +63,12 @@ const (
 	// wired in, and designing the on-disk marker format for a sub-list
 	// position is deliberately left for whoever does that.
 	blockListItem
+	// blockCode is a fenced code block. Split out from blockRaw (RENDER-02):
+	// unlike a table, a fence names its own language in the info string,
+	// which is enough to run it through a real highlighter instead of
+	// showing it as plain source. Added last for the same reason as the
+	// others: existing kind ordinals must not shift under anchorFor's hash.
+	blockCode
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which
@@ -84,8 +90,15 @@ type block struct {
 	// verbatim path; the interactive renderer uses items instead. A
 	// blockQuote carries its lines with the leading `>` markers already
 	// stripped, so both the renderer and quoteBlock can treat it as prose
-	// with paragraph breaks rather than as source to reproduce verbatim.
+	// with paragraph breaks rather than as source to reproduce verbatim. A
+	// blockCode carries its lines with the opening/closing ``` fence already
+	// stripped — the highlighter and quoteBlock both work on the code
+	// itself, and lang carries what the fence said back for either to use.
 	lines []string
+
+	// lang is a blockCode's fence info string (e.g. "go"), used to pick a
+	// chroma lexer. Empty for a fence with no language, or any other kind.
+	lang string
 
 	// items holds a blockListItem's own item, wrapped in a one-element slice
 	// so wrapList (built for a whole blockList's items) can render it
@@ -132,13 +145,13 @@ const (
 // commentable reports whether a block can carry a thread. Headings can: "this
 // whole section is wrong" is a real comment, and it belongs on the heading.
 func (b block) commentable() bool {
-	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem
+	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode
 }
 
 // markable reports whether a block holds a review mark of its own. Headings do
 // not — they roll up their section, so the two can never disagree.
 func (b block) markable() bool {
-	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem
+	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode
 }
 
 // listItem is one item of a blockList, split out of the list's raw source so

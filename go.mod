@@ -5,9 +5,11 @@ go 1.25.0
 require (
 	charm.land/bubbletea/v2 v2.0.8
 	charm.land/lipgloss/v2 v2.0.5
+	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/charmbracelet/ultraviolet v0.0.0-20260803092147-8b693049ce2a
 	github.com/charmbracelet/x/vt v0.0.0-20260803091719-3755ebad01b1
 	github.com/creack/pty v1.1.24
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/spf13/cobra v1.10.2
 	github.com/yuin/goldmark v1.8.5
 )
@@ -21,7 +23,7 @@ require (
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
+	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-runewidth v0.0.23 // indirect

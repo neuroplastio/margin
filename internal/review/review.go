@@ -11,6 +11,7 @@
 package review
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alecthomas/chroma/v2/quick"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -811,7 +814,7 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
 					headingStyle(e.b.level).Render(e.b.text), "")
 
-		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem:
+		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
@@ -846,6 +849,13 @@ func (m *model) render() []string {
 			case blockQuote:
 				rule = dimStyle.Render("│ ")
 				out = wrapQuote(e.b.lines, w-2)
+			case blockCode:
+				// Chroma's own colours are the highlighting, regardless of
+				// review state — the same call RENDER-06 made for inline
+				// code and links: markup renders as markup, not as prose
+				// that happens to dim once reviewed.
+				out = highlightCode(e.b.lines, e.b.lang)
+				preStyled = true
 			default:
 				out = e.b.lines
 				if mark != markOK {
@@ -1271,6 +1281,30 @@ func wrapQuote(lines []string, w int) []string {
 		return []string{""}
 	}
 	return out
+}
+
+// codeStyleName is the chroma style highlightCode renders with — a dark,
+// muted palette chosen to sit near the rest of margin's own colours (see
+// RENDER-06's codeStyle/linkStyle) rather than a bright, high-contrast theme
+// meant for a dedicated editor pane.
+const codeStyleName = "monokai"
+
+// highlightCode runs a fenced code block's content through chroma, returning
+// one already-ANSI-styled line per input line — render()'s preStyled path,
+// the same one wrapInline uses for RENDER-06's inline markup. lang is the
+// fence's info string; chroma falls back to a lexer it guesses from the
+// content, and finally to an unhighlighted passthrough, so an unrecognised
+// or absent language degrades to plain text rather than an error on screen.
+func highlightCode(lines []string, lang string) []string {
+	if len(lines) == 0 {
+		return []string{""}
+	}
+	src := strings.Join(lines, "\n")
+	var buf bytes.Buffer
+	if err := quick.Highlight(&buf, src, lang, "terminal256", codeStyleName); err != nil {
+		return lines
+	}
+	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
 }
 
 // reportLatency prints the keypress-to-frame round trip, so "feels sluggish"

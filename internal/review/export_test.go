@@ -103,12 +103,12 @@ func TestExportQuotesRawBlocks(t *testing.T) {
 	doc := parseDoc([]byte("Intro paragraph.\n\n```go\nfunc main() {}\n```\n"))
 	var code block
 	for _, b := range doc {
-		if b.kind == blockRaw {
+		if b.kind == blockCode {
 			code = b
 		}
 	}
 	if code.anchor == "" {
-		t.Fatal("fixture has no raw block")
+		t.Fatal("fixture has no code block")
 	}
 	threads := map[string]*thread{code.anchor: {
 		anchor: code.anchor,
@@ -117,6 +117,9 @@ func TestExportQuotesRawBlocks(t *testing.T) {
 	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
 	if !strings.Contains(out, "func main") {
 		t.Errorf("export did not quote the code block it refers to:\n%s", out)
+	}
+	if !strings.Contains(out, "```go") {
+		t.Errorf("export did not reconstruct the fence with its language:\n%s", out)
 	}
 }
 

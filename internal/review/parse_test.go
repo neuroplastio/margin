@@ -52,7 +52,7 @@ func TestParseFindsTopLevelBlocks(t *testing.T) {
 		blockPara,     // The retry budget…
 		blockListItem, // - per-endpoint caps
 		blockListItem, // - a global ceiling
-		blockRaw,      // code fence
+		blockCode,     // code fence
 		blockQuote,    // block quote
 		blockPara,     // Final paragraph.
 	}
@@ -86,7 +86,7 @@ func TestParseCollapsesParagraphsButNotRawBlocks(t *testing.T) {
 	// line breaks are the content.
 	var code block
 	for _, b := range blocks {
-		if b.kind == blockRaw && strings.Contains(b.text, "func retry") {
+		if b.kind == blockCode && strings.Contains(b.text, "func retry") {
 			code = b
 		}
 	}
@@ -185,6 +185,55 @@ func TestTableExtensionKeepsRowsIntact(t *testing.T) {
 	}
 	if len(b.lines) != 3 {
 		t.Errorf("table has %d verbatim lines, want its 3 source rows kept apart: %q", len(b.lines), b.lines)
+	}
+}
+
+// TestParseFencedCodeBlockCarriesLanguageAndStripsFence is RENDER-02's parse-
+// level test: a fenced code block must come out as blockCode, keep its
+// language for the highlighter, and hand back content lines with the ```
+// delimiters gone — the highlighter and quoteBlock both work on the code
+// alone, not the fence syntax around it.
+func TestParseFencedCodeBlockCarriesLanguageAndStripsFence(t *testing.T) {
+	src := "```go\nfunc f() int {\n\treturn 1\n}\n```\n"
+	blocks := parseDoc([]byte(src))
+	if len(blocks) != 1 || blocks[0].kind != blockCode {
+		t.Fatalf("parsed %d block(s), want 1 blockCode: %+v", len(blocks), blocks)
+	}
+	b := blocks[0]
+	if b.lang != "go" {
+		t.Errorf("lang = %q, want %q", b.lang, "go")
+	}
+	want := []string{"func f() int {", "\treturn 1", "}"}
+	if len(b.lines) != len(want) {
+		t.Fatalf("lines = %q, want %q", b.lines, want)
+	}
+	for i := range want {
+		if b.lines[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, b.lines[i], want[i])
+		}
+	}
+	for _, l := range b.lines {
+		if strings.Contains(l, "```") {
+			t.Errorf("fence delimiter leaked into a content line: %q", l)
+		}
+	}
+	// text (used for stampID/anchoring) still carries the full raw markdown,
+	// fences included — only lines is fence-stripped.
+	if !strings.HasPrefix(b.text, "```go") {
+		t.Errorf("text = %q, want the fence kept for anchoring/stamping", b.text)
+	}
+}
+
+// TestParseFencedCodeBlockWithNoLanguage checks the language tag is simply
+// empty, not some placeholder, when the fence names none — highlightCode
+// treats "" as "guess from content," not as an error.
+func TestParseFencedCodeBlockWithNoLanguage(t *testing.T) {
+	blocks := parseDoc([]byte("```\nplain text\n```\n"))
+	if len(blocks) != 1 || blocks[0].kind != blockCode {
+		t.Fatalf("parsed %d block(s), want 1 blockCode: %+v", len(blocks), blocks)
+	}
+	if blocks[0].lang != "" {
+		t.Errorf("lang = %q, want empty for a fence with no info string", blocks[0].lang)
 	}
 }
 
@@ -312,7 +361,7 @@ func TestStampIDInvisibleToOtherRenderers(t *testing.T) {
 
 	var code block
 	for _, b := range before {
-		if b.kind == blockRaw && strings.Contains(b.text, "func retry") {
+		if b.kind == blockCode && strings.Contains(b.text, "func retry") {
 			code = b
 		}
 	}
@@ -345,7 +394,7 @@ func TestStampIDInvisibleToOtherRenderers(t *testing.T) {
 	// marker spliced in as a fourth line of "code".
 	var gotCode block
 	for _, b := range after {
-		if b.kind == blockRaw && strings.Contains(b.text, "func retry") {
+		if b.kind == blockCode && strings.Contains(b.text, "func retry") {
 			gotCode = b
 		}
 	}

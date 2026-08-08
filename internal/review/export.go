@@ -151,6 +151,25 @@ func quoteBlock(b block) string {
 			lines, truncated = lines[:maxQuoteLines], true
 		}
 
+	case blockCode:
+		// b.lines is the fence's content only (see codeLinesFor) — the
+		// delimiters are re-added here, with b.lang, so the quote is a real
+		// fenced code block an agent can read as code rather than prose that
+		// happens to look like it. The ellipsis, if any, is folded in before
+		// the closing fence rather than left to the generic trailing-line
+		// logic below, which would otherwise print it after the closing
+		// ``` and read as part of whatever follows the quote.
+		code := b.lines
+		cut := false
+		if len(code) > maxQuoteLines {
+			code, cut = code[:maxQuoteLines], true
+		}
+		lines = append([]string{"```" + b.lang}, code...)
+		if cut {
+			lines = append(lines, "…")
+		}
+		lines = append(lines, "```")
+
 	default:
 		text := collapse(b.text)
 		if cut, ok := truncateWords(text, 280); ok {

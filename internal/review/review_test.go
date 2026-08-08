@@ -676,6 +676,53 @@ func TestWrapInlineStripsMarkupAndWraps(t *testing.T) {
 	}
 }
 
+// TestHighlightCodeAppliesColourForARecognisedLanguage is the render-level
+// regression test for RENDER-02: a fenced code block whose language chroma
+// recognises must come back styled — some ANSI escape on at least one
+// line — while every source line's own text (words, indentation) survives
+// untouched underneath the colour.
+func TestHighlightCodeAppliesColourForARecognisedLanguage(t *testing.T) {
+	lines := []string{"func retry(n int) error {", "\treturn nil", "}"}
+	out := highlightCode(lines, "go")
+	if len(out) != len(lines) {
+		t.Fatalf("highlightCode returned %d line(s), want %d: %q", len(out), len(lines), out)
+	}
+	styled := false
+	for _, l := range out {
+		if ansiRe.MatchString(l) {
+			styled = true
+		}
+	}
+	if !styled {
+		t.Errorf("no line carries an ANSI escape for a recognised language: %q", out)
+	}
+	for i, l := range out {
+		plain := ansiRe.ReplaceAllString(l, "")
+		if plain != lines[i] {
+			t.Errorf("line %d = %q once de-styled, want the source line %q byte-for-byte", i, plain, lines[i])
+		}
+	}
+}
+
+// TestHighlightCodeDegradesForAnUnknownLanguage pins the fallback path: an
+// unrecognised or empty language tag must not error or drop text, even if it
+// ends up unstyled. quick.Highlight's own fallback (a guess from content, then
+// a plain lexer) already covers the "no colour" case; this only pins that the
+// source survives regardless of which path it took.
+func TestHighlightCodeDegradesForAnUnknownLanguage(t *testing.T) {
+	lines := []string{"this is not any real language %%%", "just some free text"}
+	out := highlightCode(lines, "not-a-real-lang")
+	if len(out) != len(lines) {
+		t.Fatalf("highlightCode returned %d line(s), want %d: %q", len(out), len(lines), out)
+	}
+	for i, l := range out {
+		plain := ansiRe.ReplaceAllString(l, "")
+		if plain != lines[i] {
+			t.Errorf("line %d = %q once de-styled, want the source line %q byte-for-byte", i, plain, lines[i])
+		}
+	}
+}
+
 func TestMarkParagraph(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}

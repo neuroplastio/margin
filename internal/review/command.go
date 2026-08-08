@@ -166,6 +166,8 @@ func commentTarget(m *model) string {
 		return "quote"
 	case blockListItem:
 		return "list item"
+	case blockCode:
+		return "code block"
 	default:
 		return "block"
 	}
