@@ -12,6 +12,7 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -19,18 +20,29 @@ import (
 // against. Only top-level nodes become blocks: nesting is a rendering concern,
 // and a reviewer comments on "that paragraph", not on an inline span.
 //
-// Headings and paragraphs are understood. Everything else — lists, code fences,
-// quotes, tables — is carried through as its own source lines and rendered
-// verbatim. That is deliberate for now: each of those is a felt decision about
-// how it should look, and guessing at six of them at once is exactly what the
-// review gate exists to prevent.
+// Headings, paragraphs and lists are understood. Everything else — code
+// fences, quotes, tables — is carried through as its own source lines and
+// rendered verbatim. That is deliberate for now: each of those is a felt
+// decision about how it should look, and guessing at several of them at once
+// is exactly what the review gate exists to prevent.
+//
+// GFM extensions are enabled (tables, strikethrough, autolinks, task lists):
+// without them a table is invisible to goldmark as a table at all — it parses
+// as an *ast.Paragraph, and collapse() then does to it exactly what a
+// paragraph's line breaks are supposed to get, joining rows into one wrapped
+// mess (2026-08-08 rendering-bugs feedback). With the extension it is an
+// *ast.Table, which lands in the blockRaw bucket below and is at least shown
+// verbatim; making it look like a table is RENDER-03. The other three
+// extensions are inline-only — they change what a paragraph's text contains,
+// never what kind of block it is — so enabling them alongside costs nothing
+// here and heads off the same defect turning up again for a task list.
 //
 // A leading YAML frontmatter block is recognised and pulled out before goldmark
 // ever sees it as prose (see frontmatterExtent) — left to goldmark it misparses
 // as a thematic break plus a setext heading, which corrupts both the section
 // model and the export.
 func parseDoc(src []byte) []block {
-	md := goldmark.New()
+	md := goldmark.New(goldmark.WithExtensions(extension.GFM))
 	root := md.Parser().Parse(text.NewReader(src))
 
 	var blocks []block
@@ -215,6 +227,16 @@ func blockFor(n ast.Node, src []byte) (block, bool) {
 	case *ast.ThematicBreak:
 		return block{}, false
 
+	case *ast.List:
+		items := listItemsFor(raw)
+		if len(items) == 0 {
+			return block{}, false
+		}
+		lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
+		b := block{kind: blockList, text: raw, lines: lines, items: items, start: start, stop: stop}
+		b.anchor = anchorFor(b)
+		return b, true
+
 	default:
 		lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
 		if len(lines) == 1 && strings.TrimSpace(lines[0]) == "" {
@@ -327,6 +349,42 @@ func widenFence(src []byte, start, stop int) (int, int) {
 // collapse folds a block's source lines into one line for re-wrapping.
 func collapse(s string) string {
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// listItemRE recognises the start of a list item line: leading indentation,
+// a marker (-, *, + or an ordered N. / N)), then its own text.
+var listItemRE = regexp.MustCompile(`^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$`)
+
+// listItemsFor splits a list block's raw source into its items, so each can
+// wrap independently at render time instead of being truncated at the
+// measure (2026-08-08 rendering-bugs feedback, defect 2).
+//
+// It works line by line off the raw source rather than walking goldmark's
+// AST: every item, at any nesting depth, starts a line matching
+// listItemRE, and a nested item is just such a line with more leading
+// whitespace. That means nesting depth falls out of the indentation for
+// free — a nested item naturally becomes its own entry with a wider prefix
+// and, at render time, a deeper hanging indent — with no separate tree walk
+// needed to compute it. A line that does not open a new item is a
+// soft-wrapped continuation of prose and folds into the current item's text
+// the same way collapse() folds a paragraph's line breaks away; a blank line
+// (the separator in a loose list) is simply skipped.
+func listItemsFor(raw string) []listItem {
+	var items []listItem
+	for _, line := range strings.Split(strings.TrimRight(raw, "\n"), "\n") {
+		if m := listItemRE.FindStringSubmatch(line); m != nil {
+			prefix := m[1] + m[2] + " "
+			items = append(items, listItem{prefix: prefix, text: strings.TrimSpace(m[3])})
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || len(items) == 0 {
+			continue
+		}
+		last := &items[len(items)-1]
+		last.text += " " + trimmed
+	}
+	return items
 }
 
 // anchorFor derives a block's id from its content. It is the fallback for a

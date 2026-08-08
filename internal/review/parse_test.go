@@ -50,7 +50,7 @@ func TestParseFindsTopLevelBlocks(t *testing.T) {
 		blockPara,    // Each outbound call…
 		blockHeading, // ## Budgets
 		blockPara,    // The retry budget…
-		blockRaw,     // list
+		blockList,    // list
 		blockRaw,     // code fence
 		blockRaw,     // block quote
 		blockPara,    // Final paragraph.
@@ -139,6 +139,68 @@ func TestParseSkipsEmptyAndThematicBreaks(t *testing.T) {
 		if strings.TrimSpace(b.text) == "---" {
 			t.Error("thematic break became a reviewable block")
 		}
+	}
+}
+
+// TestTableExtensionKeepsRowsIntact is the regression test for defect 1 of
+// the 2026-08-08 rendering-bugs feedback: with no goldmark extensions
+// enabled, a table has no *ast.Table to become — it parses as an
+// *ast.Paragraph, and collapse() then joins its rows into one wrapped mess.
+// Enabling extension.GFM (see parseDoc) makes it an *ast.Table instead, which
+// lands in the blockRaw bucket and is at least shown verbatim; making it look
+// like a table is RENDER-03, not this.
+func TestTableExtensionKeepsRowsIntact(t *testing.T) {
+	src := "| Component | Before |\n| --- | --- |\n| Session read | in-process map |\n"
+	blocks := parseDoc([]byte(src))
+	if len(blocks) != 1 {
+		t.Fatalf("table parsed into %d blocks, want 1: %+v", len(blocks), blocks)
+	}
+	b := blocks[0]
+	if b.kind == blockPara {
+		t.Fatalf("table parsed as a paragraph, want blockRaw (kind=%d): %q", b.kind, b.text)
+	}
+	if len(b.lines) != 3 {
+		t.Errorf("table has %d verbatim lines, want its 3 source rows kept apart: %q", len(b.lines), b.lines)
+	}
+}
+
+// TestListItemsForSplitsByMarkerAndFoldsContinuations exercises listItemsFor
+// directly against the shape defect 2 named: a long item wrapped in the
+// source across two lines, followed by a short sibling item.
+func TestListItemsForSplitsByMarkerAndFoldsContinuations(t *testing.T) {
+	raw := "- **Week 1** — write to both stores, read from memory. Redis is shadow traffic;\n" +
+		"  if it falls over, nothing user-visible happens.\n" +
+		"- **Week 2** — read from Redis.\n"
+	items := listItemsFor(raw)
+	if len(items) != 2 {
+		t.Fatalf("got %d items, want 2: %+v", len(items), items)
+	}
+	if items[0].prefix != "- " {
+		t.Errorf("item 0 prefix = %q, want %q", items[0].prefix, "- ")
+	}
+	if !strings.Contains(items[0].text, "shadow traffic") || !strings.Contains(items[0].text, "user-visible happens") {
+		t.Errorf("item 0 did not fold its continuation line in: %q", items[0].text)
+	}
+	if strings.Contains(items[0].text, "\n") {
+		t.Errorf("item 0 text kept a line break, want it collapsed like a paragraph: %q", items[0].text)
+	}
+	if items[1].text != "**Week 2** — read from Redis." {
+		t.Errorf("item 1 text = %q", items[1].text)
+	}
+}
+
+// TestListItemsForKeepsNestedItemsIndentedApart checks that a nested item —
+// indented deeper in the source — becomes its own entry with a wider prefix,
+// which is what gives it a deeper hanging indent at render time without any
+// separate nesting-depth bookkeeping.
+func TestListItemsForKeepsNestedItemsIndentedApart(t *testing.T) {
+	raw := "- top\n  - nested\n"
+	items := listItemsFor(raw)
+	if len(items) != 2 {
+		t.Fatalf("got %d items, want 2: %+v", len(items), items)
+	}
+	if items[1].prefix != "  - " {
+		t.Errorf("nested item prefix = %q, want %q", items[1].prefix, "  - ")
 	}
 }
 

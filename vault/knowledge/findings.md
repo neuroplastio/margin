@@ -236,3 +236,42 @@ This is the third defect in this project that a passing test reported as fine
 (see F1, F8). The pattern is consistent: anything about *the frame as a whole* —
 its height, its offset, what actually reaches the screen — is invisible to tests
 that ask the model questions. A screenshot has now been decisive twice.
+
+## F11 — `goldmark.New()` with no extensions silently drops GFM syntax
+
+`goldmark.New()` with no options speaks CommonMark only. Tables, strikethrough,
+autolinks and task lists are all GFM extensions, not CommonMark — without
+`goldmark.WithExtensions(...)`, a table never becomes an `*ast.Table`. It parses
+as an `*ast.Paragraph` instead, since the pipes and dashes are just text to a
+CommonMark-only parser, and `collapse()` then does to that paragraph exactly
+what it is supposed to do: joins its lines into one and wraps them to the
+measure. The result — a table flattened into a single wrapped run of `|` and
+`---` — looked like a bug in `collapse()` or in the block model. It was neither;
+the block model never saw a table at all.
+
+`goldmark.New(goldmark.WithExtensions(extension.GFM))` (parse.go) fixes it.
+Worth remembering for any future format: **a parser only produces the node
+kinds it was told about.** A block that "renders wrong" is worth checking
+against `md.Parser().Parse(...)`'s actual AST before assuming the bug is
+downstream — an unenabled extension does not error, it just quietly reclassifies
+the input as something else.
+
+## F12 — A bucket named "undecided" accretes wrong behaviour, not just missing behaviour
+
+`blockRaw` was documented as "any block type whose rendering has not been
+decided yet" and treated its whole membership — lists, code fences, quotes,
+tables — identically: shown verbatim, never re-wrapped. That was correct for a
+fence or a table, where the layout *is* the content, and wrong for a list, whose
+items are prose. The rule was written for the bucket's first two members and
+never re-examined when a third and fourth joined it.
+
+The tell was in the code review, not the tests: `render()`'s comment justified
+verbatim rendering with "for a code fence, the line breaks are the content" —
+true, and cited to defend a branch it was only half applicable to. A one-line
+justification that names one member of a multi-member bucket is worth checking
+against every other member before trusting it.
+
+Fixed by splitting lists into their own kind (`blockList`, document.go) with
+their own layout (`wrapList`, review.go) rather than adding a special case
+inside `blockRaw`'s branch — a bucket is easier to keep honest when each member
+that behaves differently gets its own name.

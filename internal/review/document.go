@@ -16,7 +16,8 @@ const (
 	blockPara
 	blockThread
 	// blockRaw is any block type whose rendering has not been decided yet —
-	// lists, code fences, quotes, tables. Its source lines are shown verbatim.
+	// code fences, quotes, tables. Its source lines are shown verbatim: for a
+	// fence or a table, layout is content, and re-wrapping it would destroy it.
 	blockRaw
 	// blockFrontmatter is a leading YAML frontmatter block (see
 	// frontmatterExtent in parse.go). It is metadata about the document, not
@@ -25,6 +26,12 @@ const (
 	// never sees its blocks' kind values shift — those feed anchorFor's hash
 	// for any block that has not yet been stamped.
 	blockFrontmatter
+	// blockList is a bulleted or numbered list. Split out from blockRaw
+	// (2026-08-08 rendering-bugs feedback): a list item is prose and has to
+	// wrap, unlike a fence or a table where the layout itself is the content.
+	// Added last for the same reason blockFrontmatter was: existing kind
+	// ordinals must not shift under anchorFor's hash.
+	blockList
 )
 
 // block is one entry in the document. Commentable blocks carry an anchor, which
@@ -41,8 +48,14 @@ type block struct {
 	stamped bool
 
 	// lines holds the verbatim source of a blockRaw, which must not be
-	// re-wrapped — indentation and line breaks are the content.
+	// re-wrapped — indentation and line breaks are the content. A blockList
+	// also carries it, purely so export's quoteBlock can keep reusing the
+	// verbatim path; the interactive renderer uses items instead.
 	lines []string
+
+	// items holds a blockList's items, split out for independent wrapping.
+	// Nil for every other kind.
+	items []listItem
 
 	level       int // heading level
 	line        int // 1-based line the block starts on; 0 when unknown
@@ -77,13 +90,23 @@ const (
 // commentable reports whether a block can carry a thread. Headings can: "this
 // whole section is wrong" is a real comment, and it belongs on the heading.
 func (b block) commentable() bool {
-	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw
+	return b.kind == blockHeading || b.kind == blockPara || b.kind == blockRaw || b.kind == blockList
 }
 
 // markable reports whether a block holds a review mark of its own. Headings do
 // not — they roll up their section, so the two can never disagree.
 func (b block) markable() bool {
-	return b.kind == blockPara || b.kind == blockRaw
+	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList
+}
+
+// listItem is one item of a blockList, split out of the list's raw source so
+// it can wrap independently of its siblings. prefix is the marker exactly as
+// it reads on screen — indentation folded in, so a nested item gets a wider
+// prefix and, at render time, a deeper hanging indent — with no separate
+// nesting-depth field needed.
+type listItem struct {
+	prefix string // e.g. "- ", "  - ", "1. ", printed before the item's first line
+	text   string // the item's own prose, collapsed, ready to re-wrap
 }
 
 // next returns the mark one step around the cycle: unmarked, reviewed, flagged.

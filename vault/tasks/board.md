@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-08 (EXPORT-05 done; first real review filed, queue has 5)
+Last updated: 2026-08-08 (rendering-bugs feedback addressed; queue has 3)
 
 **Active milestone:** M1 — Real documents
 **Needs a look:** *(nothing outstanding)*
@@ -32,9 +32,10 @@ Last updated: 2026-08-08 (EXPORT-05 done; first real review filed, queue has 5)
   gap on a real document.
 - **RENDER-01** `[felt]` Render lists. One block type, then stop and ask.
 - **RENDER-02** `[felt]` Render fenced code blocks with chroma highlighting.
-- **RENDER-03** `[felt]` Render tables. *Note: the parse must be fixed first —
-  goldmark has no table extension enabled, so a table currently arrives as a
-  paragraph. See the 2026-08-08 rendering-bugs feedback.*
+- **RENDER-03** `[felt]` Render tables. *The parse prerequisite this note used
+  to name is done — 2026-08-08.1 enabled goldmark's GFM extensions, so a table
+  now arrives as a `blockRaw`, shown verbatim, rather than a paragraph. This
+  task is now purely the visual treatment: what a table actually looks like.*
 - **RENDER-04** `[felt]` Render block quotes.
 - **RENDER-07** `[felt]` Frontmatter's visual treatment. PARSE-03 stopped it
   from corrupting the block model and made it invisible in the meantime, but

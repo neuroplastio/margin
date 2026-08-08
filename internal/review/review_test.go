@@ -513,6 +513,35 @@ func TestClickInsidePaneDoesNotBlur(t *testing.T) {
 
 // --- review marks -----------------------------------------------------------
 
+// TestWrapListWrapsInsteadOfTruncating is the render-level regression test
+// for defect 2 of the 2026-08-08 rendering-bugs feedback: a list item longer
+// than the measure used to come out as one over-width blockRaw line, cut off
+// by whatever terminal or pager was watching rather than by margin. Every
+// line wrapList produces must fit, and nothing from the item's text may go
+// missing across the wrap.
+func TestWrapListWrapsInsteadOfTruncating(t *testing.T) {
+	item := listItem{prefix: "- ", text: "write to both stores, read from memory, and watch the fallback rate trend to zero as old sessions expire"}
+	w := 40
+	out := wrapList([]listItem{item}, w)
+	if len(out) < 2 {
+		t.Fatalf("item did not wrap at width %d, got %d line(s): %v", w, len(out), out)
+	}
+	for _, l := range out {
+		if len(l) > w {
+			t.Errorf("line %q is %d bytes, wider than the measure %d", l, len(l), w)
+		}
+	}
+	if !strings.Contains(out[1], "  ") || strings.HasPrefix(out[1], "-") {
+		t.Errorf("continuation line %q is not hanging-indented under the text, not the marker", out[1])
+	}
+	joined := strings.Join(out, " ")
+	for _, word := range strings.Fields(item.text) {
+		if !strings.Contains(joined, word) {
+			t.Errorf("word %q from the item went missing across the wrap: %v", word, out)
+		}
+	}
+}
+
 func TestMarkParagraph(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}

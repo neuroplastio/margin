@@ -142,7 +142,7 @@ func quoteBlock(b block) string {
 		// greppable in the source.
 		lines = []string{strings.Repeat("#", max(b.level, 1)) + " " + b.text}
 
-	case blockRaw:
+	case blockRaw, blockList:
 		lines = b.lines
 		if len(lines) > maxQuoteLines {
 			lines, truncated = lines[:maxQuoteLines], true

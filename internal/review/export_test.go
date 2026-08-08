@@ -184,7 +184,7 @@ func TestExportPreservesListStructure(t *testing.T) {
 	doc := parseDoc([]byte(sampleDoc))
 	var list block
 	for _, b := range doc {
-		if b.kind == blockRaw && strings.Contains(b.text, "per-endpoint caps") {
+		if b.kind == blockList && strings.Contains(b.text, "per-endpoint caps") {
 			list = b
 		}
 	}

@@ -782,21 +782,33 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
 					headStyle.Render(e.b.text), "")
 
-		case e.b.kind == blockPara, e.b.kind == blockRaw:
+		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
 				// Reviewed prose recedes so unreviewed text is what draws the eye.
 				body = reviewedTxt
 			}
-			// A blockRaw is shown verbatim: for a code fence or a list, the
+			// A blockRaw is shown verbatim: for a code fence or a table, the
 			// indentation and the line breaks are the content, so re-wrapping
-			// it to the measure would destroy it.
-			out := e.b.lines
-			if e.b.kind == blockPara {
+			// it to the measure would destroy it. A blockList's items are
+			// prose, though, so they wrap like a paragraph does — just one
+			// item at a time, with a hanging indent that keeps the marker
+			// column clear (2026-08-08 rendering-bugs feedback, defect 2).
+			var out []string
+			switch e.b.kind {
+			case blockPara:
 				out = wrap(e.b.text, w)
-			} else if mark != markOK {
-				body = rawStyle
+			case blockList:
+				out = wrapList(e.b.items, w)
+				if mark != markOK {
+					body = rawStyle
+				}
+			default:
+				out = e.b.lines
+				if mark != markOK {
+					body = rawStyle
+				}
 			}
 			for _, l := range out {
 				lines = append(lines,
@@ -1035,6 +1047,29 @@ func wrap(s string, w int) []string {
 	}
 	if len(line) > 0 {
 		out = append(out, strings.Join(line, " "))
+	}
+	if len(out) == 0 {
+		return []string{""}
+	}
+	return out
+}
+
+// wrapList lays out a blockList's items one at a time: each item's own prose
+// wraps to the measure at wrap does for a paragraph, minus its prefix's
+// width, and every line after the first is indented to that same width so
+// continuation text lines up under the item's own text rather than under its
+// marker.
+func wrapList(items []listItem, w int) []string {
+	var out []string
+	for _, item := range items {
+		hang := strings.Repeat(" ", len(item.prefix))
+		for j, l := range wrap(item.text, w-len(item.prefix)) {
+			if j == 0 {
+				out = append(out, item.prefix+l)
+			} else {
+				out = append(out, hang+l)
+			}
+		}
 	}
 	if len(out) == 0 {
 		return []string{""}
