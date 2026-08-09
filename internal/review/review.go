@@ -208,6 +208,15 @@ type model struct {
 	// pending.
 	count string
 
+	// freshAnchor is the anchor of a thread ensureThread created for a
+	// composer open. It is the marker that lets dismiss drop a thread whose
+	// first comment was never committed (the 2026-08-09 cancel-early
+	// feedback) without ever touching a thread that existed before the
+	// composer opened — a `:q!` on a resumed draft still discards only the
+	// draft, not the thread. Cleared when dismiss runs; the thread is
+	// re-created on the next open if nothing else populated it.
+	freshAnchor string
+
 	paletteOpen     bool
 	paletteQuery    string
 	paletteSelected int
@@ -686,6 +695,7 @@ func (m *model) ensureThread(anchor string) *thread {
 		if b.anchor == anchor && b.commentable() {
 			t := &thread{anchor: anchor, quote: b.text}
 			m.threads[anchor] = t
+			m.freshAnchor = anchor
 			m.rebuild()
 			return t
 		}
@@ -1068,6 +1078,15 @@ func (m *model) openComposer(anchor string, target int) tea.Cmd {
 	c, err := newComposer(m.gen, anchor, target, seed, m.contentWidth()-2*borderW, paneRows)
 	if err != nil {
 		m.status = "could not open editor: " + err.Error()
+		// A thread ensureThread just created for this open would linger as an
+		// empty "no comments yet" row with nothing ever committed to it — the
+		// same situation dismiss's cancel-early drop handles, minus the
+		// composer to dismiss.
+		if m.freshAnchor == anchor && len(t.posted) == 0 && len(t.drafts) == 0 && !t.resolved {
+			delete(m.threads, anchor)
+			m.rebuild()
+		}
+		m.freshAnchor = ""
 		return nil
 	}
 	m.comp = c
@@ -1139,6 +1158,23 @@ func (m *model) dismiss(err error) tea.Cmd {
 
 	m.comp.close()
 	m.comp = nil
+
+	// Cancelling before committing must not leave an empty thread behind
+	// (feedback 2026-08-09): a thread ensureThread created for this open, and
+	// that now holds no posted comment, no draft and no resolved flag, has
+	// nothing worth a row. Drop it, putting focus back on the block it hung
+	// off (the thread row entry, if focus sat on one, will vanish with it). A
+	// thread that existed before the composer opened is never dropped here.
+	if m.freshAnchor == t.anchor && len(t.posted) == 0 && len(t.drafts) == 0 && !t.resolved {
+		for i, e := range m.entries {
+			if e.b.anchor == t.anchor && e.thread == nil {
+				m.at = cursor{entry: i, comment: commentNone}
+				break
+			}
+		}
+		delete(m.threads, t.anchor)
+	}
+	m.freshAnchor = ""
 	m.rebuild()
 
 	if next := m.pendingOpen; next != nil {

@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-08-09 (claim cancel-early-empty-thread)
+Last updated: 2026-08-09 (cancel-early empty thread)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) cancel-early empty thread: `c` on a thread-less block then an
+  immediate cancel no longer leaves a "no comments yet" thread behind — the
+  thread `ensureThread` created for the open is dropped unless a comment was
+  posted or a draft kept, and focus returns to the block; pre-existing threads
+  are untouched — journal 2026-08-09.40
 - (feedback fix) composer edit cursor-at-end: `e` on an existing comment opens
   the composer in normal mode with the cursor on the last character of the
   comment text, so an `a`/`A` append lands at the end; the same fix lands the
@@ -107,12 +112,7 @@ Last updated: 2026-08-09 (claim cancel-early-empty-thread)
 
 ## In progress
 
-- [ ] **(feedback fix)** cancel-early empty thread: `c` on a thread-less block
-      opens the composer via `ensureThread`, which creates an empty thread;
-      cancelling before anything is committed leaves it showing "no comments
-      yet". Drains the cancel-early item of
-      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md` (two
-      items remain: unchanged-edit draft, enter/esc dive bindings).
+*(none)*
 
 ## Backlog — M1
 
@@ -148,6 +148,22 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** cancel-early empty thread: `c` on a thread-less block
+      opens the composer through `ensureThread`, which creates an empty thread;
+      cancelling before anything was committed left a "no comments yet" row
+      behind. `dismiss` now drops a thread it freshly created for the open
+      (`m.freshAnchor`, set by `ensureThread`) when the composer closes with no
+      posted comment, no draft and no resolved flag — every cancel path
+      (double-`esc`, empty submit, `:q!`, blur) — putting focus back on the
+      block the aborted comment was about. A thread that existed before the
+      open is never dropped: `:q!` on a resumed draft still discards only the
+      draft, not the thread (pin `TestSpacemacsDiscard`), a kept draft keeps
+      its fresh thread, and a cancelled edit keeps the thread it belongs to.
+      Also covers the composer-failed-to-open edge. Drains the cancel-early
+      item of `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`;
+      the unchanged-edit-draft and enter/esc dive items remain.
+      `[felt]` — see journal 2026-08-09.40 — done 2026-08-09
 
 - [x] **(feedback fix)** composer edit cursor-at-end: `e` on a posted comment
       opens the composer in normal mode with the cursor on the last character

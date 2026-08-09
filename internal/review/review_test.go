@@ -503,6 +503,96 @@ func TestSpacemacsDiscard(t *testing.T) {
 	}
 }
 
+// --- cancel-early must not leave an empty thread ---------------------------
+
+// TestCancelNewCommentCreatesNoThread: `c` on a block with no thread and an
+// immediate double-<Esc> cancel (nothing typed, so nothing to keep) must not
+// leave a "no comments yet" thread behind — the feedback's whole point. Focus
+// goes back to the block the aborted comment was about.
+func TestCancelNewCommentCreatesNoThread(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeKeys(m.comp, keyEsc, keyEsc)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if _, ok := m.threads[freshAnchor]; ok {
+		t.Fatalf("cancel left an empty thread for %s behind", freshAnchor)
+	}
+	for i, e := range m.entries {
+		if e.thread != nil && e.thread.anchor == freshAnchor {
+			t.Fatalf("cancel left a thread row at entry %d", i)
+		}
+	}
+	if got := m.entries[m.at.entry].b.anchor; got != freshAnchor {
+		t.Fatalf("focus on %s, want it back on the block %s", got, freshAnchor)
+	}
+}
+
+// TestSubmitEmptyNewCommentCreatesNoThread: submitting an empty buffer says
+// "nothing to submit" and must be as thread-free as a cancel.
+func TestSubmitEmptyNewCommentCreatesNoThread(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeKeys(m.comp, tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl})
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if _, ok := m.threads[freshAnchor]; ok {
+		t.Fatalf("submitting an empty buffer left a thread for %s behind", freshAnchor)
+	}
+}
+
+// TestDiscardNewCommentCreatesNoThread: the discard gesture must be thread-free
+// too.
+func TestDiscardNewCommentCreatesNoThread(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeKeys(m.comp, keyEsc)
+	typeText(m.comp, ":q!")
+	typeKeys(m.comp, keyEnter)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if _, ok := m.threads[freshAnchor]; ok {
+		t.Fatalf("discard left a thread for %s behind", freshAnchor)
+	}
+}
+
+// TestDraftKeepsFreshThread: the drop must only fire on nothing committed —
+// a kept draft is content, and its thread stays.
+func TestDraftKeepsFreshThread(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m.comp, "half a thought")
+	typeKeys(m.comp, keyEsc, keyEsc)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	tr := m.threads[freshAnchor]
+	if tr == nil {
+		t.Fatal("a kept draft dropped its thread")
+	}
+	if got := tr.draft(newCommentSlot); got != "half a thought" {
+		t.Fatalf("draft = %q, want the unfinished text preserved", got)
+	}
+}
+
+// TestCancelEditKeepsThread: the drop must not fire on a cancelled edit — the
+// thread carries the comment being edited.
+func TestCancelEditKeepsThread(t *testing.T) {
+	m := newTestModel(t)
+	original := m.threads[soloAnchor].posted[0].body
+
+	open(t, m, soloAnchor, 0, "Where does thirty")
+	typeKeys(m.comp, keyEsc)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if m.threads[soloAnchor] == nil {
+		t.Fatal("a cancelled edit dropped its thread")
+	}
+	if got := m.threads[soloAnchor].posted[0].body; got != original {
+		t.Fatalf("posted comment mutated by a cancelled edit: %q", got)
+	}
+}
+
+
 // --- blur -------------------------------------------------------------------
 
 // TestBlurKeepsDraft is the core bet: losing focus tears down a live editor and
