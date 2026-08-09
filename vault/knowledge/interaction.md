@@ -21,6 +21,8 @@ raise it in [`../questions/`](../questions/) and stop. Adding to this file is th
 | `e` | Edit the focused comment or draft |
 | `space` | Cycle the mark: unmarked → reviewed → flagged |
 | `r` / `f` | Set reviewed / flagged directly, toggling off on a re-press |
+| `R` | Resolve or unresolve the focused thread |
+| `D` | Delete the focused thread or comment (asks for confirmation) |
 | `Y` | Copy the whole review to the clipboard |
 | `q` | Quit |
 
@@ -147,7 +149,4 @@ These have been raised but not judged. Each needs a felt leg and a review.
   position, and how it is toggled and focused are still open), what review
   progress looks like rolled up across a tree, and whether the export covers
   one document or all of them.
-- Whether a tombstoned comment (D11) renders at all or only prevents the reply
-  above it from dangling; whether a resolved thread collapses, dims, or
-  disappears; and which keys resolve, unresolve, and delete.
 - Whether marks and comments belong in the same gutter column.

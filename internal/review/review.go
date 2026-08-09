@@ -141,6 +141,7 @@ type model struct {
 	scrollAnchor cursor
 	status       string
 	quitting     bool
+	confirmDelete bool // true when the user must press the delete key again
 
 	spans    []span
 	subspans map[cursor]span // comment-level spans of the expanded thread
@@ -393,20 +394,55 @@ func (m *model) toggleMark(want reviewMark) {
 // thread is collapsed or expanded: resolving is about the thread, not about
 // whatever state it happens to be rendered in right now.
 func (m *model) toggleResolved() {
-	t := m.threads[m.anchorAt()]
-	if t == nil {
+	a := m.anchorAt()
+	if a == "" || m.threads[a] == nil {
 		m.status = "no thread here to resolve"
 		return
 	}
+	t := m.threads[a]
 	t.resolved = !t.resolved
-	if t.resolved {
-		m.status = "resolved"
-	} else {
+	m.status = "resolved"
+	if !t.resolved {
 		m.status = "unresolved"
 	}
-	if err := m.store.save(t); err != nil {
-		m.status += " (not saved to disk: " + err.Error() + ")"
+	if m.store != nil {
+		_ = m.store.save(t)
 	}
+}
+
+// deleteFocused tombstones the focused comment (if expanded) or the whole
+// thread, asking for a second press to confirm since an agent reply already
+// in the thread makes deletion less obviously the reviewer's alone to do.
+func (m *model) deleteFocused() tea.Cmd {
+	anchor := m.anchorAt()
+	if anchor == "" || m.threads[anchor] == nil {
+		return nil
+	}
+	t := m.threads[anchor]
+	
+	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
+		if !m.confirmDelete {
+			m.confirmDelete = true
+			m.status = "Press D again to delete comment"
+			return nil
+		}
+		t.deleteComment(m.at.comment)
+		m.status = "comment deleted"
+	} else {
+		if !m.confirmDelete {
+			m.confirmDelete = true
+			m.status = "Press D again to delete the whole thread"
+			return nil
+		}
+		t.deleteThread()
+		m.status = "thread deleted"
+	}
+	
+	m.confirmDelete = false
+	if m.store != nil {
+		_ = m.store.save(t)
+	}
+	return nil
 }
 
 // sectionLabel names what a mark command is about to act on: a single block,
@@ -641,6 +677,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.handleClick(msg.Mouse())
 
 	case tea.KeyPressMsg:
+		if m.confirmDelete {
+			id, ok := keymap[msg.String()]
+			if !ok || id != "thread.delete" {
+				m.confirmDelete = false
+				m.status = "canceled delete"
+			}
+		}
 		return m, m.handleKey(msg)
 	}
 	return m, nil
@@ -1007,15 +1050,23 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		head := mark(j) + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
 		if d := t.draft(j); d != "" {
 			head += draftStyle.Render("  ✎ edited, unsaved")
+		} else if c.deleted {
+			head += dimStyle.Render("  [deleted]")
 		}
 		body = append(body, head)
-		shown := c.body
+		
 		if d := t.draft(j); d != "" {
-			shown = d
+			for _, l := range wrap(d, w-6) {
+				body = append(body, "  "+l)
+			}
+		} else if c.deleted {
+			body = append(body, "  "+dimStyle.Render("[deleted]"))
+		} else {
+			for _, l := range wrap(c.body, w-6) {
+				body = append(body, "  "+l)
+			}
 		}
-		for _, l := range wrap(shown, w-6) {
-			body = append(body, "  "+l)
-		}
+		
 		m.subspans[cursor{entry: i, comment: j}] = span{
 			start: commentStart, end: base + borderW + resolvedOffset + len(body) - 1,
 		}

@@ -382,7 +382,12 @@ func (t *thread) summary() string {
 	if len(t.posted) == 0 {
 		return "no comments"
 	}
-	s := t.posted[0].author + " · " + truncate(firstLine(t.posted[0].body), 52)
+	first := t.posted[0]
+	body := first.body
+	if first.deleted {
+		body = "[deleted]"
+	}
+	s := first.author + " · " + truncate(firstLine(body), 52)
 	if n := len(t.posted) - 1; n > 0 {
 		s += fmt.Sprintf("  (+%d)", n)
 	}

@@ -1,11 +1,10 @@
 # Board
 
-Last updated: 2026-08-08 (fixed: `**bold**` inside list items and quotes was
-showing literal asterisks — wrapList/wrapQuote now wrap through wrapInline
-like paragraphs do; feedback item addressed and deleted)
+Last updated: 2026-08-09 (THREAD-04 landed: D bound to thread.delete, confirmation required, tombstones render as dim [deleted])
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- THREAD-04 (delete thread/comment with confirmation and tombstone) — journal 2026-08-09.1
 - RENDER-05 (heading hierarchy: weight + colour by depth) — journal
   2026-08-08.2
 - RENDER-04 (block quotes: rule down the left edge) — journal 2026-08-08.3
@@ -36,11 +35,7 @@ like paragraphs do; feedback item addressed and deleted)
 
 ## In progress
 
-- **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
-  reply already in the thread makes "delete the thread" less obviously the
-  reviewer's alone to do. THREAD-03 landed the tombstone data model and
-  persistence; no command calls it yet — this is what wires one in, with the
-  confirmation D11 calls for. (claimed by antigravity 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -97,6 +92,11 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **THREAD-04** what deletion looks like and what confirms it: D bound to
+      thread.delete, requiring a second press to confirm. Deleted comments
+      render their body as `[deleted]` with a dim style, both in expanded and
+      collapsed views. `[felt]` — see journal 2026-08-09.1 — done 2026-08-09
 
 - [x] **(feedback fix)** inline markup inside list items and quotes:
       `wrapList`/`wrapQuote` (`internal/review/review.go`) now wrap through

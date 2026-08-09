@@ -134,6 +134,16 @@ var commands = []command{
 		Run:    func(m *model) tea.Cmd { m.toggleResolved(); return nil },
 	},
 	{
+		ID:          "thread.delete",
+		Description: "Delete the focused comment or thread",
+		Applicable: func(m *model) bool {
+			a := m.anchorAt()
+			return a != "" && m.threads[a] != nil
+		},
+		Target: deleteTarget,
+		Run:    func(m *model) tea.Cmd { return m.deleteFocused() },
+	},
+	{
 		ID:          "review.export",
 		Description: "Copy the whole review to the clipboard",
 		Applicable:  func(m *model) bool { return true },
@@ -223,6 +233,18 @@ func resolveTarget(m *model) string {
 	return "resolve"
 }
 
+// deleteTarget names what thread.delete is about to do.
+func deleteTarget(m *model) string {
+	t := m.threads[m.anchorAt()]
+	if t == nil {
+		return ""
+	}
+	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
+		return "comment by " + t.posted[m.at.comment].author
+	}
+	return "thread"
+}
+
 // markTarget names what a mark command would act on: a single block, or the
 // whole section when focus sits on a heading. Shares sectionLabel (review.go)
 // with toggleMark and cycleMark's own status messages, so the palette's title
@@ -250,6 +272,7 @@ var keymap = map[string]string{
 	"f":     "mark.flagged",
 	"space": "mark.cycle", " ": "mark.cycle",
 	"R": "thread.resolve",
+	"D": "thread.delete",
 	"Y": "review.export",
 	"q": "app.quit", "ctrl+c": "app.quit",
 }
