@@ -13,14 +13,16 @@ journal 2026-08-09.19 — the host now encodes every modified-key family itself
 legacy meta form instead of collapsing to a bare ESC), and the composer binds
 `<C-BS>`/`<M-BS>` to delete-word. The incremental scroll keys landed in journal
 2026-08-09.20 — `J`/`K` scroll the viewport down/up 3 lines per press without
-changing focus (`m.at`). What remains:)*
+changing focus (`m.at`). The .margin directory location landed in journal
+2026-08-09.21 — `resolveReviewRoot` locates the project root via `.git`/`.margin`
+anchor so `.margin` lands in the project root with `docPath` relative to it.
+What remains:)*
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
 - **Thread UX Improvements:**
   - **Dive into multi-line blocks:** the dive mechanism (`l`/`h`) currently enters threads only. Per-line focus inside a long block had no payload when the dive was built; revisit alongside the line-reference (L12-18) work.
 
 ## 2. EXPORT-04 & Persistence Location
-- **.margin directory location:** `.margin` directory currently gets created inside `testdata/`, and export paths are relative to workdir. Shift `.margin` location to current working directory, with future detection of project root (e.g. `.git` or margin config file as anchor).
 - **Locator format:** Approved (`## file.md:line (^anchor)` is good and actionable).
 
 ## 3. CMD-03 & CMD-05 — Command Palette UI & Staged Commands

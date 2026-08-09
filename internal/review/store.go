@@ -40,6 +40,58 @@ const frontmatterDelim = "---"
 // parseComments.
 const tombstoneMarker = "*deleted*"
 
+// resolveReviewRoot determines the review root directory and the relative docPath
+// for path (D9). It walks up from path's directory looking for a project root marker
+// (.git or .margin). If found, that directory becomes root, and docPath is path
+// relative to root. If no marker is found, it falls back to the current working
+// directory.
+func resolveReviewRoot(path string) (root, docPath string) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = path
+	}
+
+	startDir := filepath.Dir(absPath)
+	dir := startDir
+	foundRoot := ""
+
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			foundRoot = dir
+			break
+		}
+		if _, err := os.Stat(filepath.Join(dir, ".margin")); err == nil {
+			foundRoot = dir
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	if foundRoot != "" {
+		root = foundRoot
+	} else {
+		cwd, err := os.Getwd()
+		if err == nil {
+			root = cwd
+		} else {
+			root = startDir
+		}
+	}
+
+	rel, err := filepath.Rel(root, absPath)
+	if err == nil && !strings.HasPrefix(rel, "..") {
+		docPath = rel
+	} else {
+		docPath = filepath.Base(path)
+	}
+
+	return root, docPath
+}
+
 // threadsDir is where every thread file for a review root lives. root is the
 // directory margin was pointed at — today always the lone document's
 // directory, since M1 reviews one file at a time, but the layout does not

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (J/K incremental scrolling)
+Last updated: 2026-08-09 (.margin directory location project root detection)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -59,8 +59,7 @@ Last updated: 2026-08-09 (J/K incremental scrolling)
 
 ## In progress
 
-- (feedback fix) .margin directory location (project root detection) — claimed 2026-08-09
-
+*(none)*
 
 ## Backlog — M1
 
@@ -96,6 +95,13 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** .margin directory location: `resolveReviewRoot` walks
+      up parent directories from the document path looking for a project root
+      marker (`.git` or `.margin`). If found, that directory is `root` and `docPath`
+      is derived relative to it; falls back to current working directory. Drains
+      the ".margin directory location" bullet of `vault/feedback/2026-08-09-todo-review-feedback.md`.
+      `[mech]` — see journal 2026-08-09.21 — done 2026-08-09
 
 - [x] **(feedback fix)** J/K incremental viewport scrolling: `J`/`K` scroll
       the document viewport 3 lines per press without changing focus (`m.at`).

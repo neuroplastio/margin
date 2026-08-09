@@ -379,3 +379,60 @@ func TestMarshalThreadIsHumanReadableMarkdown(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveReviewRootFindsGitRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll .git: %v", err)
+	}
+	sub := filepath.Join(root, "docs", "spec")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatalf("MkdirAll sub: %v", err)
+	}
+	docPath := filepath.Join(sub, "plan.md")
+	if err := os.WriteFile(docPath, []byte("# Plan"), 0o644); err != nil {
+		t.Fatalf("WriteFile doc: %v", err)
+	}
+
+	gotRoot, gotDocPath := resolveReviewRoot(docPath)
+	if gotRoot != root {
+		t.Errorf("gotRoot = %q, want %q", gotRoot, root)
+	}
+	wantDocPath := filepath.Join("docs", "spec", "plan.md")
+	if gotDocPath != wantDocPath {
+		t.Errorf("gotDocPath = %q, want %q", gotDocPath, wantDocPath)
+	}
+}
+
+func TestResolveReviewRootFindsMarginRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".margin"), 0o755); err != nil {
+		t.Fatalf("MkdirAll .margin: %v", err)
+	}
+	docPath := filepath.Join(root, "nested", "doc.md")
+	if err := os.MkdirAll(filepath.Dir(docPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	gotRoot, gotDocPath := resolveReviewRoot(docPath)
+	if gotRoot != root {
+		t.Errorf("gotRoot = %q, want %q", gotRoot, root)
+	}
+	wantDocPath := filepath.Join("nested", "doc.md")
+	if gotDocPath != wantDocPath {
+		t.Errorf("gotDocPath = %q, want %q", gotDocPath, wantDocPath)
+	}
+}
+
+func TestResolveReviewRootFallbackToCwd(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "standalone.md")
+	gotRoot, gotDoc := resolveReviewRoot(docPath)
+	if gotRoot == "" {
+		t.Error("expected non-empty gotRoot")
+	}
+	if gotDoc == "" {
+		t.Error("expected non-empty gotDoc")
+	}
+}
+

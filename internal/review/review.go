@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -2233,7 +2232,7 @@ func Run(path string, opts RunOptions) error {
 	var threads map[string]*thread
 	var root, docPath string
 	if !opts.Stdin {
-		root, docPath = filepath.Dir(path), filepath.Base(path)
+		root, docPath = resolveReviewRoot(path)
 		threads, err = loadThreadsForDoc(root, docPath)
 		if err != nil {
 			return fmt.Errorf("run: %w", err)
