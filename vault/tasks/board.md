@@ -65,7 +65,7 @@ Last updated: 2026-08-09 (thread comment focus highlight)
 
 ## In progress
 
-*(none)*
+- (feedback fix) deleted comments keep content and restore option [felt] — claimed 2026-08-09 by ant-agent
 
 ## Backlog — M1
 
