@@ -80,7 +80,12 @@ Last updated: 2026-08-09 (CLI export for agent automation)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** frontmatter keyboard reachability and horizontal
+      scroll: make the frontmatter block a focus stop (`g`/`j` land on it,
+      focus-follow scroll brings it back into view) and replace its ellipsis
+      truncation with code-block-style `h`/`l` horizontal scroll — drains
+      `vault/feedback/2026-08-09-frontmatter-feedback.md`
+      (agent, 2026-08-09)
 
 ## Backlog — M1
 
