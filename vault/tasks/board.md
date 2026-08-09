@@ -76,7 +76,10 @@ Last updated: 2026-08-09 (CLI comment add for agent automation)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** CLI commands for agent automation — the extract half:
+      a dedicated non-interactive `margin export FILE.md` command that prints
+      the review as it stands on disk without driving the TUI
+      (agent-2, 2026-08-09)
 
 ## Backlog — M1
 
