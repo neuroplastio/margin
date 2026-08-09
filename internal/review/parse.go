@@ -52,6 +52,7 @@ func parseDoc(src []byte) []block {
 	fmStart, fmStop, hasFM := frontmatterExtent(src)
 	if hasFM {
 		b := block{kind: blockFrontmatter, text: string(src[fmStart:fmStop]), start: fmStart, stop: fmStop, line: 1}
+		blockLineExtent(&b, src)
 		b.anchor = anchorFor(b)
 		blocks = append(blocks, b)
 	}
@@ -90,10 +91,27 @@ func parseDoc(src []byte) []block {
 		// A line number is a locator an agent can act on today, independent of
 		// whether this block has been stamped yet.
 		b.line = 1 + bytes.Count(src[:b.start], []byte{'\n'})
+		blockLineExtent(&b, src)
 		blocks = append(blocks, b)
 	}
 	disambiguateAnchors(blocks)
 	return blocks
+}
+
+// blockLineExtent populates endLine for a block based on its byte extent in src.
+func blockLineExtent(b *block, src []byte) {
+	if b.line <= 0 {
+		return
+	}
+	if b.start >= 0 && b.stop > b.start && b.stop <= len(src) {
+		nl := bytes.Count(src[b.start:b.stop], []byte{'\n'})
+		if src[b.stop-1] == '\n' && nl > 0 {
+			nl--
+		}
+		b.endLine = b.line + nl
+	} else {
+		b.endLine = b.line
+	}
 }
 
 // disambiguateAnchors rewrites the content-derived anchors of byte-identical
@@ -588,6 +606,7 @@ func listItemBlocks(n ast.Node, src []byte) []block {
 			items:   []listItem{p.listItem},
 			listEnd: i == len(pos)-1,
 			line:    listLine + p.row,
+			endLine: listLine + p.row,
 			start:   start,
 			stop:    stop,
 		}

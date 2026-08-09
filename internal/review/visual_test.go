@@ -250,4 +250,91 @@ func TestShowDeletedMovedToT(t *testing.T) {
 	if got := keymap["y"]; got != "selection.yank" {
 		t.Errorf("keymap[y] = %q, want selection.yank", got)
 	}
+	if got := keymap["yr"]; got != "selection.yankRef" {
+		t.Errorf("keymap[yr] = %q, want selection.yankRef", got)
+	}
+	if got := keymap["gy"]; got != "selection.yankRef" {
+		t.Errorf("keymap[gy] = %q, want selection.yankRef", got)
+	}
 }
+
+// TestLineRangePrependingInComments: commenting (c) with an active visual selection
+// prepends the line range (e.g. "L12-18: " or "L12: ") to the comment draft.
+func TestLineRangePrependingInComments(t *testing.T) {
+	m := newModelAt("sample.md", parseDoc([]byte(sampleDoc)), nil)
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: 1, comment: commentNone} // paragraph at line 3
+
+	pressKey(m, "V")
+	pressKey(m, "j")
+	if !m.visual {
+		t.Fatal("V j did not enter visual mode")
+	}
+
+	startLine, endLine := m.selectionLineRange()
+	if startLine <= 0 {
+		t.Fatalf("selectionLineRange = (%d, %d), want positive line numbers", startLine, endLine)
+	}
+
+	wantPrefix := m.selectionLineRef()
+	if wantPrefix == "" {
+		t.Fatal("selectionLineRef returned empty string")
+	}
+
+	pressKey(m, "c")
+	if m.visual {
+		t.Fatal("c did not leave visual mode")
+	}
+
+	a := m.anchorAt()
+	tr := m.threads[a]
+	if tr == nil {
+		t.Fatalf("no thread created for anchor %q", a)
+	}
+
+	draft := tr.draft(newCommentSlot)
+	if !strings.HasPrefix(draft, wantPrefix) {
+		t.Errorf("draft = %q, want prefix %q", draft, wantPrefix)
+	}
+}
+
+// TestYankReference: yr or gy copies the line reference string (e.g. "document.md:L12-18")
+// to the clipboard and clears visual mode.
+func TestYankReference(t *testing.T) {
+	m := newModelAt("sample.md", parseDoc([]byte(sampleDoc)), nil)
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: 1, comment: commentNone}
+
+	pressKey(m, "V")
+	pressKey(m, "j")
+
+	wantRef := "sample.md:L" + strings.TrimPrefix(m.selectionLineRef(), "L")
+	wantRef = strings.TrimSuffix(wantRef, ": ")
+
+	cmd := m.yankRef()
+	if cmd == nil {
+		t.Fatal("yankRef returned nil command")
+	}
+	if m.visual {
+		t.Fatal("yankRef did not exit visual mode")
+	}
+	if !strings.Contains(m.status, wantRef) {
+		t.Errorf("status = %q, want containing %q", m.status, wantRef)
+	}
+
+	// Test gy and yr keymap chords
+	m.at = cursor{entry: 1, comment: commentNone}
+	pressKey(m, "y")
+	pressKey(m, "r")
+	if !strings.Contains(m.status, "yanked reference") {
+		t.Errorf("status after yr = %q, want containing 'yanked reference'", m.status)
+	}
+
+	m.at = cursor{entry: 1, comment: commentNone}
+	pressKey(m, "g")
+	pressKey(m, "y")
+	if !strings.Contains(m.status, "yanked reference") {
+		t.Errorf("status after gy = %q, want containing 'yanked reference'", m.status)
+	}
+}
+

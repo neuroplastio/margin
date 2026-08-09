@@ -133,7 +133,19 @@ type block struct {
 
 	level       int // heading level
 	line        int // 1-based line the block starts on; 0 when unknown
+	endLine     int // 1-based line the block ends on; 0 when unknown
 	start, stop int // byte range in the source document
+}
+
+// lineRange returns the 1-based start and end line numbers of block b in the source document.
+func (b block) lineRange() (startLine, endLine int) {
+	if b.line <= 0 {
+		return 0, 0
+	}
+	if b.endLine < b.line {
+		return b.line, b.line
+	}
+	return b.line, b.endLine
 }
 
 type comment struct {

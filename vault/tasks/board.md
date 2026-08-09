@@ -1,9 +1,12 @@
 # Board
 
-Last updated: 2026-08-09 (.margin directory location project root detection)
+Last updated: 2026-08-09 (line/range prepending in comments & yank reference gy/yr)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) line/range prepending in comments & yank reference: commenting
+  (`c`) with visual selection prepends `L12-18: ` / `L12: ` to comment draft; `gy` / `yr` /
+  `selection.yankRef` yanks line reference to clipboard — journal 2026-08-09.22
 - (feedback fix) J/K incremental scrolling: J/K scroll the document viewport
   3 lines per press without moving focus — journal 2026-08-09.20
 - (feedback fix) thread dive navigation: block-level `j`/`k` walk blocks and
@@ -59,10 +62,7 @@ Last updated: 2026-08-09 (.margin directory location project root detection)
 
 ## In progress
 
-- (feedback fix) line/range prepending in comments & yank reference (gy/yr) —
-  in progress by agent (2026-08-09) `[felt]`
-
-
+*(none)*
 
 ## Backlog — M1
 
@@ -96,6 +96,15 @@ Q-0001 and Q-0002 were answered 2026-08-07 and folded into
 resolution and deletion) in the leg that closed them; the question files are
 deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
+
+## Done
+
+- [x] **(feedback fix)** line/range prepending in comments & yank reference:
+      when commenting (`c`) with an active visual selection (`V`), automatically
+      prepends line range (`L12-18: ` or `L12: `) to comment draft; new
+      `selection.yankRef` command (bound to `gy` and `yr`) yanks line reference to
+      clipboard. Drains `vault/feedback/2026-08-09-visual-mode-range-selection-feedback.md`.
+      `[felt]` — see journal 2026-08-09.22 — done 2026-08-09ttled" section for what each still leaves open for a felt leg.
 
 ## Done
 

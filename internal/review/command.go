@@ -11,7 +11,11 @@
 // point; nothing about the palette itself is decided or built here.
 package review
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // command is one registered verb.
 type command struct {
@@ -147,11 +151,26 @@ var commands = []command{
 		Run: func(m *model, val string) tea.Cmd {
 			// A new comment always starts a reply, never edits, wherever
 			// focus is.
-			if a := m.anchorAt(); a != "" {
-				return m.openComposer(a, newCommentSlot)
+			a := m.anchorAt()
+			if a == "" {
+				m.status = "nothing to comment on here"
+				return nil
 			}
-			m.status = "nothing to comment on here"
-			return nil
+			ref := ""
+			if m.visual {
+				ref = m.selectionLineRef()
+				m.visual = false
+			}
+			if ref != "" {
+				t := m.ensureThread(a)
+				if t != nil {
+					currDraft := t.draft(newCommentSlot)
+					if !strings.HasPrefix(currDraft, ref) {
+						t.setDraft(newCommentSlot, ref+currDraft)
+					}
+				}
+			}
+			return m.openComposer(a, newCommentSlot)
 		},
 	},
 	{
@@ -252,23 +271,23 @@ var commands = []command{
 			}
 			m.visual = true
 			m.visualFrom = m.at.entry
-			// Blockwise, as the feedback asks: the anchor is an entry,
-			// never a comment, so focus lifts off a comment stop onto its
-			// block rather than leaving j/k somewhere the entry-only stop
-			// list cannot see.
+			// Visual mode operates blockwise — lift any comment focus onto its block.
 			m.at.comment = commentNone
+			m.status = ""
 			return nil
 		},
 	},
 	{
-		// selection.yank copies the selected blocks' markdown source to the
-		// clipboard and leaves visual mode. With no selection active it
-		// yanks the focused block alone — the degenerate range of one, so
-		// there is one code path, not two.
 		ID:          "selection.yank",
-		Description: "Yank the selected blocks' text",
+		Description: "Yank selected blocks (or focused block)",
 		Applicable:  func(m *model) bool { return true },
 		Run:         func(m *model, val string) tea.Cmd { return m.yankSelection() },
+	},
+	{
+		ID:          "selection.yankRef",
+		Description: "Yank line reference",
+		Applicable:  func(m *model) bool { return true },
+		Run:         func(m *model, val string) tea.Cmd { return m.yankRef() },
 	},
 	{
 		ID:          "review.export",
@@ -450,9 +469,11 @@ var keymap = map[string]string{
 	"R": "thread.resolve",
 	"D": "thread.delete",
 	"T": "thread.showDeleted",
-	"V": "selection.start",
-	"y": "selection.yank",
-	"Y": "review.export",
+	"V":  "selection.start",
+	"y":  "selection.yank",
+	"yr": "selection.yankRef",
+	"gy": "selection.yankRef",
+	"Y":  "review.export",
 	"m": "mark",
 	"s": "goto",
 	"q": "app.quit", "ctrl+c": "app.quit",

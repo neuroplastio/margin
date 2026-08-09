@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -167,6 +168,7 @@ type model struct {
 	// in the highlight, the block count, or the yank.
 	visual     bool
 	visualFrom int
+	pendingKey string
 
 	paletteOpen     bool
 	paletteQuery    string
@@ -731,6 +733,95 @@ func (m *model) yankSelection() tea.Cmd {
 	return tea.SetClipboard(out)
 }
 
+// blockLineRange returns the 1-based start and end line numbers for the block at entry i.
+func (m *model) blockLineRange(i int) (startLine, endLine int) {
+	if i < 0 || i >= len(m.entries) {
+		return 0, 0
+	}
+	e := m.entries[i]
+	b := e.b
+	if e.thread != nil {
+		if a := e.b.anchor; a != "" {
+			for _, docB := range m.doc {
+				if docB.anchor == a {
+					b = docB
+					break
+				}
+			}
+		}
+	}
+	return b.lineRange()
+}
+
+// selectionLineRange returns the 1-based start and end line numbers for the active selection
+// or for the focused entry when no selection is active.
+func (m *model) selectionLineRange() (startLine, endLine int) {
+	if m.visual {
+		lo, hi, ok := m.selectionRange()
+		if ok {
+			sLo, _ := m.blockLineRange(lo)
+			_, eHi := m.blockLineRange(hi)
+			if sLo > 0 && eHi > 0 {
+				return sLo, eHi
+			}
+		}
+	}
+	return m.blockLineRange(m.at.entry)
+}
+
+// selectionLineRef returns the formatted line reference prefix for commenting, e.g. "L12-18: " or "L12: ".
+func (m *model) selectionLineRef() string {
+	startLine, endLine := m.selectionLineRange()
+	if startLine <= 0 {
+		return ""
+	}
+	if startLine == endLine {
+		return fmt.Sprintf("L%d: ", startLine)
+	}
+	return fmt.Sprintf("L%d-%d: ", startLine, endLine)
+}
+
+// yankRef copies the line number / range reference to the clipboard (selection.yankRef / gy / yr).
+func (m *model) yankRef() tea.Cmd {
+	startLine, endLine := m.selectionLineRange()
+	if m.visual {
+		m.visual = false
+	}
+	if startLine <= 0 {
+		m.status = "nothing to reference here"
+		return nil
+	}
+
+	var lineStr string
+	if startLine == endLine {
+		lineStr = fmt.Sprintf("L%d", startLine)
+	} else {
+		lineStr = fmt.Sprintf("L%d-%d", startLine, endLine)
+	}
+
+	docName := ""
+	if m.path != "" && m.path != "-" {
+		docName = filepath.Base(m.path)
+	}
+
+	var ref string
+	if docName != "" {
+		ref = fmt.Sprintf("%s:%s", docName, lineStr)
+	} else {
+		ref = lineStr
+	}
+
+	via, err := copyToClipboard(ref)
+	if err != nil {
+		m.status = "clipboard: " + err.Error()
+	} else if via != "" {
+		m.status = fmt.Sprintf("yanked reference %s (%s)", ref, via)
+	} else {
+		m.status = "yanked reference " + ref
+	}
+	return tea.SetClipboard(ref)
+}
+
 // exportToClipboard renders the review and puts it on the clipboard.
 func (m *model) exportToClipboard() tea.Cmd {
 	out := exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved, m.ephemeral)
@@ -959,7 +1050,19 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	// visual mode esc has no binding at all (the composer owns its own esc).
 	if m.visual && msg.String() == "esc" {
 		m.visual = false
+		m.pendingKey = ""
 		return nil
+	}
+
+	if m.pendingKey != "" {
+		pk := m.pendingKey
+		combo := pk + msg.String()
+		m.pendingKey = ""
+		if id, ok := keymap[combo]; ok {
+			if cmd, ok := commandByID(id); ok {
+				return cmd.Run(m, "")
+			}
+		}
 	}
 
 	// Every key margin recognises resolves to a command id via keymap and runs
@@ -968,6 +1071,7 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	// id is guaranteed to do exactly what the key does.
 	if msg.String() == ":" && m.comp == nil {
 		m.visual = false
+		m.pendingKey = ""
 		m.paletteOpen = true
 		m.paletteQuery = ""
 		m.paletteSelected = 0
@@ -984,12 +1088,18 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	if cmd.Values != nil {
 		m.visual = false
+		m.pendingKey = ""
 		m.paletteOpen = true
 		m.paletteQuery = cmd.ID + " "
 		m.paletteSelected = 0
 		return nil
 	}
 	out := cmd.Run(m, "")
+	if msg.String() == "y" || msg.String() == "g" {
+		m.pendingKey = msg.String()
+	} else {
+		m.pendingKey = ""
+	}
 	// Any command that is not movement or selection itself ends the
 	// selection — vim's rule — so there is no bookkeeping about which verbs
 	// keep a selection alive.
@@ -997,6 +1107,20 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.visual = false
 	}
 	return out
+}
+
+func (m *model) flushPendingKey() tea.Cmd {
+	if m.pendingKey == "" {
+		return nil
+	}
+	pk := m.pendingKey
+	m.pendingKey = ""
+	if id, ok := keymap[pk]; ok {
+		if cmd, ok := commandByID(id); ok {
+			return cmd.Run(m, "")
+		}
+	}
+	return nil
 }
 
 func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
