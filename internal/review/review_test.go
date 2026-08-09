@@ -1612,6 +1612,7 @@ func TestFocusRetainedOnCommentExit(t *testing.T) {
 // places the focus bar and highlight on the comment body lines rather than the author header.
 func TestThreadCommentFocusHighlightsBodyText(t *testing.T) {
 	m := seedModel()
+	m.subspans = make(map[cursor]span)
 	i := entryFor(t, m, convoAnchor)
 	thr := m.threads[convoAnchor]
 	w := 80

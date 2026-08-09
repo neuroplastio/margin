@@ -1608,8 +1608,10 @@ func (m *model) appendComments(body []string, i int, t *thread, w, base, off int
 			}
 		}
 
-		m.subspans[cursor{entry: i, comment: j}] = span{
-			start: commentStart, end: base + borderW + off + len(body) - 1,
+		if m.subspans != nil {
+			m.subspans[cursor{entry: i, comment: j}] = span{
+				start: commentStart, end: base + borderW + off + len(body) - 1,
+			}
 		}
 		if vi < len(visible)-1 {
 			body = append(body, "")
