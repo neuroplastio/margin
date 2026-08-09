@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (rich/raw toggle)
+Last updated: 2026-08-09 (esc-based composer exit)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -93,7 +93,14 @@ Last updated: 2026-08-09 (rich/raw toggle)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** esc-based composer exit: `<esc>` in normal mode
+      closes the composer keeping a draft. A new comment opens in insert mode,
+      so it takes double `<esc>` (the first leaves insert mode, the second
+      exits); an edit opens in normal mode, so a single `<esc>` exits. Replaces
+      `<Esc><Esc>` as the primary exit; `:q`/`:q!`/`SPC c d`/`SPC c k` stay as
+      the explicit gestures — drains the first item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`
+      (agent-4, 2026-08-09)
 
 ## Backlog — M1
 
