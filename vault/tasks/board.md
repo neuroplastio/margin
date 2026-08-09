@@ -64,7 +64,8 @@ Last updated: 2026-08-09 (palette visual separation & hover visibility)
 
 ## In progress
 
-*(none)*
+- (feedback fix) thread comment focus highlight: highlight comment body text and place focus bar on body lines rather than author header — claimed by 22d48181 2026-08-09
+
 
 ## Backlog — M1
 
