@@ -65,6 +65,7 @@ document, regardless of the order the tree-view work itself lands in.
   `ctrl+f`/`ctrl+b`, `pgup`/`pgdn`, `home`/`end`. The open decision is whether
   they carry focus along with the viewport, the way vim's `ctrl+d` carries the
   cursor, or scroll underneath a focus that stays put.
+  - _Claimed by agent 2026-08-09_
 - **SCROLL-03** `[felt]` Mouse wheel. Almost certainly scroll-only with focus
   left where it is, since that is how a wheel behaves everywhere — but that makes
   it deliberately inconsistent with SCROLL-02, which is worth deciding on purpose
