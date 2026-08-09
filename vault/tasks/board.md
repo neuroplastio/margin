@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (dive into multi-line blocks)
+Last updated: 2026-08-09 (tunable mouse wheel speed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -70,7 +70,9 @@ Last updated: 2026-08-09 (dive into multi-line blocks)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** tunable mouse wheel speed: mouse wheel scrolls a
+      configurable number of lines per tick (`--wheel-speed N`, default 3)
+      (Anatoly Rugalev, 2026-08-09)
 
 ## Backlog — M1
 
