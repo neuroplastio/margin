@@ -1,9 +1,12 @@
 # Board
 
-Last updated: 2026-08-09 (visual block selection + yank)
+Last updated: 2026-08-09 (mark visuals: gutter rules)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) mark visuals: per-line ✓/! icons replaced by a vertical
+  rule in the mark's colour down each marked block; headings take the rule
+  too, partial keeps the dimmed · — journal 2026-08-09.17
 - (feedback fix) visual block selection: `V` selects blocks (bg + gutter bar +
   footer mode line), `y` yanks their markdown source; showDeleted moved to
   `T` — journal 2026-08-09.16
@@ -50,13 +53,7 @@ Last updated: 2026-08-09 (visual block selection + yank)
 
 ## In progress
 
-- **(feedback) mark visuals in gutter** `[felt]` — replace the per-line
-  mark icons (✓/! repeated on every line of a marked block) with a
-  vertical rule in the gutter, coloured by mark. Drains the "Mark
-  Visuals in Gutter" bullet of
-  `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`; the
-  file's other bullets stay for future legs. (claimed by toly,
-  2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -93,6 +90,23 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** mark visuals in the gutter: a marked block no
+      longer repeats an icon per line (a six-line reviewed paragraph showed
+      six `✓`s — "weird", per the maintainer). `gutter`
+      (`internal/review/review.go`) now draws a vertical rule (`│`) in the
+      mark's colour on every line of the block, reading as one continuous
+      line down its extent — green `114` for reviewed, orange `209` for
+      flagged, the colours the retired icons already used. Headings take the
+      same rule for a full section roll-up rather than keeping the icons as
+      a "summary" marker (rejected: two visual languages in one column); a
+      partial roll-up keeps the settled dimmed `·` (interaction.md).
+      `reviewMark.glyph()` survives only in the plain-text quit-time
+      summary, where `✓`/`!` is the more legible encoding. Widths untouched
+      — `gutterW` stays 3, no hit-test or wrap math moves. Drains the "Mark
+      Visuals in Gutter" bullet of the additional-UX feedback file; the
+      vim-mode background artifacts, comment-focus highlight, CLI
+      subcommands and focus-on-composer-exit bullets remain. `[felt]` — see
+      journal 2026-08-09.17 — done 2026-08-09
 - [x] **(feedback fix)** visual block selection and yank: `V` starts a
       blockwise selection (the maintainer's `Shift+V` ask — a terminal
       delivers it as `V`, which `thread.showDeleted` gave up, moving to

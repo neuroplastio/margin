@@ -124,6 +124,98 @@ func TestIdenticalSiblingSectionsMarkIndependently(t *testing.T) {
 	}
 }
 
+// TestMarkRendersAsGutterRule: the 2026-08-09 additional-UX feedback ("per-line
+// icons for marks look weird") — a marked block carries a vertical rule in the
+// mark's colour on every one of its lines, reading as one continuous line down
+// the block's extent, instead of an icon repeated per line. A partial section
+// roll-up keeps the settled dimmed ·.
+func TestMarkRendersAsGutterRule(t *testing.T) {
+	m := newTestModel(t)
+	m.marks[freshAnchor] = markOK
+	m.marks[convoAnchor] = markFlag
+	m.at = cursor{entry: blockEntryFor(t, m, soloAnchor), comment: commentNone}
+	lines := m.render()
+
+	ruleOK := okStyle.Render("│")
+	ruleFlag := flagStyle.Render("│")
+
+	// Every text line of a reviewed block carries the rule — the repetition is
+	// what reads as one continuous line. ^a1 wraps to more than one line at
+	// the test width, or this pins nothing.
+	i := blockEntryFor(t, m, freshAnchor)
+	n := 0
+	for j := m.spans[i].start; j <= m.spans[i].end; j++ {
+		if lines[j] == "" {
+			continue // the trailing separator carries no gutter
+		}
+		n++
+		if !strings.Contains(lines[j], ruleOK) {
+			t.Errorf("reviewed block line %d = %q, want the green rule", j, lines[j])
+		}
+		if strings.Contains(lines[j], "✓") {
+			t.Errorf("reviewed block line %d = %q still carries the retired icon", j, lines[j])
+		}
+	}
+	if n < 2 {
+		t.Fatalf("reviewed block rendered %d text lines, want a wrap so the rule's continuity is pinned", n)
+	}
+
+	// A flagged block gets the rule in the flag colour; the seeded fixture
+	// text has no "!" of its own, so finding one is the retired icon.
+	i = blockEntryFor(t, m, convoAnchor)
+	for j := m.spans[i].start; j <= m.spans[i].end; j++ {
+		if lines[j] == "" {
+			continue
+		}
+		if !strings.Contains(lines[j], ruleFlag) {
+			t.Errorf("flagged block line %d = %q, want the orange rule", j, lines[j])
+		}
+		if strings.Contains(lines[j], "!") {
+			t.Errorf("flagged block line %d = %q still carries the retired icon", j, lines[j])
+		}
+	}
+
+	// An unmarked block's gutter stays blank.
+	i = blockEntryFor(t, m, soloAnchor)
+	for j := m.spans[i].start; j <= m.spans[i].end; j++ {
+		if strings.Contains(lines[j], ruleOK) || strings.Contains(lines[j], ruleFlag) {
+			t.Errorf("unmarked block line %d = %q carries a mark rule", j, lines[j])
+		}
+	}
+}
+
+// TestPartialSectionKeepsDimmedDot: interaction.md settles that partial
+// coverage renders as a dimmed ·, and the rule swap does not unsettle it —
+// the heading of a section with one reviewed and one flagged block shows the
+// dot, not a rule.
+func TestPartialSectionKeepsDimmedDot(t *testing.T) {
+	m := newTestModel(t)
+	m.marks[freshAnchor] = markOK
+	m.marks[convoAnchor] = markFlag
+	m.at = cursor{entry: blockEntryFor(t, m, soloAnchor), comment: commentNone}
+	lines := m.render()
+
+	head := lines[m.spans[0].start]
+	if m.entries[0].b.kind != blockHeading {
+		t.Fatal("fixture no longer starts with a heading")
+	}
+	if !strings.Contains(head, dimStyle.Render("·")) {
+		t.Errorf("partial section heading = %q, want the dimmed ·", head)
+	}
+	if strings.Contains(head, okStyle.Render("│")) || strings.Contains(head, flagStyle.Render("│")) {
+		t.Errorf("partial section heading = %q carries a mark rule, want the dot", head)
+	}
+
+	// Fully reviewed, the same heading trades the dot for the rule.
+	m.marks["^c3"] = markOK
+	m.marks[convoAnchor] = markOK
+	lines = m.render()
+	head = lines[m.spans[0].start]
+	if !strings.Contains(head, okStyle.Render("│")) {
+		t.Errorf("fully reviewed section heading = %q, want the green rule", head)
+	}
+}
+
 func TestExportIsBoundToShiftY(t *testing.T) {
 	m := seedModel()
 	cmd := m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'y', Mod: uv.ModShift, Text: "Y"}))

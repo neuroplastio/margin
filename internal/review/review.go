@@ -31,7 +31,7 @@ import (
 const (
 	paneRows   = 10 // composer height; nvim gets cramped below ~8
 	minPaneCol = 40
-	gutterW    = 3 // focus bar + review glyph + space
+	gutterW    = 3 // focus bar + mark rule + space
 	borderW    = 1
 	maxMeasure = 76 // the comfortable reading measure
 	footerRows = 2
@@ -1186,10 +1186,15 @@ func selLine(s string) string {
 	return selBG + selReassert.Replace(s) + "\x1b[m"
 }
 
-// gutter draws the focus bar and the review glyph in a fixed-width column, so
+// gutter draws the focus bar and the review mark in a fixed-width column, so
 // marks line up down the page and can be scanned without reading the prose.
-// A focused block that is also selected keeps the focus colour, so the
-// selection's moving end reads at a glance — vim's cursor in visual mode.
+// A mark is a vertical rule in the mark's colour, drawn on every line of the
+// block, so a marked block reads as one continuous line down its extent
+// rather than an icon repeated per line (2026-08-09 additional-UX feedback:
+// "per-line icons for marks look weird"). A partial roll-up keeps the settled
+// dimmed · (interaction.md). A focused block that is also selected keeps the
+// focus colour, so the selection's moving end reads at a glance — vim's
+// cursor in visual mode.
 func (m *model) gutter(focused bool, hovered bool, selected bool, mark reviewMark, partial bool) string {
 	bar := " "
 	if focused {
@@ -1199,17 +1204,17 @@ func (m *model) gutter(focused bool, hovered bool, selected bool, mark reviewMar
 	} else if hovered {
 		bar = hoverStyle.Render("▌")
 	}
-	glyph := " "
+	rule := " "
 	switch mark {
 	case markOK:
-		glyph = okStyle.Render(mark.glyph())
+		rule = okStyle.Render("│")
 	case markFlag:
-		glyph = flagStyle.Render(mark.glyph())
+		rule = flagStyle.Render("│")
 	}
 	if partial && mark != markNone {
-		glyph = dimStyle.Render("·")
+		rule = dimStyle.Render("·")
 	}
-	return bar + glyph + " "
+	return bar + rule + " "
 }
 
 // render walks the block list once, producing the lines to draw plus the span
