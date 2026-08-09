@@ -36,7 +36,11 @@ like paragraphs do; feedback item addressed and deleted)
 
 ## In progress
 
-*(none)*
+- **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
+  reply already in the thread makes "delete the thread" less obviously the
+  reviewer's alone to do. THREAD-03 landed the tombstone data model and
+  persistence; no command calls it yet — this is what wires one in, with the
+  confirmation D11 calls for. (claimed by antigravity 2026-08-09)
 
 ## Backlog — M1
 
@@ -44,11 +48,6 @@ like paragraphs do; feedback item addressed and deleted)
 
 ## Backlog — M2
 
-- **THREAD-04** `[felt]` What deletion looks like and what confirms it. An agent
-  reply already in the thread makes "delete the thread" less obviously the
-  reviewer's alone to do. THREAD-03 landed the tombstone data model and
-  persistence; no command calls it yet — this is what wires one in, with the
-  confirmation D11 calls for.
 - **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
   an agent and seeing whether it acts correctly. *First round addressed
   2026-08-07 (line locators, structure-preserving quotes); still wants a real
