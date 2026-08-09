@@ -2,7 +2,6 @@
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
 - **Thread UX Improvements:**
-  - Show existing comments when adding a comment to a thread (currently feels like writing a parallel thread).
   - `j`/`k` navigation eats focus on threads. Need a dedicated "dive" navigation type for diving into threads and multi-line blocks.
   - When a thread has only one comment, focus shouldn't stop on it twice—it should only eat focus once.
   - Fix vim mode key combos: Vim mode doesn't receive `ctrl+backspace` or other key combos, dropping into normal mode unexpectedly.

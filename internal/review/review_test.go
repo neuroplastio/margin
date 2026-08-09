@@ -1447,6 +1447,100 @@ func TestComposerBoxDoesNotRewrap(t *testing.T) {
 	}
 }
 
+// TestComposerShowsConversationOnNewComment pins the 2026-08-09 feedback:
+// adding a comment to a thread that already has one shows the conversation
+// above the editor, so the reply reads as a reply rather than a parallel
+// thread. The emulator's rows, the mouse routing (paneTop) and the comments'
+// click targets (subspans) must all agree on where the editor starts.
+func TestComposerShowsConversationOnNewComment(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, convoAnchor, newCommentSlot, "")
+	typeText(m.comp, "replying with the thread on screen")
+	time.Sleep(300 * time.Millisecond)
+
+	m.View()
+	if m.paneLead == 0 {
+		t.Fatal("new comment on an existing thread renders the composer alone — the conversation should show above it")
+	}
+	lines := m.render()
+	plain := make([]string, len(lines))
+	for i, l := range lines {
+		plain[i] = ansiRe.ReplaceAllString(l, "")
+	}
+
+	// Both seeded comments render inside the thread's box, above the
+	// emulator's first row.
+	span := m.spans[m.at.entry]
+	above := strings.Join(plain[span.start:m.paneTop], "\n")
+	for _, want := range []string{"Shouldn't be global", "Changed to per-endpoint budgets"} {
+		if !strings.Contains(above, want) {
+			t.Errorf("conversation above the composer is missing %q:\n%s", want, above)
+		}
+	}
+
+	// A rule marks where reading stops and writing starts, on the line
+	// directly above the emulator.
+	if rule := strings.Trim(plain[m.paneTop-1], " │"); !strings.Contains(rule, "───") {
+		t.Errorf("no separator rule ahead of the composer, got %q", plain[m.paneTop-1])
+	}
+
+	// paneTop still points at the emulator's first row, past the
+	// conversation.
+	em := strings.Split(plainScreen(m.comp.em), "\n")
+	row := strings.TrimPrefix(plain[m.paneTop], strings.Repeat(" ", gutterW)+"│")
+	row = strings.TrimSuffix(row, "│")
+	if got, want := strings.TrimRight(row, " "), strings.TrimRight(em[0], " "); got != want {
+		t.Errorf("paneTop row = %q, emulator row 0 = %q — mouse routing would land off the text", got, want)
+	}
+
+	// The comments on screen keep their click targets, and those targets
+	// cover the lines the comments actually render on.
+	for j, author := range []string{"toly", "agent"} {
+		s, ok := m.subspans[cursor{entry: m.at.entry, comment: j}]
+		if !ok {
+			t.Fatalf("comment %d has no subspan while composing", j)
+		}
+		if !strings.Contains(plain[s.start], author) {
+			t.Errorf("comment %d subspan starts at %q, want its author line", j, plain[s.start])
+		}
+		if s.end >= m.paneTop {
+			t.Errorf("comment %d subspan ends at row %d, into the editor at %d", j, s.end, m.paneTop)
+		}
+	}
+}
+
+// TestComposerBoxStaysSoloWhenEditing pins the other half of the split: an
+// edit's text is already live in the emulator, so the box stays composer-only
+// and the conversation does not render twice.
+func TestComposerBoxStaysSoloWhenEditing(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, convoAnchor, 0, "Shouldn't be global")
+
+	m.View()
+	if m.paneLead != 0 {
+		t.Fatalf("editing renders %d lead lines, want the composer-only box", m.paneLead)
+	}
+	span := m.spans[m.at.entry]
+	if got := span.end - span.start + 1; got != paneRows+3 {
+		t.Fatalf("edit box occupies %d rows, want %d", got, paneRows+3)
+	}
+}
+
+// TestComposerBoxStaysSoloOnFreshThread: with no conversation to show, a new
+// comment's box is exactly what it was before the conversation landed.
+func TestComposerBoxStaysSoloOnFreshThread(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+
+	m.View()
+	if m.paneLead != 0 {
+		t.Fatalf("no conversation exists on a fresh thread, but paneLead = %d", m.paneLead)
+	}
+}
+
 // TestFrameFitsTheTerminal keeps the frame from overflowing the screen.
 //
 // In the alternate screen a frame of exactly m.h lines is correct — it fills the

@@ -160,6 +160,13 @@ type model struct {
 	subspans map[cursor]span // comment-level spans of the expanded thread
 	paneTop  int             // line index of the first emulator row; -1 when idle
 	paneW    int
+	// paneLead counts the box content lines rendered ahead of the composer
+	// emulator — the thread's existing conversation, shown while a new
+	// comment is being written into it. render() resets it and threadLines
+	// sets it, the same render-pass side channel spans and subspans use, and
+	// View folds it into paneTop so mouse routing and cursor placement keep
+	// pointing at the emulator's first row.
+	paneLead int
 
 	// Latency instrumentation: keyAt is stamped when a keypress is forwarded
 	// and sampled on the first frame the child's response reaches, so samples
@@ -1076,6 +1083,7 @@ func (m *model) render() []string {
 	w := m.contentWidth()
 	m.spans = make([]span, len(m.entries))
 	m.subspans = map[cursor]span{}
+	m.paneLead = 0
 	var lines []string
 
 	if len(m.doc) > 0 && m.doc[0].kind == blockFrontmatter {
@@ -1188,6 +1196,59 @@ func (m *model) render() []string {
 	return lines
 }
 
+// appendComments renders the thread's visible posted comments onto body — a
+// head line (focus mark, author, age, unsaved-edit/deleted marker) over the
+// wrapped text, a blank line between comments — registering each comment's
+// subspan as it goes. off is how many content lines will sit ahead of the
+// comments in the final box (the resolved badge's two lines when it shows);
+// base is the absolute line the box starts at, so the subspans come out in
+// the same coordinates as everything else. Both views that show the
+// conversation — the expanded thread, and the composer box of a new reply —
+// render it through here, so a comment reads and hit-tests the same whether
+// you are reading the thread or writing into it.
+func (m *model) appendComments(body []string, i int, t *thread, w, base, off int) []string {
+	mark := func(j int) string {
+		if m.at.comment == j {
+			return focusStyle.Render("▌ ")
+		}
+		return "  "
+	}
+	visible := m.visibleComments(t)
+	for vi, j := range visible {
+		c := t.posted[j]
+		// +borderW for the box's top border, which Render adds around this
+		// content.
+		commentStart := base + borderW + off + len(body)
+		head := mark(j) + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
+		if d := t.draft(j); d != "" {
+			head += draftStyle.Render("  ✎ edited, unsaved")
+		} else if c.deleted {
+			head += dimStyle.Render("  [deleted]")
+		}
+		body = append(body, head)
+
+		if d := t.draft(j); d != "" {
+			for _, l := range wrap(d, w-6) {
+				body = append(body, "  "+l)
+			}
+		} else if c.deleted {
+			body = append(body, "  "+dimStyle.Render("[deleted]"))
+		} else {
+			for _, l := range wrap(c.body, w-6) {
+				body = append(body, "  "+l)
+			}
+		}
+
+		m.subspans[cursor{entry: i, comment: j}] = span{
+			start: commentStart, end: base + borderW + off + len(body) - 1,
+		}
+		if vi < len(visible)-1 {
+			body = append(body, "")
+		}
+	}
+	return body
+}
+
 // threadLines renders a thread in whichever of the three states it is in:
 // collapsed to a line, expanded for reading, or hosting the live editor. base is
 // the absolute line the thread starts at, so comment spans come out in the same
@@ -1213,7 +1274,30 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	}
 
 	if m.comp != nil && m.comp.anchor == t.anchor {
-		return indent(strings.Split(box.Render(m.comp.em.Render()), "\n"))
+		// Writing a new comment into a thread shows the thread: a reply
+		// written against the conversation it joins reads as a reply, where
+		// the same box holding only the editor read as starting a parallel
+		// thread (2026-08-09 todo-review feedback). The conversation renders
+		// through the same appendComments the expanded view uses, a dim rule
+		// marks where reading stops and writing starts, and paneLead tells
+		// View how far down the emulator's first row moved. An edit keeps
+		// the composer-only box: the text being edited is already live in
+		// the emulator, so the want the feedback names — seeing what you are
+		// replying to — does not apply to it.
+		var lead []string
+		if m.comp.target == newCommentSlot {
+			if t.resolved {
+				lead = append(lead, resolvedTxt.Render("✓ resolved"), "")
+			}
+			// off is 0: whatever lead already holds (the badge) is counted
+			// by appendComments itself through len(body).
+			if lead = m.appendComments(lead, i, t, w, base, 0); len(lead) > 0 {
+				lead = append(lead, "", dimStyle.Render(strings.Repeat("─", w-2*borderW)))
+			}
+		}
+		m.paneLead = len(lead)
+		body := append(lead, strings.Split(m.comp.em.Render(), "\n")...)
+		return indent(strings.Split(box.Render(strings.Join(body, "\n")), "\n"))
 	}
 
 	// Collapsed: literally one line, no box. A bordered one-liner costs three
@@ -1247,45 +1331,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	if t.resolved {
 		resolvedOffset = 2
 	}
-	var body []string
-	mark := func(j int) string {
-		if m.at.comment == j {
-			return focusStyle.Render("▌ ")
-		}
-		return "  "
-	}
-	visible := m.visibleComments(t)
-	for vi, j := range visible {
-		c := t.posted[j]
-		// +1 for the box's top border, which Render adds around this content.
-		commentStart := base + borderW + resolvedOffset + len(body)
-		head := mark(j) + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
-		if d := t.draft(j); d != "" {
-			head += draftStyle.Render("  ✎ edited, unsaved")
-		} else if c.deleted {
-			head += dimStyle.Render("  [deleted]")
-		}
-		body = append(body, head)
-		
-		if d := t.draft(j); d != "" {
-			for _, l := range wrap(d, w-6) {
-				body = append(body, "  "+l)
-			}
-		} else if c.deleted {
-			body = append(body, "  "+dimStyle.Render("[deleted]"))
-		} else {
-			for _, l := range wrap(c.body, w-6) {
-				body = append(body, "  "+l)
-			}
-		}
-		
-		m.subspans[cursor{entry: i, comment: j}] = span{
-			start: commentStart, end: base + borderW + resolvedOffset + len(body) - 1,
-		}
-		if vi < len(visible)-1 {
-			body = append(body, "")
-		}
-	}
+	body := m.appendComments(nil, i, t, w, base, resolvedOffset)
 	if d := t.draft(newCommentSlot); d != "" {
 		if len(body) > 0 {
 			body = append(body, "")
@@ -1344,10 +1390,11 @@ func (m *model) View() tea.View {
 
 	lines := m.render()
 	// The emulator's first row sits one line below the focused thread's box
-	// border, which render() has just measured.
+	// border, past whatever conversation render() drew ahead of it — both
+	// measured by the render pass that just ran.
 	m.paneTop = -1
 	if m.comp != nil && m.at.entry < len(m.spans) {
-		m.paneTop = m.spans[m.at.entry].start + borderW
+		m.paneTop = m.spans[m.at.entry].start + borderW + m.paneLead
 		m.paneW = m.contentWidth() - 2*borderW
 	}
 

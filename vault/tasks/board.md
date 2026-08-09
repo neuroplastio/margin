@@ -1,10 +1,12 @@
 # Board
 
-Last updated: 2026-08-09 (ctrl+enter decode path pinned; terminal reporting is
-the remaining variable)
+Last updated: 2026-08-09 (new-comment composer shows the thread above the
+editor)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) new-comment composer shows the thread's comments above the
+  editor, dim rule between; edit stays solo — journal 2026-08-09.12
 - (feedback fix) deleted comments disappear by default; `V` (thread.showDeleted)
   reveals them with the `[deleted]` marker — journal 2026-08-09.9
 - SCROLL-04 (mouse hover effects) — journal 2026-08-09.7
@@ -81,6 +83,23 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** adding a comment to a thread shows the thread: the
+      composer box for a *new* comment now renders the thread's visible
+      comments (and the resolved badge, when set) above the emulator, with a
+      dim full-width `─` rule marking where reading stops and writing starts,
+      instead of swapping the whole thread for the editor. The comment loop
+      of `threadLines` is extracted into `appendComments` (`review.go`),
+      shared with the expanded view, so a comment reads, wraps and hit-tests
+      identically in both — tombstones stay hidden unless `V` is on, through
+      the same `visibleComments` filter. A new render-pass side channel
+      `m.paneLead` records how far the emulator's first row moved down; `View`
+      folds it into `paneTop`, so mouse routing, wheel routing and the
+      hardware cursor keep pointing at the editor. Comments above the editor
+      keep their subspans: clicking one while composing blurs and lands focus
+      on it, the same rule clicking away already followed. Editing (`e`)
+      keeps the composer-only box — the text being edited is already live in
+      the emulator — and a fresh or draft-only thread renders exactly as
+      before. `[felt]` — see journal 2026-08-09.12 — done 2026-08-09
 - [x] **(feedback fix)** ctrl+enter in the composer: the handler was already
       correct; what was missing was a test pinning the decode half of the chain.
       `TestCtrlEnterDecodesThroughRealReader` feeds the raw kitty `CSI 13;5u`
