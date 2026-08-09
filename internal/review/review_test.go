@@ -1621,23 +1621,23 @@ func TestThreadCommentFocusHighlightsBodyText(t *testing.T) {
 	m.at = cursor{entry: i, comment: 0}
 	linesFocused := m.appendComments(nil, i, thr, w, 0, 0)
 	// Author header is linesFocused[0]; body is linesFocused[1]
-	if strings.Contains(linesFocused[0], focusStyle.Render("▌")) {
+	if strings.Contains(linesFocused[0], focusStyle.Render("▌ ")) {
 		t.Errorf("author header line %q contains focus bar, want it on body text instead", linesFocused[0])
 	}
-	if !strings.Contains(linesFocused[1], focusStyle.Render("▌")) {
-		t.Errorf("body text line %q does not contain focus bar, want it highlighted", linesFocused[1])
+	if !strings.HasPrefix(linesFocused[1], focusStyle.Render("▌ ")) {
+		t.Errorf("body text line %q does not start with focus bar", linesFocused[1])
 	}
-	if !strings.Contains(linesFocused[1], focusStyle.Render("Shouldn't be global")) {
-		t.Errorf("body text line %q does not contain focusStyle highlighted body text", linesFocused[1])
+	if !strings.Contains(linesFocused[1], "Shouldn't be global") {
+		t.Errorf("body text line %q does not contain comment text", linesFocused[1])
 	}
 
 	// 2. When comment is not focused:
 	m.at = cursor{entry: i, comment: commentNone}
 	linesUnfocused := m.appendComments(nil, i, thr, w, 0, 0)
-	if strings.Contains(linesUnfocused[0], focusStyle.Render("▌")) {
+	if strings.Contains(linesUnfocused[0], focusStyle.Render("▌ ")) {
 		t.Errorf("unfocused author header %q contains focus bar", linesUnfocused[0])
 	}
-	if strings.Contains(linesUnfocused[1], focusStyle.Render("▌")) {
+	if strings.Contains(linesUnfocused[1], focusStyle.Render("▌ ")) {
 		t.Errorf("unfocused body line %q contains focus bar", linesUnfocused[1])
 	}
 }

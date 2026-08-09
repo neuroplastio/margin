@@ -215,8 +215,11 @@ func marshalThread(docPath string, t *thread) []byte {
 		b.WriteString(c.author)
 		b.WriteString(" — ")
 		b.WriteString(c.at.UTC().Format(time.RFC3339Nano))
-		b.WriteString("\n\n")
 		if c.deleted {
+			b.WriteString(" [deleted]")
+		}
+		b.WriteString("\n\n")
+		if c.deleted && c.body == "" {
 			b.WriteString(tombstoneMarker)
 		} else {
 			b.WriteString(strings.Trim(c.body, "\n"))
@@ -227,11 +230,11 @@ func marshalThread(docPath string, t *thread) []byte {
 }
 
 // commentHeaderRE matches a comment section's header line: `## author —
-// timestamp`. The em dash is part of the fixed shape we write, not something
+// timestamp` or `## author — timestamp [deleted]`. The em dash is part of the fixed shape we write, not something
 // a hand-written file needs to reproduce exactly — a parse failure here is
 // reported with the offending line so a malformed file fails loudly rather
 // than losing a comment silently.
-var commentHeaderRE = regexp.MustCompile(`^## (.+?) — (.+)$`)
+var commentHeaderRE = regexp.MustCompile(`^## (.+?) — (\S+?)(?:\s+\[deleted\])?$`)
 
 // parseThreadFile is marshalThread's inverse. It returns an error for
 // anything that does not round-trip: a caller with a thread file that fails
@@ -296,6 +299,7 @@ func parseComments(lines []string) ([]comment, error) {
 			return nil, fmt.Errorf("expected a comment header (## author — time), got %q", lines[i])
 		}
 		author, rawTime := m[1], m[2]
+		headerDeleted := strings.HasSuffix(lines[i], " [deleted]")
 		at, err := time.Parse(time.RFC3339Nano, rawTime)
 		if err != nil {
 			return nil, fmt.Errorf("comment %q: bad timestamp %q: %w", author, rawTime, err)
@@ -306,8 +310,8 @@ func parseComments(lines []string) ([]comment, error) {
 			i++
 		}
 		body := strings.Trim(strings.Join(lines[start:i], "\n"), "\n")
-		deleted := body == tombstoneMarker
-		if deleted {
+		deleted := headerDeleted || body == tombstoneMarker
+		if body == tombstoneMarker {
 			body = ""
 		}
 		out = append(out, comment{

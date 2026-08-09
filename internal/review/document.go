@@ -325,33 +325,71 @@ func reattach(doc []block, threads map[string]*thread) {
 	}
 }
 
-// deleteComment tombstones the posted comment at index i (D11): its author
-// and timestamp are kept so a reply that answered it does not end up
-// dangling above nothing, and its body is dropped. An out-of-range index is a
-// no-op — a caller holding a stale index should not panic. Any in-progress
-// edit of the comment is discarded along with it: editing a tombstoned
-// comment's now-empty body makes no sense.
-//
-// What a tombstone looks like on screen — whether it renders at all, or only
-// prevents the dangle — is not decided here; nothing in this package's
-// renderers branches on deleted yet. That is THREAD-04.
+// deleteComment marks the posted comment at index i as deleted (D11): its
+// author, timestamp, and body are preserved so deleted comments can be viewed
+// and restored. An out-of-range index is a no-op. Any in-progress edit of the
+// comment is discarded along with it.
 func (t *thread) deleteComment(i int) {
 	if i < 0 || i >= len(t.posted) {
 		return
 	}
-	t.posted[i].body = ""
 	t.posted[i].deleted = true
 	delete(t.drafts, i)
 }
 
-// deleteThread tombstones every posted comment in t. D11 gives "delete a
-// whole thread" the same shape as deleting one comment, applied to all of
-// them — there is nothing else per-thread left to distinguish "deleted" from
-// "never had a comment," so no separate thread-level flag is needed.
+// restoreComment restores a deleted comment at index i.
+func (t *thread) restoreComment(i int) {
+	if i < 0 || i >= len(t.posted) {
+		return
+	}
+	t.posted[i].deleted = false
+}
+
+// toggleDeleteComment toggles the deleted status of the comment at index i.
+// Returns true if the comment is now deleted, false if restored.
+func (t *thread) toggleDeleteComment(i int) bool {
+	if i < 0 || i >= len(t.posted) {
+		return false
+	}
+	if t.posted[i].deleted {
+		t.restoreComment(i)
+		return false
+	}
+	t.deleteComment(i)
+	return true
+}
+
+// deleteThread marks every posted comment in t as deleted.
 func (t *thread) deleteThread() {
 	for i := range t.posted {
 		t.deleteComment(i)
 	}
+}
+
+// restoreThread restores every posted comment in t.
+func (t *thread) restoreThread() {
+	for i := range t.posted {
+		t.restoreComment(i)
+	}
+}
+
+// toggleDeleteThread toggles the deleted status of every comment in t.
+// If any non-deleted comment exists, all are deleted; if all are deleted, all are restored.
+// Returns true if thread is now deleted, false if restored.
+func (t *thread) toggleDeleteThread() bool {
+	hasActive := false
+	for _, c := range t.posted {
+		if !c.deleted {
+			hasActive = true
+			break
+		}
+	}
+	if hasActive {
+		t.deleteThread()
+		return true
+	}
+	t.restoreThread()
+	return false
 }
 
 func (t *thread) draft(target int) string {

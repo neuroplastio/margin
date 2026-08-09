@@ -621,24 +621,19 @@ func (m *model) deleteFocused() tea.Cmd {
 	t := m.threads[anchor]
 	
 	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
-		if !m.confirmDelete {
-			m.confirmDelete = true
-			m.status = "Press D again to delete comment"
-			return nil
+		if t.toggleDeleteComment(m.at.comment) {
+			m.status = "comment deleted"
+		} else {
+			m.status = "comment restored"
 		}
-		t.deleteComment(m.at.comment)
-		m.status = "comment deleted"
 	} else {
-		if !m.confirmDelete {
-			m.confirmDelete = true
-			m.status = "Press D again to delete the whole thread"
-			return nil
+		if t.toggleDeleteThread() {
+			m.status = "thread deleted"
+		} else {
+			m.status = "thread restored"
 		}
-		t.deleteThread()
-		m.status = "thread deleted"
 	}
 	
-	m.confirmDelete = false
 	if m.store != nil {
 		_ = m.store.save(t)
 	}
@@ -1020,13 +1015,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if m.paletteOpen {
 			return m, m.handlePaletteKey(msg)
-		}
-		if m.confirmDelete {
-			id, ok := keymap[msg.String()]
-			if !ok || id != "thread.delete" {
-				m.confirmDelete = false
-				m.status = "canceled delete"
-			}
 		}
 		return m, m.handleKey(msg)
 	}
@@ -1593,10 +1581,12 @@ func (m *model) appendComments(body []string, i int, t *thread, w, base, off int
 				}
 			}
 		} else if c.deleted {
-			if focused {
-				body = append(body, bodyPrefix+focusStyle.Render("[deleted]"))
-			} else {
-				body = append(body, bodyPrefix+dimStyle.Render("[deleted]"))
+			bodyText := c.body
+			if bodyText == "" {
+				bodyText = "[deleted]"
+			}
+			for _, l := range wrap(bodyText, w-6) {
+				body = append(body, bodyPrefix+dimStyle.Render(l))
 			}
 		} else {
 			for _, l := range wrap(c.body, w-6) {
