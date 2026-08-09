@@ -158,6 +158,16 @@ type model struct {
 	// recover.
 	showDeleted bool
 
+	// visual reports that a blockwise selection is active (the 2026-08-09
+	// visual-mode feedback's Shift+V): anchored at visualFrom, extended to
+	// wherever focus moves, rendered as a background tint plus a gutter bar,
+	// and cancelled by esc, a second V, or any command that is not movement
+	// or selection itself. Thread entries inside the range are the
+	// conversation about the document, not the document — they take no part
+	// in the highlight, the block count, or the yank.
+	visual     bool
+	visualFrom int
+
 	paletteOpen     bool
 	paletteQuery    string
 	paletteSelected int
@@ -318,8 +328,36 @@ func (m *model) visibleComments(t *thread) []int {
 	return out
 }
 
+// selectionRange returns the entry-index range the selection covers, lo to hi
+// inclusive, or false when visual mode is off. The range is derived from the
+// anchor and wherever focus is now — never stored — so any movement (j/k,
+// g/G, a click, a page key) extends it, and nothing has to be kept in sync.
+func (m *model) selectionRange() (lo, hi int, ok bool) {
+	if !m.visual || len(m.entries) == 0 {
+		return 0, 0, false
+	}
+	lo, hi = m.visualFrom, m.at.entry
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return max(lo, 0), min(hi, len(m.entries)-1), true
+}
+
 func (m *model) moveFocus(d int) {
 	cs := m.stops()
+	if m.visual {
+		// The selection is blockwise — the feedback's "threads remain
+		// line-based" — so a comment inside a thread is not a selection
+		// unit, and j/k walks entries only rather than diving into a thread
+		// mid-selection.
+		entries := make([]cursor, 0, len(cs))
+		for _, c := range cs {
+			if c.comment == commentNone {
+				entries = append(entries, c)
+			}
+		}
+		cs = entries
+	}
 	for i, c := range cs {
 		if c == m.at {
 			if j := i + d; j >= 0 && j < len(cs) {
@@ -579,6 +617,46 @@ func (m *model) cycleMark() {
 	}
 }
 
+// yankSelection copies the markdown source of every block in the selection —
+// or of the focused block alone when no selection is active — and leaves
+// visual mode. The clipboard gets source, not the rendered view: a yank is
+// pasting into something that reads markdown, and the rendered gutter rules
+// and highlights would be garbage there. Thread entries inside the range
+// contribute nothing, since they are the conversation about the document.
+func (m *model) yankSelection() tea.Cmd {
+	lo, hi, ok := m.selectionRange()
+	if !ok {
+		lo, hi = m.at.entry, m.at.entry
+	}
+	var blocks []string
+	for i := lo; i <= hi && i < len(m.entries); i++ {
+		if e := m.entries[i]; e.thread == nil {
+			if s := blockSource(e.b); s != "" {
+				blocks = append(blocks, s)
+			}
+		}
+	}
+	m.visual = false
+	if len(blocks) == 0 {
+		m.status = "nothing to yank here"
+		return nil
+	}
+	out := strings.Join(blocks, "\n\n") + "\n"
+
+	// Same dual-path delivery as exportToClipboard: a helper when one is
+	// installed, OSC 52 always, since it is what works over SSH.
+	via, err := copyToClipboard(out)
+	switch {
+	case err != nil:
+		m.status = "clipboard: " + err.Error()
+	case via != "":
+		m.status = fmt.Sprintf("yanked %d block(s) (%s)", len(blocks), via)
+	default:
+		m.status = "yank sent to clipboard via OSC 52 — check your terminal allows it"
+	}
+	return tea.SetClipboard(out)
+}
+
 // exportToClipboard renders the review and puts it on the clipboard.
 func (m *model) exportToClipboard() tea.Cmd {
 	out := exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved, m.ephemeral)
@@ -803,11 +881,19 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 
+	// esc cancels an active selection and does nothing otherwise — outside
+	// visual mode esc has no binding at all (the composer owns its own esc).
+	if m.visual && msg.String() == "esc" {
+		m.visual = false
+		return nil
+	}
+
 	// Every key margin recognises resolves to a command id via keymap and runs
 	// through that command's Run — see command.go. handleKey itself carries no
 	// verb-specific behaviour, so a future palette invoking the same command
 	// id is guaranteed to do exactly what the key does.
 	if msg.String() == ":" && m.comp == nil {
+		m.visual = false
 		m.paletteOpen = true
 		m.paletteQuery = ""
 		m.paletteSelected = 0
@@ -823,12 +909,20 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 	if cmd.Values != nil {
+		m.visual = false
 		m.paletteOpen = true
 		m.paletteQuery = cmd.ID + " "
 		m.paletteSelected = 0
 		return nil
 	}
-	return cmd.Run(m, "")
+	out := cmd.Run(m, "")
+	// Any command that is not movement or selection itself ends the
+	// selection — vim's rule — so there is no bookkeeping about which verbs
+	// keep a selection alive.
+	if m.visual && !strings.HasPrefix(id, "move.") && !strings.HasPrefix(id, "selection.") {
+		m.visual = false
+	}
+	return out
 }
 
 func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
@@ -1034,6 +1128,7 @@ var (
 	flagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	resolvedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("108"))
+	selStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("111"))
 	rawStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("109"))
 	codeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("216"))
 	linkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Underline(true)
@@ -1067,12 +1162,40 @@ func headingStyle(level int) lipgloss.Style {
 	return headingStyles[i]
 }
 
+// selBG is the selection background's SGR opener. It is applied by selLine
+// rather than by wrapping a line in a lipgloss background style because
+// lipgloss does not reassert an outer style after an inner one resets: a
+// pre-styled line (chroma's code, RENDER-06's inline markup) ends its own
+// spans with a full reset, which would cut the background mid-line.
+const selBG = "\x1b[48;5;236m"
+
+var selReassert = strings.NewReplacer(
+	"\x1b[m", "\x1b[m"+selBG,
+	"\x1b[0m", "\x1b[0m"+selBG,
+)
+
+// selLine paints the selection background across an already-rendered line by
+// reasserting it after every inner reset, so one uniform treatment covers
+// chroma code, inline markup and plain text alike. Empty lines stay
+// untouched: the blank after a block is the gap between blocks, and painting
+// it would merge every block of the selection into one slab.
+func selLine(s string) string {
+	if s == "" {
+		return s
+	}
+	return selBG + selReassert.Replace(s) + "\x1b[m"
+}
+
 // gutter draws the focus bar and the review glyph in a fixed-width column, so
 // marks line up down the page and can be scanned without reading the prose.
-func (m *model) gutter(focused bool, hovered bool, mark reviewMark, partial bool) string {
+// A focused block that is also selected keeps the focus colour, so the
+// selection's moving end reads at a glance — vim's cursor in visual mode.
+func (m *model) gutter(focused bool, hovered bool, selected bool, mark reviewMark, partial bool) string {
 	bar := " "
 	if focused {
 		bar = focusStyle.Render("▌")
+	} else if selected {
+		bar = selStyle.Render("▌")
 	} else if hovered {
 		bar = hoverStyle.Render("▌")
 	}
@@ -1107,17 +1230,24 @@ func (m *model) render() []string {
 		lines = append(lines, renderFrontmatter(m.doc[0], w)...)
 	}
 
+	selLo, selHi, sel := m.selectionRange()
+
 	for i, e := range m.entries {
 		start := len(lines)
 		focused := m.at.entry == i
 		hovered := m.hoveredEntry == i
+		selected := sel && i >= selLo && i <= selHi
 
 		switch {
 		case e.b.kind == blockHeading:
 			mark, partial := rollUp(m.marksFor(m.sectionAnchors(i)))
+			text := headingStyle(e.b.level).Render(e.b.text)
+			if selected {
+				text = selLine(text)
+			}
 			lines = append(lines,
-				m.gutter(focused && m.at.comment == commentNone, hovered, mark, partial)+
-					headingStyle(e.b.level).Render(e.b.text), "")
+				m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, partial)+
+					text, "")
 
 		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable:
 			mark := m.marks[e.b.anchor]
@@ -1187,8 +1317,12 @@ func (m *model) render() []string {
 				if !preStyled {
 					text = body.Render(l)
 				}
+				text = rule + text
+				if selected {
+					text = selLine(text)
+				}
 				lines = append(lines,
-					m.gutter(focused && m.at.comment == commentNone, hovered, mark, false)+rule+text)
+					m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, false)+text)
 			}
 			// A blockListItem gets its trailing blank line only once, after
 			// the list's last item, so a six-item list still reads as one
@@ -1357,7 +1491,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	}
 	if len(body) == 0 {
 		if t.hasDeleted() {
-			body = []string{"  " + dimStyle.Render("comments deleted — V to reveal")}
+			body = []string{"  " + dimStyle.Render("comments deleted — T to reveal")}
 		} else {
 			body = []string{"  " + dimStyle.Render("no comments yet — c to write one")}
 		}
@@ -1435,6 +1569,20 @@ func (m *model) View() tea.View {
 			"  "+what+"  ·  ctrl+s save · esc esc keep · SPC c k discard · click away to blur"))
 	} else if m.paletteOpen {
 		b.WriteString(paletteBox)
+	} else if m.visual {
+		n := 0
+		if lo, hi, ok := m.selectionRange(); ok {
+			for i := lo; i <= hi; i++ {
+				if m.entries[i].thread == nil {
+					n++
+				}
+			}
+		}
+		b.WriteString(selStyle.Render("-- VISUAL --") + dimStyle.Render(fmt.Sprintf(
+			"  %d block(s)  ·  j/k extend · y yank · V/esc cancel", n)))
+		if m.status != "" {
+			b.WriteString(dimStyle.Render("   " + m.status))
+		}
 	} else {
 		done, flagged, total := m.reviewProgress()
 		progress := fmt.Sprintf("%d/%d reviewed", done, total)

@@ -173,7 +173,8 @@ var commands = []command{
 	{
 		// thread.showDeleted toggles whether tombstoned comments render at
 		// all — deleted by default per the 2026-08-09 feedback, revealed by
-		// this command (`V`, or palette: `:` + "show"). A view toggle, so it
+		// this command (`T` — `V` went to visual mode, 2026-08-09 — or
+		// palette: `:` + "show"). A view toggle, so it
 		// applies to the whole document regardless of focus, the same way
 		// review.export does.
 		ID:          "thread.showDeleted",
@@ -197,6 +198,42 @@ var commands = []command{
 			}
 			return nil
 		},
+	},
+	{
+		// selection.start enters (or leaves) visual mode: a blockwise
+		// selection anchored where focus sits, extended by every movement,
+		// cancelled by esc, a second V, or any command that is not movement
+		// or selection itself. The 2026-08-09 visual-mode feedback asked
+		// for Shift+V; a terminal delivers that as "V", which
+		// thread.showDeleted gave up for it — the selection mode earns the
+		// modifier key, the reveal toggle keeps the palette and moves to T.
+		ID:          "selection.start",
+		Description: "Select blocks (visual mode)",
+		Applicable:  func(m *model) bool { return true },
+		Run: func(m *model, val string) tea.Cmd {
+			if m.visual {
+				m.visual = false
+				return nil
+			}
+			m.visual = true
+			m.visualFrom = m.at.entry
+			// Blockwise, as the feedback asks: the anchor is an entry,
+			// never a comment, so focus lifts off a comment stop onto its
+			// block rather than leaving j/k somewhere the entry-only stop
+			// list cannot see.
+			m.at.comment = commentNone
+			return nil
+		},
+	},
+	{
+		// selection.yank copies the selected blocks' markdown source to the
+		// clipboard and leaves visual mode. With no selection active it
+		// yanks the focused block alone — the degenerate range of one, so
+		// there is one code path, not two.
+		ID:          "selection.yank",
+		Description: "Yank the selected blocks' text",
+		Applicable:  func(m *model) bool { return true },
+		Run:         func(m *model, val string) tea.Cmd { return m.yankSelection() },
 	},
 	{
 		ID:          "review.export",
@@ -373,7 +410,9 @@ var keymap = map[string]string{
 	"space": "mark.cycle", " ": "mark.cycle",
 	"R": "thread.resolve",
 	"D": "thread.delete",
-	"V": "thread.showDeleted",
+	"T": "thread.showDeleted",
+	"V": "selection.start",
+	"y": "selection.yank",
 	"Y": "review.export",
 	"m": "mark",
 	"s": "goto",

@@ -1,9 +1,12 @@
 # Board
 
-Last updated: 2026-08-09 (sibling-section marking bug: identical bodies shared one anchor)
+Last updated: 2026-08-09 (visual block selection + yank)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) visual block selection: `V` selects blocks (bg + gutter bar +
+  footer mode line), `y` yanks their markdown source; showDeleted moved to
+  `T` — journal 2026-08-09.16
 - (feedback fix) palette backspace cancels: `:`+backspace closes; staged-seed
   backspace closes like `esc` instead of rewinding — journal 2026-08-09.14
 - (feedback fix) new-comment composer shows the thread's comments above the
@@ -47,14 +50,7 @@ Last updated: 2026-08-09 (sibling-section marking bug: identical bodies shared o
 
 ## In progress
 
-- **(feedback) visual block selection + yank** `[felt]` — `V` starts a
-  blockwise selection (the maintainer's `Shift+V` ask), movement extends
-  it, `y` copies the selected blocks' markdown source to the clipboard,
-  `esc` cancels. `thread.showDeleted` gives up `V` and moves to `T`.
-  Drains the "Visual Line Selection" and "Yank Content" bullets of
-  `vault/feedback/2026-08-09-visual-mode-range-selection-feedback.md`;
-  the line-reference prepending, flexible placement and yank-reference
-  bullets stay in the file for future legs. (claimed by toly, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -91,6 +87,25 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** visual block selection and yank: `V` starts a
+      blockwise selection (the maintainer's `Shift+V` ask — a terminal
+      delivers it as `V`, which `thread.showDeleted` gave up, moving to
+      `T`), anchored where focus sits and derived to wherever focus moves,
+      so every motion extends it; `esc`, a second `V`, or any non-movement
+      command cancels. Selected blocks paint a dark-slate background
+      (`selLine` reasserts it after every inner SGR reset, since lipgloss
+      does not reassert an outer style across chroma/inline resets) plus a
+      blue gutter bar, with the pink focus bar kept on the moving endpoint
+      and a `-- VISUAL -- n block(s)` footer mode line. `y` copies the
+      selection's markdown *source* (`blockSource`, export.go — quoteBlock's
+      dual without prefix or truncation) to the clipboard via export's
+      dual path, or the focused block alone when nothing is selected.
+      Thread entries in a range are conversation, not document: never
+      highlighted, counted, or yanked. Drains the "Visual Line Selection"
+      and "Yank Content" bullets of the visual-mode feedback file; the
+      `L12-18:` comment prepending, flexible placement and `gy`/`yr`
+      yank-reference bullets remain. `[felt]` — see journal 2026-08-09.16 —
+      done 2026-08-09
 - [x] **(feedback fix)** sibling-section marking bug: marking one header
       section (the maintainer's "CMD-05", anchor `^ccd3fc`) lit up every
       sibling header as reviewed. The mechanism was anchor collision —

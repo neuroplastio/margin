@@ -1110,12 +1110,12 @@ func TestThreadWithOnlyDeletedCommentsHintsTheReveal(t *testing.T) {
 	found := false
 	outer := m.spans[m.at.entry]
 	for i := outer.start; i <= outer.end; i++ {
-		if strings.Contains(lines[i], "V to reveal") {
+		if strings.Contains(lines[i], "T to reveal") {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("all-deleted thread does not hint the V reveal")
+		t.Error("all-deleted thread does not hint the T reveal")
 	}
 }
 

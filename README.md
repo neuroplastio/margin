@@ -51,6 +51,8 @@ detectably orphaned rather than silently misplaced.
 | Key | Does |
 | --- | --- |
 | `j` / `k` | Move between blocks, and between comments in a focused thread |
+| `V` | Select blocks (visual mode): movement extends, `esc` cancels |
+| `y` | Yank the selected blocks' markdown to the clipboard |
 | `c` | New comment on the focused block (opens in insert mode) |
 | `e` | Edit the focused comment or draft (opens in normal mode) |
 | `space` | Cycle the mark: unmarked → reviewed → flagged |

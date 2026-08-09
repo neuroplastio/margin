@@ -136,6 +136,49 @@ func locator(path string, b block) string {
 	return b.anchor
 }
 
+// blockSource reconstructs a block's markdown source — what yanking a
+// selection puts on the clipboard (selection.yank). It is quoteBlock's dual:
+// the same per-kind reconstruction, without the quotation prefix and without
+// the truncation, since a yank wants the whole block, not an excerpt.
+func blockSource(b block) string {
+	switch b.kind {
+	case blockHeading:
+		return strings.Repeat("#", max(b.level, 1)) + " " + b.text
+
+	case blockQuote:
+		// b.lines arrives with the `>` markers stripped (quoteLinesFor), so
+		// re-adding them rebuilds the source — the same move quoteBlock
+		// makes with its "> " prefix on every line.
+		var sb strings.Builder
+		for i, l := range b.lines {
+			if i > 0 {
+				sb.WriteByte('\n')
+			}
+			if l == "" {
+				sb.WriteString(">")
+			} else {
+				sb.WriteString("> " + l)
+			}
+		}
+		return sb.String()
+
+	case blockCode:
+		// b.lines is the fence's content only; the delimiters are re-added
+		// with b.lang so the paste is a real fenced code block again.
+		return "```" + b.lang + "\n" + strings.Join(b.lines, "\n") + "\n```"
+
+	case blockRaw, blockList, blockListItem, blockTable:
+		// Verbatim source — the lines field exists for exactly this (see
+		// its doc comment): tables keep their `|` markup, list items their
+		// markers, raws whatever they were.
+		return strings.Join(b.lines, "\n")
+
+	default:
+		// A paragraph's text is its source, line breaks and all.
+		return b.text
+	}
+}
+
 // quoteBlock renders the block as a markdown blockquote.
 //
 // Structure is preserved for anything whose structure is its content — a list,

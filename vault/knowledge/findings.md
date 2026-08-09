@@ -390,3 +390,18 @@ The companion trap: `--stdin` run with a *terminal* on stdin (someone typed
 keystrokes until EOF and then opens a review of whatever was typed. The check
 is `os.Stdin.Stat()` + `os.ModeCharDevice` — no new dependency, and `/dev/null`
 is a char device too, so the guard is unit-testable without a pty.
+
+## F18 — lipgloss does not reassert an outer style across an inner reset
+
+Wrapping an already-styled string in a second lipgloss style does not compose
+the way nesting suggests: the outer style opens, then the *first* inner SGR
+reset (`\x1b[m` / `\x1b[0m`) kills the outer attributes for the rest of the
+string. Verified empirically against v2.0.5 —
+`bg.Render(fg.Render("a") + " b")` emits the background opener, the inner
+foreground, `a`, a bare reset, then ` b` with **no** background. Any leg that
+wants a background (or any uniform attribute) painted across pre-styled
+content — chroma code, RENDER-06 inline markup — must reassert it after every
+inner reset instead of wrapping. `selLine` (`review.go`, visual selection,
+2026-08-09.16) is the working example: open the background, replace every
+inner reset with reset+opener, terminate at the end. The same trap applies to
+chroma's own output, which resets per token.
