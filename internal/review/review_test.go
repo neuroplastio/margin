@@ -1577,3 +1577,34 @@ func TestFirstPaintBeforeSizeIsKnownDoesNotPoisonScroll(t *testing.T) {
 		t.Errorf("first rendered line is %q, want the document's opening heading", first)
 	}
 }
+
+// TestFocusRetainedOnCommentExit verifies that exiting the composer leaves
+// focus on the comment so pressing 'e' immediately re-edits it.
+func TestFocusRetainedOnCommentExit(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m.comp, "fresh comment body")
+	typeKeys(m.comp, keyEsc, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if m.at.comment != 0 {
+		t.Fatalf("focus after submitting new comment = %d, want 0", m.at.comment)
+	}
+
+	cmd := m.editFocused()
+	if cmd == nil || m.comp == nil {
+		t.Fatal("editFocused() after comment exit did not open composer")
+	}
+	if m.comp.target != 0 {
+		t.Fatalf("composer target = %d, want 0", m.comp.target)
+	}
+
+	typeText(m.comp, " updated")
+	typeKeys(m.comp, keyEsc, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if m.at.comment != 0 {
+		t.Fatalf("focus after updating comment = %d, want 0", m.at.comment)
+	}
+}
+

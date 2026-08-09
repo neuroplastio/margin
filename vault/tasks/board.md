@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (line/range prepending in comments & yank reference gy/yr)
+Last updated: 2026-08-09 (focus retained on comment exit)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) focus retained on comment exit: exiting composer leaves focus on the comment so pressing e immediately re-edits it — journal 2026-08-09.23
 - (feedback fix) line/range prepending in comments & yank reference: commenting
   (`c`) with visual selection prepends `L12-18: ` / `L12: ` to comment draft; `gy` / `yr` /
   `selection.yankRef` yanks line reference to clipboard — journal 2026-08-09.22
@@ -62,8 +63,7 @@ Last updated: 2026-08-09 (line/range prepending in comments & yank reference gy/
 
 ## In progress
 
-- (feedback fix) focus retained on comment exit (Antigravity 2026-08-09)
-
+*(none)*
 
 ## Backlog — M1
 
@@ -99,6 +99,12 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** focus retained on comment exit: exiting composer (`dismiss`)
+      leaves focus (`m.at.comment`) on the newly posted or edited comment so
+      pressing `e` immediately re-edits it. Drains the "Focus Retained on Comment Exit"
+      bullet in `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`.
+      `[felt]` — see journal 2026-08-09.23 — done 2026-08-09
 
 - [x] **(feedback fix)** line/range prepending in comments & yank reference:
       when commenting (`c`) with an active visual selection (`V`), automatically

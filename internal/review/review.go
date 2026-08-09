@@ -956,6 +956,12 @@ func (m *model) dismiss(err error) tea.Cmd {
 	if next := m.pendingOpen; next != nil {
 		m.pendingOpen = nil
 		m.at = *next
+	} else if target == newCommentSlot {
+		if out == outcomeSubmit && body != "" && len(t.posted) > 0 {
+			m.at.comment = len(t.posted) - 1
+		}
+	} else if target >= 0 && target < len(t.posted) {
+		m.at.comment = target
 	}
 	return nil
 }
