@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (palette visual separation & hover visibility)
+Last updated: 2026-08-09 (thread comment focus highlight)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) thread comment focus highlight: focusing a comment places focus bar and highlight on comment body text lines rather than author header — journal 2026-08-09.25
 - (feedback fix) palette visual separation & hover visibility: dim horizontal rule ─ above command palette, hover indicator color brightened to 248 for clear visibility — journal 2026-08-09.24
 - (feedback fix) focus retained on comment exit: exiting composer leaves focus on the comment so pressing e immediately re-edits it — journal 2026-08-09.23
 - (feedback fix) line/range prepending in comments & yank reference: commenting
@@ -64,8 +65,7 @@ Last updated: 2026-08-09 (palette visual separation & hover visibility)
 
 ## In progress
 
-- (feedback fix) thread comment focus highlight: highlight comment body text and place focus bar on body lines rather than author header — claimed by 22d48181 2026-08-09
-
+*(none)*
 
 ## Backlog — M1
 
@@ -101,6 +101,13 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** thread comment focus highlight: focusing a comment
+      places focus bar and highlight on comment body text lines rather than author
+      header. Drains the "Thread Comment Focus Highlight" bullet in
+      `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`.
+      `[felt]` — see journal 2026-08-09.25 — done 2026-08-09
+
 
 - [x] **(feedback fix)** palette visual separation & hover visibility: prepends
       dim horizontal rule `─` to command palette and brightens mouse hover indicator

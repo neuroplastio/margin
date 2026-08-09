@@ -1564,19 +1564,14 @@ func (m *model) render() []string {
 // render it through here, so a comment reads and hit-tests the same whether
 // you are reading the thread or writing into it.
 func (m *model) appendComments(body []string, i int, t *thread, w, base, off int) []string {
-	mark := func(j int) string {
-		if m.at.comment == j {
-			return focusStyle.Render("▌ ")
-		}
-		return "  "
-	}
 	visible := m.visibleComments(t)
 	for vi, j := range visible {
 		c := t.posted[j]
+		focused := m.at.comment == j
 		// +borderW for the box's top border, which Render adds around this
 		// content.
 		commentStart := base + borderW + off + len(body)
-		head := mark(j) + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
+		head := "  " + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
 		if d := t.draft(j); d != "" {
 			head += draftStyle.Render("  ✎ edited, unsaved")
 		} else if c.deleted {
@@ -1584,15 +1579,32 @@ func (m *model) appendComments(body []string, i int, t *thread, w, base, off int
 		}
 		body = append(body, head)
 
+		bodyPrefix := "  "
+		if focused {
+			bodyPrefix = focusStyle.Render("▌ ")
+		}
+
 		if d := t.draft(j); d != "" {
 			for _, l := range wrap(d, w-6) {
-				body = append(body, "  "+l)
+				if focused {
+					body = append(body, bodyPrefix+focusStyle.Render(l))
+				} else {
+					body = append(body, bodyPrefix+l)
+				}
 			}
 		} else if c.deleted {
-			body = append(body, "  "+dimStyle.Render("[deleted]"))
+			if focused {
+				body = append(body, bodyPrefix+focusStyle.Render("[deleted]"))
+			} else {
+				body = append(body, bodyPrefix+dimStyle.Render("[deleted]"))
+			}
 		} else {
 			for _, l := range wrap(c.body, w-6) {
-				body = append(body, "  "+l)
+				if focused {
+					body = append(body, bodyPrefix+focusStyle.Render(l))
+				} else {
+					body = append(body, bodyPrefix+l)
+				}
 			}
 		}
 
