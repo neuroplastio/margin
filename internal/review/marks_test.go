@@ -94,6 +94,36 @@ func TestSpaceIsBoundToTheCycle(t *testing.T) {
 	}
 }
 
+// TestIdenticalSiblingSectionsMarkIndependently is the maintainer's marking
+// bug from the 2026-08-09 todo-review feedback: marking one header section
+// (their "CMD-05", anchor ^ccd3fc) lit up every sibling header. The mechanism
+// is anchor collision — sections whose bodies are byte-identical (board.md's
+// repeated "*(none)*" paragraphs, say) derive the same content anchor, so the
+// section mark lands on the shared anchor and every twin's roll-up reads it.
+func TestIdenticalSiblingSectionsMarkIndependently(t *testing.T) {
+	m := newModel(parseDoc([]byte("## One\n\n*(none)*\n\n## Two\n\n*(none)*\n")), nil)
+
+	headings := map[string]int{}
+	for i, e := range m.entries {
+		if e.b.kind == blockHeading {
+			headings[e.b.text] = i
+		}
+	}
+	if len(headings) != 2 {
+		t.Fatalf("fixture headings = %v, want One and Two", headings)
+	}
+
+	m.at = cursor{entry: headings["One"], comment: commentNone}
+	m.toggleMark(markOK)
+
+	if got, _ := rollUp(m.marksFor(m.sectionAnchors(headings["Two"]))); got != markNone {
+		t.Errorf("sibling section's roll-up = %v, want unmarked — the mark leaked across identical bodies", got)
+	}
+	if done, _, _ := m.reviewProgress(); done != 1 {
+		t.Errorf("reviewed count = %d, want 1 — the twin must not count as reviewed", done)
+	}
+}
+
 func TestExportIsBoundToShiftY(t *testing.T) {
 	m := seedModel()
 	cmd := m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'y', Mod: uv.ModShift, Text: "Y"}))

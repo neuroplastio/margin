@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (palette backspace cancels the palette)
+Last updated: 2026-08-09 (sibling-section marking bug: identical bodies shared one anchor)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -47,13 +47,7 @@ Last updated: 2026-08-09 (palette backspace cancels the palette)
 
 ## In progress
 
-- **(feedback) sibling-section marking bug** `[mech]` — marking one header
-  section incorrectly marks all sibling headers: sections whose bodies are
-  byte-identical derive the same content anchor (`anchorFor` hashes kind +
-  text only), so a mark on one twin lands on all of them and every sibling
-  roll-up lights up. Drains the "Marking Bug (`ccd3fc`)" bullet of
-  `vault/feedback/2026-08-09-todo-review-feedback.md`. (claimed by toly,
-  2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -90,6 +84,22 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** sibling-section marking bug: marking one header
+      section (the maintainer's "CMD-05", anchor `^ccd3fc`) lit up every
+      sibling header as reviewed. The mechanism was anchor collision —
+      `anchorFor` derives a content anchor from `sha256(kind\x00text)` only,
+      so byte-identical blocks (a TODO document's repeated `*(none)*`
+      placeholders) shared one anchor, and one section's mark write was read
+      back by every twin's roll-up and counted twice by `reviewProgress`.
+      Fixed with a disambiguation pass at the end of `parseDoc`
+      (`disambiguateAnchors`, `internal/review/parse.go`): the first
+      occurrence keeps the bare anchor (so a pre-existing thread file still
+      finds its block), repeats gain `#2`/`#3` ordinal suffixes — a shape
+      `anchorFor` never derives, so no collision with a real anchor is
+      possible. Stamped ids and the on-disk formats are untouched; the pass
+      rewrites only session-local content-derived anchors, and only the
+      colliding ones. Drains the "Marking Bug" bullet of the todo-review
+      feedback file. `[mech]` — see journal 2026-08-09.15 — done 2026-08-09
 - [x] **(feedback fix)** palette backspace cancels the palette: `:` then
       backspace now closes the palette (the `:` is "erased"), and backspace
       at a staged command's seed (`mark ` / `goto `) closes like `esc`

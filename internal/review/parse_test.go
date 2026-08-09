@@ -39,6 +39,30 @@ func parseSample(t *testing.T) []block {
 	return parseDoc([]byte(sampleDoc))
 }
 
+// TestIdenticalBlocksGetDistinctAnchors pins the disambiguation pass: a
+// content-derived anchor hashes only kind and text (anchorFor), so without it
+// two byte-identical blocks share one anchor and a mark, a thread, or a focus
+// lookup on one twin lands on all of them — the maintainer's "marking CMD-05
+// marked all sibling headers" (2026-08-09 todo-review feedback). The first
+// occurrence keeps the bare anchor a pre-existing thread file may still point
+// at; repeats gain ordinal suffixes.
+func TestIdenticalBlocksGetDistinctAnchors(t *testing.T) {
+	blocks := parseDoc([]byte("same words\n\nsame words\n\nsame words\n\nother words\n"))
+	if len(blocks) != 4 {
+		t.Fatalf("blocks = %d, want 4", len(blocks))
+	}
+	base := anchorFor(blocks[0])
+	if blocks[0].anchor != base {
+		t.Errorf("first occurrence = %q, want the bare derived anchor %q", blocks[0].anchor, base)
+	}
+	if blocks[1].anchor != base+"#2" || blocks[2].anchor != base+"#3" {
+		t.Errorf("repeats = %q, %q, want %q and %q", blocks[1].anchor, blocks[2].anchor, base+"#2", base+"#3")
+	}
+	if blocks[3].anchor != anchorFor(blocks[3]) {
+		t.Errorf("distinct block = %q, want its untouched derived anchor %q", blocks[3].anchor, anchorFor(blocks[3]))
+	}
+}
+
 func TestParseFindsTopLevelBlocks(t *testing.T) {
 	blocks := parseSample(t)
 

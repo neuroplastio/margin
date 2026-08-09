@@ -92,7 +92,32 @@ func parseDoc(src []byte) []block {
 		b.line = 1 + bytes.Count(src[:b.start], []byte{'\n'})
 		blocks = append(blocks, b)
 	}
+	disambiguateAnchors(blocks)
 	return blocks
+}
+
+// disambiguateAnchors rewrites the content-derived anchors of byte-identical
+// blocks so an anchor names exactly one block. anchorFor hashes only kind and
+// text, so two blocks with the same text — board.md's repeated "*(none)*"
+// paragraphs are the live example — share one anchor, and a mark (or a
+// thread, or a focus lookup) on one twin lands on all of them: marking one
+// section lit up every sibling section with an identical body (2026-08-09
+// todo-review feedback, "Marking Bug"). The first occurrence keeps the bare
+// anchor, so a thread file written against it before this pass existed still
+// finds its block; repeats gain "#2", "#3", … — a shape anchorFor never
+// derives (it emits "^" plus hex), so a suffix can never collide with a real
+// anchor. Stamped blocks keep their on-disk ids untouched.
+func disambiguateAnchors(blocks []block) {
+	seen := map[string]int{}
+	for i := range blocks {
+		if blocks[i].stamped || blocks[i].anchor == "" {
+			continue
+		}
+		seen[blocks[i].anchor]++
+		if n := seen[blocks[i].anchor]; n > 1 {
+			blocks[i].anchor = fmt.Sprintf("%s#%d", blocks[i].anchor, n)
+		}
+	}
 }
 
 // frontmatterExtent reports the byte range [0, stop) of a leading YAML
