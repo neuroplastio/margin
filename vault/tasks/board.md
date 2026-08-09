@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (CMD-05 landed: staged value commands)
+Last updated: 2026-08-09 (SCROLL-02 landed: page and half-page movement)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- SCROLL-02 (page and half-page movement) — journal 2026-08-09.5
 - CMD-05 (staged value commands and key-opens-a-stage) — journal 2026-08-09.4
 - CMD-03 (command palette UI: renders at bottom, 7 items shown, typed filtering) — journal 2026-08-09.3
 - EXPORT-04 (export wording and shape, agent instructions) — journal 2026-08-09.2
@@ -61,11 +62,6 @@ asked for. Split per the feedback's own suggested ordering — see
 Independent of the tree view (D10): these are about moving around one
 document, regardless of the order the tree-view work itself lands in.
 
-- **SCROLL-02** `[felt]` Page and half-page keys — `ctrl+d`/`ctrl+u`,
-  `ctrl+f`/`ctrl+b`, `pgup`/`pgdn`, `home`/`end`. The open decision is whether
-  they carry focus along with the viewport, the way vim's `ctrl+d` carries the
-  cursor, or scroll underneath a focus that stays put.
-  - _Claimed by agent 2026-08-09_
 - **SCROLL-03** `[felt]` Mouse wheel. Almost certainly scroll-only with focus
   left where it is, since that is how a wheel behaves everywhere — but that makes
   it deliberately inconsistent with SCROLL-02, which is worth deciding on purpose
@@ -89,6 +85,7 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **SCROLL-02** page and half-page keys (`ctrl+d`/`u`, `pgup`/`pgdn`, `home`/`end`). Built to carry focus along with the viewport, matching vim's `ctrl+d` rather than a generic pager. `[felt]` — see journal 2026-08-09.5 — done 2026-08-09
 - [x] **CMD-05** staged value commands and key-opens-a-stage. `mark` and `goto` staged commands added. `m` and `s` keys open the palette partway through. Backspace rewinds predictably. `[felt]` — see journal 2026-08-09.4 — done 2026-08-09
 - [x] **CMD-03** the palette itself: `:` opens it, rendered at the bottom of the screen without dimming the document, showing up to 7 ranked items, supporting typed filtering and navigation. `[felt]` — see journal 2026-08-09.3 — done 2026-08-09
 - [x] **EXPORT-04** agent instructions added to the export preamble, and locator includes the anchor ID `## file:line (^id)` so agents can successfully read/write thread files and resolve threads without guessing. `[felt]` — see journal 2026-08-09.2 — done 2026-08-09

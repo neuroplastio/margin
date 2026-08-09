@@ -294,6 +294,49 @@ func (m *model) moveFocus(d int) {
 	}
 }
 
+func (m *model) pageScroll(half, down bool) {
+	if len(m.spans) == 0 {
+		return
+	}
+	viewport := max(m.h-footerRows, 1)
+	dist := viewport
+	if half {
+		dist /= 2
+	}
+	if dist < 1 {
+		dist = 1
+	}
+	if !down {
+		dist = -dist
+	}
+
+	m.scroll += dist
+
+	var docLine int
+	f, ok := m.subspans[m.at]
+	if !ok && m.at.entry < len(m.spans) {
+		f = m.spans[m.at.entry]
+		ok = true
+	}
+	if ok {
+		docLine = f.start + dist
+	} else {
+		docLine = m.scroll
+	}
+
+	target, hit := m.hitTest(docLine)
+	if !hit {
+		if down {
+			stops := m.stops()
+			target = stops[len(stops)-1]
+		} else {
+			target = m.stops()[0]
+		}
+	}
+	m.at = target
+	m.scrollAnchor = m.at
+}
+
 // anchorAt is the document anchor the focus currently sits on, "" for headings.
 func (m *model) anchorAt() string {
 	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
