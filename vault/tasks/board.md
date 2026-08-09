@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (SCROLL-03 landed: mouse wheel support)
+Last updated: 2026-08-09 (SCROLL-04 landed: mouse hover effects)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- SCROLL-04 (mouse hover effects) — journal 2026-08-09.7
 - SCROLL-03 (mouse wheel) — journal 2026-08-09.6
 - SCROLL-02 (page and half-page movement) — journal 2026-08-09.5
 - CMD-05 (staged value commands and key-opens-a-stage) — journal 2026-08-09.4
@@ -40,10 +41,7 @@ Last updated: 2026-08-09 (SCROLL-03 landed: mouse wheel support)
 
 ## In progress
 
-- **SCROLL-04** `[felt]` Mouse hover effects — highlight the block under the
-  pointer without moving focus. Explicitly "a stretch"; do not take it ahead of
-  the wheel, and note it sits awkwardly against the rule that the mouse only
-  moves focus on click. (claimed by toly, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -80,6 +78,7 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **SCROLL-04** mouse hover effects: `tea.MouseMotionMsg` drives `m.hoveredEntry` via `hitTest`, rendering a dim `▌` in the gutter for the block under the pointer without moving `m.at`. `[felt]` — see journal 2026-08-09.7 — done 2026-08-09
 - [x] **SCROLL-03** mouse wheel support: scrolling the wheel shifts the document viewport directly (`m.scroll`), bypassing `clampScroll`'s snapping. Focus intentionally stays left where it is. A wheel event over an open composer scrolls the comment instead. `[felt]` — see journal 2026-08-09.6 — done 2026-08-09
 - [x] **SCROLL-02** page and half-page keys (`ctrl+d`/`u`, `pgup`/`pgdn`, `home`/`end`). Built to carry focus along with the viewport, matching vim's `ctrl+d` rather than a generic pager. `[felt]` — see journal 2026-08-09.5 — done 2026-08-09
 - [x] **CMD-05** staged value commands and key-opens-a-stage. `mark` and `goto` staged commands added. `m` and `s` keys open the palette partway through. Backspace rewinds predictably. `[felt]` — see journal 2026-08-09.4 — done 2026-08-09

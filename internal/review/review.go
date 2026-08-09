@@ -123,9 +123,10 @@ type model struct {
 	// document. nil wherever store is nil, for the same reason.
 	watcher *threadWatcher
 
-	at   cursor
-	comp *composer
-	gen  int
+	at           cursor
+	hoveredEntry int
+	comp         *composer
+	gen          int
 
 	// pendingOpen is queued when a click lands on another thread while an
 	// editor is open. Blur is asynchronous — nvim has to write its buffer and
@@ -185,6 +186,7 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 		path: path, doc: doc, threads: threads,
 		marks:        map[string]reviewMark{},
 		at:           cursor{entry: 0, comment: commentNone},
+		hoveredEntry: -1,
 		scrollAnchor: cursor{entry: -1, comment: commentNone},
 		paneTop:      -1,
 	}
@@ -727,6 +729,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		return m, m.handleWheel(tea.Mouse(msg))
 
+	case tea.MouseMotionMsg:
+		return m, m.handleMotion(tea.Mouse(msg))
+
 	case tea.KeyPressMsg:
 		if m.paletteOpen {
 			return m, m.handlePaletteKey(msg)
@@ -913,6 +918,27 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	return nil
 }
 
+// handleMotion sets hoveredEntry for the block under the pointer.
+func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
+	line := mo.Y + m.scroll
+
+	if m.comp != nil && m.paneTop >= 0 {
+		relY, relX := line-m.paneTop, mo.X-(gutterW+borderW)
+		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
+			m.hoveredEntry = -1
+			return nil
+		}
+	}
+
+	target, ok := m.hitTest(line)
+	if ok {
+		m.hoveredEntry = target.entry
+	} else {
+		m.hoveredEntry = -1
+	}
+	return nil
+}
+
 // handleWheel scrolls the document, or passes the wheel event to an open
 // composer if the pointer is over it. Focus is explicitly left alone.
 func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
@@ -959,6 +985,7 @@ var (
 	authorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	draftStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
 	focusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
+	hoverStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("239"))
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	flagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -998,10 +1025,12 @@ func headingStyle(level int) lipgloss.Style {
 
 // gutter draws the focus bar and the review glyph in a fixed-width column, so
 // marks line up down the page and can be scanned without reading the prose.
-func (m *model) gutter(focused bool, mark reviewMark, partial bool) string {
+func (m *model) gutter(focused bool, hovered bool, mark reviewMark, partial bool) string {
 	bar := " "
 	if focused {
 		bar = focusStyle.Render("▌")
+	} else if hovered {
+		bar = hoverStyle.Render("▌")
 	}
 	glyph := " "
 	switch mark {
@@ -1036,12 +1065,13 @@ func (m *model) render() []string {
 	for i, e := range m.entries {
 		start := len(lines)
 		focused := m.at.entry == i
+		hovered := m.hoveredEntry == i
 
 		switch {
 		case e.b.kind == blockHeading:
 			mark, partial := rollUp(m.marksFor(m.sectionAnchors(i)))
 			lines = append(lines,
-				m.gutter(focused && m.at.comment == commentNone, mark, partial)+
+				m.gutter(focused && m.at.comment == commentNone, hovered, mark, partial)+
 					headingStyle(e.b.level).Render(e.b.text), "")
 
 		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable:
@@ -1113,7 +1143,7 @@ func (m *model) render() []string {
 					text = body.Render(l)
 				}
 				lines = append(lines,
-					m.gutter(focused && m.at.comment == commentNone, mark, false)+rule+text)
+					m.gutter(focused && m.at.comment == commentNone, hovered, mark, false)+rule+text)
 			}
 			// A blockListItem gets its trailing blank line only once, after
 			// the list's last item, so a six-item list still reads as one
