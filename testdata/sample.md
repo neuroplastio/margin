@@ -4,6 +4,7 @@ status: draft
 owner: platform
 reviewers: [toly]
 tags: [storage, migration, redis]
+description: Moving session state off the application servers and into a shared store so a rolling deploy stops logging everyone out and a single node failure stops taking a slice of active sessions with it.
 ---
 
 # Session storage migration
@@ -43,7 +44,7 @@ incident, and the failure modes are understood.
 ### What changes
 
 | Component | Before | After |
-| --- | --- | --- |
+| :--- | :---: | ---: |
 | Session read | in-process map | Redis `GET`, ~0.4ms p50 |
 | Session write | in-process map | Redis `SETEX`, TTL 24h |
 | Deploy | drops sessions | no effect |
@@ -75,10 +76,27 @@ session is under 2KB and the marshalling cost is noise next to the round trip.
 If that stops being true, `msgpack` is a drop-in change behind the same
 interface.
 
+#### Config surface
+
+The store lives behind a `SESSION_STORE` build tag so the in-memory and Redis
+implementations can coexist in one binary during the dual-write window:
+
+```
+# session flags consumed by the cmd/sessionserver entrypoint; the empty
+# SESSION_REDIS_URL below is deliberate and means "in-memory store, no
+# connection", which is exactly the test-double behaviour the runbook wants
+# from a cold boot before the shadow-traffic week actually starts talking to redis.
+SESSION_REDIS_URL=
+SESSION_REDIS_POOL_SIZE=32
+```
+
 > **Open question.** Do we need session data encrypted at rest in Redis? The
 > tokens are opaque and the payload is a user id plus a permission set, but
 > "permission set" is arguably sensitive. Flagging for security review rather
 > than deciding here.
+>
+> Second paragraph of the same quote, to check the paragraph-break handling —
+> a blank `>` line separates this from the first without ending the block.
 
 ## Rollout
 
@@ -89,6 +107,11 @@ revertible and none of them requires a maintenance window:
   if it falls over, nothing user-visible happens.
 - **Week 2** — read from Redis, fall back to memory on a miss. Watch the
   fallback rate; it should trend to zero as old sessions expire.
+  - What "zero" means: no fallback reads in the last full day, not just a
+    quiet hour. A couple of stragglers from a long-lived session are noise.
+  - If the rate climbs instead of falling, pause here and re-check the TTL:
+    an expiry shorter than the ticket window looks like a bug but is a
+    settings error.
 - **Week 3** — remove the memory path. Delete the sticky-session config from
   the load balancer, which is the change that actually pays for this work.
 
