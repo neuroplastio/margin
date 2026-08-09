@@ -163,6 +163,35 @@ func TestAltBackspaceDeletesWord(t *testing.T) {
 	deleteWordBeforeCursor(t, tea.Key{Code: uv.KeyBackspace, Mod: uv.ModAlt})
 }
 
+// TestComposerPaintsNoBackground pins the "vim mode displays a strange black
+// background" fix (additional-ux-and-cli feedback): nvim's default colorscheme
+// paints Normal with its own dark background (NvimDarkGrey2, RGB 20;22;27),
+// so the emulator's Render() decorated every cell — typed text, empty rows,
+// and erased cells alike — with a background SGR that clashed with margin's
+// themed background and left artifacts on deleted character cells. The
+// composer init now forces Normal/NormalFloat/EndOfBuffer backgrounds to NONE,
+// so the rendered pane must carry no background escape at all.
+func TestComposerPaintsNoBackground(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m.comp, "hello world")
+	if s := waitForScreen(t, m.comp.em, "world", 3*time.Second); !strings.Contains(s, "hello world") {
+		t.Fatalf("seed text never landed; screen was:\n%s", s)
+	}
+
+	// Erase most of the text: this was the half of the bug where erased cells
+	// kept the dark background behind them.
+	for i := 0; i < 5; i++ {
+		typeKeys(m.comp, keyBackspace)
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	if got := m.comp.em.Render(); strings.Contains(got, "\x1b[48") {
+		t.Fatalf("composer render carries a background SGR (the pane must be transparent):\n%q", got)
+	}
+}
+
 // TestCtrlBackspaceDecodesThroughRealReader pins the whole real path, the way
 // TestCtrlEnterDecodesThroughRealReader did for submit: the exact bytes a
 // kitty-speaking terminal sends for ctrl+backspace (CSI 127;5u) go through

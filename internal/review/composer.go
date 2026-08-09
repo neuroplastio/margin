@@ -90,6 +90,14 @@ vim.opt.showmode = false
 vim.opt.cmdheight = 0
 vim.opt.fillchars = { eob = ' ' }
 
+-- nvim's default colorscheme paints Normal with its own dark background
+-- (NvimDarkGrey2), which clashes with margin's themed background and leaves
+-- background SGR behind on erased cells. The pane is a window on the host's
+-- document: paint nothing, let margin's own background show through.
+vim.api.nvim_set_hl(0, 'Normal', { bg = 'NONE', ctermbg = 'NONE' })
+vim.api.nvim_set_hl(0, 'NormalFloat', { bg = 'NONE', ctermbg = 'NONE' })
+vim.api.nvim_set_hl(0, 'EndOfBuffer', { bg = 'NONE', ctermbg = 'NONE' })
+
 vim.opt.wrap = true
 vim.opt.linebreak = true
 vim.opt.breakindent = true

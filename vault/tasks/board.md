@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-08-09 (tunable mouse wheel speed)
+Last updated: 2026-08-09 (composer background artifacts)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) composer background artifacts: the composer pane no longer
+  paints nvim's own dark background — Normal/NormalFloat/EndOfBuffer forced to
+  transparent in composerInit, so the pane shows the terminal's background like
+  the document; erased cells leave no marks — journal 2026-08-09.30
 - (feedback fix) tunable mouse wheel speed: `--wheel-speed N` sets lines per
   tick (default 3, clamp at 1) — journal 2026-08-09.29
 - (feedback fix) dive into multi-line blocks: `l` on a table/raw block dives
@@ -108,6 +112,22 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** composer background artifacts: nvim's default
+      colorscheme paints `Normal` with its own dark background
+      (`NvimDarkGrey2`, RGB 20;22;27) on every cell, so the composer pane
+      rendered as a dark slab over the document — a "strange black background
+      beneath typed text" that left "persistent background artifacts on
+      deleted character cells" after backspaces. `composerInit` now forces
+      `Normal`, `NormalFloat` and `EndOfBuffer` to `bg = 'NONE'`, so the pane
+      renders on the terminal's own background, matching the document;
+      erased cells leave nothing behind. Host-side stripping of `48;` SGR
+      from `em.Render()` deliberately rejected — the emulator should report
+      what the child painted, and the child should simply not paint this.
+      Drains the "Vim Mode Background Rendering Artifacts" bullet of
+      `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`; the CLI
+      automation bullet remains. Recorded as F21.
+      `[felt]` — see journal 2026-08-09.30 — done 2026-08-09
 
 - [x] **(feedback fix)** tunable mouse wheel speed: mouse wheel scrolls a
       configurable number of lines per tick (`--wheel-speed N`, default 3,

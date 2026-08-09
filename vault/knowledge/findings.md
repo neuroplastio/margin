@@ -453,3 +453,26 @@ until something Reads. The composer never notices because its
 `io.Copy(ptmx, c.em)` goroutine is always reading. A test that calls
 `sendKey` without a concurrent reader deadlocks — start the read goroutine
 *before* the send (see `sendKeyBytes` in composer_keys_test.go).
+
+## F21 — nvim paints the pane with its own background unless told not to
+
+Even stripped to a textarea (`-u composerInit`, no colorscheme loaded), nvim
+paints the whole pane with the default colorscheme's `Normal` background —
+`guibg=NvimDarkGrey2`, RGB `20;22;27` — on *every* cell, empty rows included.
+The vt emulator faithfully records that as a `48;2;20;22;27` SGR on every
+cell, so `em.Render()` came out as a dark slab with a different background
+than the document around it, and erased characters kept the background where
+the text had been — the "strange black background beneath typed text /
+persistent artifacts on deleted character cells" feedback.
+
+The fix is nvim-side, not host-side: force the background-bearing highlight
+groups to transparent in `composerInit` —
+`nvim_set_hl(0, 'Normal'|'NormalFloat'|'EndOfBuffer', { bg = 'NONE', ctermbg = 'NONE' })`.
+(`EndOfBuffer` is the filler past the last line; `fillchars.eob` only changes
+its glyph, not its background.) With that, the pane renders plain text and
+the terminal's own background shows through, matching margin's document. A
+host-side attempt (stripping `48;` from `em.Render()`) would be wrong: it
+would break legitimate backgrounds the moment a real colorscheme or a visual
+selection wants one. `set_hl`'s valid keys are `bg`/`fg`, not `guibg`/`guifg`
+— the `gui` prefix names the *attribute source*, not the dictionary key, and
+`nvim_set_hl` errors `E5113: invalid key: guibg`.

@@ -127,10 +127,11 @@ func waitExit(t *testing.T, c *composer, timeout time.Duration) error {
 }
 
 var (
-	keyEsc   = tea.Key{Code: uv.KeyEscape}
-	keyEnter = tea.Key{Code: uv.KeyEnter}
-	keyCtrlS = tea.Key{Code: 's', Mod: uv.ModCtrl}
-	keySpace = tea.Key{Code: uv.KeySpace, Text: " "}
+	keyEsc       = tea.Key{Code: uv.KeyEscape}
+	keyEnter     = tea.Key{Code: uv.KeyEnter}
+	keyCtrlS     = tea.Key{Code: 's', Mod: uv.ModCtrl}
+	keySpace     = tea.Key{Code: uv.KeySpace, Text: " "}
+	keyBackspace = tea.Key{Code: uv.KeyBackspace}
 )
 
 func entryFor(t *testing.T, m *model, anchor string) int {
@@ -1753,6 +1754,3 @@ func TestWheelSpeedZeroMeansDefault(t *testing.T) {
 		t.Errorf("wheel down with wheelSpeed 0: scroll = %d, want %d (clamped to 1)", m.scroll, start+1)
 	}
 }
-
-
-
