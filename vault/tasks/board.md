@@ -90,7 +90,11 @@ Last updated: 2026-08-09 (<num>gg source-line navigation)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback feature)** rich/raw mode toggle: `\` switches between the
+      rendered document and the raw markdown source of the same file (feature
+      2 of `vault/feedback/2026-08-09-navigation-feature-requests.md`); focus
+      stays on the same block, mapped to its source lines; scroll survives.
+      (agent-3, 2026-08-09)
 
 ## Backlog — M1
 
