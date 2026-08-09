@@ -1,10 +1,18 @@
 # Feedback from maintainer review of TODO items — 2026-08-09
 
+*(Partially drained 2026-08-09: the dive navigation and single-comment-focus
+bullets landed in journal 2026-08-09.18 — block-level `j`/`k` walk blocks and
+thread rows only (a thread is exactly one stop, whatever its length), `l`
+dives into the focused thread's comments, `h` surfaces, and j/k inside a dive
+flow back out at the ends. Diving into *multi-line blocks* was deferred: no
+verb acts on a line today, so a per-line focus would be a stop with nothing
+to do — it lands naturally with the line-reference work (L12-18 prepending)
+in the visual-mode feedback file. What remains:)*
+
 ## 1. THREAD-04 — Delete Thread & Thread UX
 - **Thread UX Improvements:**
-  - `j`/`k` navigation eats focus on threads. Need a dedicated "dive" navigation type for diving into threads and multi-line blocks.
-  - When a thread has only one comment, focus shouldn't stop on it twice—it should only eat focus once.
   - Fix vim mode key combos: Vim mode doesn't receive `ctrl+backspace` or other key combos, dropping into normal mode unexpectedly.
+  - **Dive into multi-line blocks:** the dive mechanism (`l`/`h`) currently enters threads only. Per-line focus inside a long block had no payload when the dive was built; revisit alongside the line-reference (L12-18) work.
 
 ## 2. EXPORT-04 & Persistence Location
 - **.margin directory location:** `.margin` directory currently gets created inside `testdata/`, and export paths are relative to workdir. Shift `.margin` location to current working directory, with future detection of project root (e.g. `.git` or margin config file as anchor).

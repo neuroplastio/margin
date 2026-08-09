@@ -50,7 +50,8 @@ detectably orphaned rather than silently misplaced.
 
 | Key | Does |
 | --- | --- |
-| `j` / `k` | Move between blocks, and between comments in a focused thread |
+| `j` / `k` | Move between blocks and thread rows (a thread is one stop) |
+| `l` / `h` | Dive into the focused thread's comments / surface back out |
 | `V` | Select blocks (visual mode): movement extends, `esc` cancels |
 | `y` | Yank the selected blocks' markdown to the clipboard |
 | `c` | New comment on the focused block (opens in insert mode) |

@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-08-09 (mark visuals: gutter rules)
+Last updated: 2026-08-09 (thread dive navigation)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) thread dive navigation: block-level `j`/`k` walk blocks and
+  thread rows only (a thread is one stop whatever its length), `l` dives
+  into the focused thread's comments, `h` surfaces, dived j/k pop out at the
+  ends — journal 2026-08-09.18
 - (feedback fix) mark visuals: per-line ✓/! icons replaced by a vertical
   rule in the mark's colour down each marked block; headings take the rule
   too, partial keeps the dimmed · — journal 2026-08-09.17
@@ -53,15 +57,7 @@ Last updated: 2026-08-09 (mark visuals: gutter rules)
 
 ## In progress
 
-- **(feedback) thread dive navigation** `[felt]` — j/k stops eating focus on
-  threads: block-level j/k walks blocks and thread rows only (a thread is
-  exactly one stop, however many comments), and a dedicated dive (`l`) steps
-  into the focused thread's comments, with `h` surfacing. Drains the
-  "j/k eats focus" and "single-comment thread stops twice" bullets of
-  `vault/feedback/2026-08-09-todo-review-feedback.md`; the file's other
-  bullets (vim-mode key combos, .margin location, palette separation,
-  J/K scroll, wheel speed, hover visibility) stay for future legs.
-  (claimed by toly, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -97,6 +93,31 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** thread dive navigation: j/k no longer eat focus on
+      threads — the old flat stop list (block → thread row → every comment)
+      cost three presses to pass a two-comment thread and stopped twice on a
+      one-comment one. Block-level j/k now walk entries only, so a thread is
+      exactly one stop whatever its length (`moveFocus`, `internal/review/
+      review.go`), and a new explicit dive is the only way j/k reach a
+      comment: `l`/`right` (`move.dive`) steps onto the first visible
+      comment from the block or its thread row (both name the same anchor,
+      the rule `c`/`R`/`D` already use), j/k walk the thread's comments, and
+      `h`/`left` (`move.surface`) steps back out to the thread row. Dived
+      movement pops out at the ends — j past the last comment lands on the
+      next entry, k past the first on the thread row — chosen over clamping,
+      which would re-create the eaten press inside the dive. Visual mode's
+      entry-filtering special case became dead code (entering visual already
+      lifts comment focus) and went; `l` mid-selection is inert. Clicks and
+      page landings still dive implicitly via the hit-test; `editFocused`'s
+      stale "select a comment with j/k" hint now points at `l`. Diving into
+      multi-line blocks deferred: no verb acts on a line today, and the
+      L12-18 line-reference work will define what a line stop means — a
+      residue bullet records this in the feedback file. Drains the "j/k eats
+      focus" and "single-comment thread stops twice" bullets of the
+      todo-review feedback file; the vim-mode key combos, .margin location,
+      palette separation, J/K scroll, wheel speed and hover visibility
+      bullets remain. `[felt]` — see journal 2026-08-09.18 — done 2026-08-09
 
 - [x] **(feedback fix)** mark visuals in the gutter: a marked block no
       longer repeats an icon per line (a six-line reviewed paragraph showed

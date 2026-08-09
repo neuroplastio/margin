@@ -105,6 +105,29 @@ var commands = []command{
 		},
 	},
 	{
+		// move.dive is the 2026-08-09 todo-review feedback's "dedicated dive
+		// navigation type": the only way focus reaches a comment from the
+		// keyboard. j/k at block level walk blocks and thread rows only, so
+		// a thread is one stop however long its conversation; l steps into
+		// it, and h (move.surface) steps back out.
+		ID:          "move.dive",
+		Description: "Dive into the focused thread",
+		Applicable: func(m *model) bool {
+			if m.visual || m.at.comment != commentNone {
+				return false
+			}
+			t := m.threads[m.anchorAt()]
+			return t != nil && len(m.visibleComments(t)) > 0
+		},
+		Run: func(m *model, val string) tea.Cmd { m.dive(); return nil },
+	},
+	{
+		ID:          "move.surface",
+		Description: "Surface back to the thread",
+		Applicable:  func(m *model) bool { return m.at.comment != commentNone },
+		Run:         func(m *model, val string) tea.Cmd { m.surface(); return nil },
+	},
+	{
 		ID:          "comment.new",
 		Description: "New comment on the focused block",
 		Applicable:  func(m *model) bool { return m.anchorAt() != "" },
@@ -397,6 +420,8 @@ func markTarget(m *model) string {
 var keymap = map[string]string{
 	"j": "move.down", "down": "move.down",
 	"k": "move.up", "up": "move.up",
+	"l": "move.dive", "right": "move.dive",
+	"h": "move.surface", "left": "move.surface",
 	"ctrl+d": "move.halfPageDown",
 	"ctrl+u": "move.halfPageUp",
 	"ctrl+f": "move.pageDown", "pgdown": "move.pageDown",

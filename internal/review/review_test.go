@@ -1046,22 +1046,10 @@ func TestCommentSpansSitInsideTheirThread(t *testing.T) {
 	}
 }
 
-// TestFocusVisitsEveryComment: j must step through an expanded thread rather
-// than skipping over it.
-func TestFocusVisitsEveryComment(t *testing.T) {
-	m := newTestModel(t)
-	m.at = cursor{entry: 0, comment: commentNone}
-
-	seen := map[cursor]bool{}
-	for i := 0; i < 200; i++ {
-		seen[m.at] = true
-		m.moveFocus(1)
-	}
-	want := cursor{entry: entryFor(t, m, convoAnchor), comment: 1}
-	if !seen[want] {
-		t.Fatalf("j never reached %+v; visited %d positions", want, len(seen))
-	}
-}
+// TestFocusVisitsEveryComment moved to dive_test.go as
+// TestDivedMovementVisitsEveryComment: the 2026-08-09 todo-review feedback
+// rejected j/k walking comments at block level, so the dive is now the only
+// way focus reaches a comment from the keyboard.
 
 // TestDeletedCommentsHiddenByDefault: the 2026-08-09 feedback asked for
 // tombstoned comments to disappear rather than render "[deleted]" — the

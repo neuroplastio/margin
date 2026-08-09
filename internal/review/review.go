@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -297,8 +298,11 @@ func (m *model) contentWidth() int {
 // --- focus ------------------------------------------------------------------
 
 // stops is every position focus can occupy, in document order: each entry, plus
-// one per posted comment of a thread. Building the list explicitly keeps the
-// movement rules in one place instead of scattered across j and k.
+// one per posted comment of a thread. j/k no longer walk this list — block
+// level moves entry to entry and comments are reached by diving (see
+// moveFocus) — but every cursor in it remains focusable by a click, a page
+// landing, or a dive, so pageScroll still uses it for its end-of-document
+// fallbacks and tests pin that a hidden deleted comment never appears in it.
 func (m *model) stops() []cursor {
 	var cs []cursor
 	for i, e := range m.entries {
@@ -344,31 +348,97 @@ func (m *model) selectionRange() (lo, hi int, ok bool) {
 }
 
 func (m *model) moveFocus(d int) {
-	cs := m.stops()
-	if m.visual {
-		// The selection is blockwise — the feedback's "threads remain
-		// line-based" — so a comment inside a thread is not a selection
-		// unit, and j/k walks entries only rather than diving into a thread
-		// mid-selection.
-		entries := make([]cursor, 0, len(cs))
-		for _, c := range cs {
-			if c.comment == commentNone {
-				entries = append(entries, c)
-			}
-		}
-		cs = entries
+	if len(m.entries) == 0 {
+		return
 	}
-	for i, c := range cs {
-		if c == m.at {
-			if j := i + d; j >= 0 && j < len(cs) {
-				m.at = cs[j]
+	// Dived into a thread: j/k walk its visible comments, and flow back out
+	// at the ends rather than trapping — down past the last comment lands on
+	// the next entry, up past the first lands back on the thread row. The
+	// alternative, clamping inside the thread until h is pressed, re-creates
+	// the feedback's complaint inside the dive: a j that goes nowhere.
+	if m.at.comment != commentNone && m.at.entry >= 0 && m.at.entry < len(m.entries) {
+		if t := m.entries[m.at.entry].thread; t != nil {
+			vis := m.visibleComments(t)
+			p := slices.Index(vis, m.at.comment)
+			if p < 0 {
+				// The focused comment fell out of the visible list (a
+				// tombstone hidden mid-session, say) — recover onto the
+				// first visible one rather than wedging the walk.
+				p = 0
+			}
+			if np := p + d; np >= 0 && np < len(vis) {
+				m.at.comment = vis[np]
+				return
+			}
+			if d > 0 {
+				if m.at.entry+1 < len(m.entries) {
+					m.at = cursor{entry: m.at.entry + 1, comment: commentNone}
+				}
+			} else {
+				m.at.comment = commentNone
 			}
 			return
 		}
+		// A dive on a non-thread entry should never happen; if it does,
+		// recover to block level rather than stranding focus.
+		m.at.comment = commentNone
 	}
-	if len(cs) > 0 {
-		m.at = cs[0]
+	// Block level: j/k walk entries — blocks and thread rows — and never
+	// stop on a comment. A thread is exactly one stop however long its
+	// conversation, reached by diving (l) rather than by walking: the
+	// 2026-08-09 todo-review feedback's fix for "j/k eats focus on threads"
+	// (three presses to get past a two-comment thread) and for a
+	// single-comment thread stopping focus twice. Visual mode needs no
+	// special case here: entering it lifts focus off comments, so the dive
+	// branch above can never fire mid-selection, and entry-only movement is
+	// what a blockwise selection already wanted.
+	j := m.at.entry + d
+	if j < 0 {
+		j = 0
 	}
+	if j >= len(m.entries) {
+		j = len(m.entries) - 1
+	}
+	m.at = cursor{entry: j, comment: commentNone}
+}
+
+// dive steps into the thread at focus: focus moves onto its first visible
+// comment — the only way j/k ever reach one (the feedback's "dedicated dive
+// navigation type"). It resolves the thread by anchor, so it works from the
+// block or from its thread row, the same way c, R and D already find the
+// thread at focus. Anywhere else it is a quiet no-op with a hint why.
+func (m *model) dive() {
+	if m.visual || m.at.comment != commentNone {
+		return
+	}
+	a := m.anchorAt()
+	if a == "" {
+		m.status = "no thread here to dive into"
+		return
+	}
+	t := m.threads[a]
+	if t == nil {
+		m.status = "no thread here to dive into"
+		return
+	}
+	vis := m.visibleComments(t)
+	if len(vis) == 0 {
+		m.status = "no visible comments to dive into"
+		return
+	}
+	for i, e := range m.entries {
+		if e.thread == t {
+			m.at = cursor{entry: i, comment: vis[0]}
+			return
+		}
+	}
+}
+
+// surface steps back out of a dive: focus leaves the comment for its thread
+// row, putting j/k back at block level. Outside a dive there is no level
+// above the document, so it does nothing.
+func (m *model) surface() {
+	m.at.comment = commentNone
 }
 
 func (m *model) pageScroll(half, down bool) {
@@ -1021,7 +1091,7 @@ func (m *model) editFocused() tea.Cmd {
 	if i := t.pendingEdit(); i >= 0 {
 		return m.openComposer(anchor, i)
 	}
-	m.status = "select a comment with j/k to edit it, or c to write a new one"
+	m.status = "l to dive into the thread and pick a comment, or c to write a new one"
 	return nil
 }
 
