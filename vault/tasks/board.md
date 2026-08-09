@@ -112,7 +112,12 @@ Last updated: 2026-08-09 (cancel-early empty thread)
 
 ## In progress
 
-*(none)*
+- **(feedback fix)** save-less exit on an unchanged edit: editing a comment and
+      exiting without changing anything currently marks it "unsaved draft". If
+      there is no diff, no draft should be created. Drains the
+      unchanged-edit-draft item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
+      enter/esc dive item remains. `[felt]` — claimed 2026-08-10
 
 ## Backlog — M1
 
