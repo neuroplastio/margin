@@ -330,3 +330,26 @@ segment-concatenation loop, the same shape as `codeLinesFor`, and is also what
 let a table cell reuse `parseInline` (RENDER-06's paragraph-markup stripper)
 unchanged in `cellText` — the input is already exactly what `parseInline`
 expects a paragraph's raw text to look like.
+
+## F15 — lipgloss `Width` includes the border; a box narrower than its content re-wraps it
+
+`Style.Width(n)` sets the *total* width, borders included. A rounded-border box
+declared `Width(74)` has a 72-column content area. That is intuitive until it
+isn't: the composer pane's emulator is created at `contentWidth()-2*borderW`
+columns, but `threadLines` originally rendered it through a box declared at
+`Width(w-2*borderW)` too — so the box's content area came out **two columns
+narrower** than the emulator feeding it. The emulator's rows are already
+wrapped to its own width, and lipgloss then re-wrapped each of those rows at
+the narrower width: a word in the last two columns got orphaned onto its own
+line, and the box's rows stopped aligning one-for-one with the emulator's, so
+the host-drawn cursor (computed from emulator coordinates) landed on the wrong
+text. The 2026-08-09.8 leg fixed it by declaring the box `Width(w)`.
+
+**The rule:** when a box's content is a grid produced elsewhere at a known
+width, size the box at `contentWidth` — the content area is then
+`contentWidth - 2*borderW`, exactly the grid's width. Declaring the box at the
+content width instead double-counts the border and makes lipgloss re-wrap.
+"Box narrower than its content re-wraps silently" is the sort of defect no
+state-inspection test sees: the fix only shows in a rendered frame, and
+`TestComposerBoxDoesNotRewrap` had to compare rendered rows against emulator
+rows to catch it.

@@ -1267,6 +1267,55 @@ func TestPaneResize(t *testing.T) {
 	}
 }
 
+// TestComposerBoxDoesNotRewrap is the regression for the composer wrapping
+// feedback: the box rendering the emulator used to be built with
+// Width(w-2*borderW), but lipgloss's Width includes the border, so the box's
+// content area was w-4 — two columns narrower than the emulator. The
+// emulator's already-wrapped lines were then re-wrapped by the box, orphaning
+// single words on their own line and shifting every row so the cursor no longer
+// matched the text. The box must be sized so its content area is exactly the
+// emulator's width, and then the emulator's rows must land in the box verbatim.
+func TestComposerBoxDoesNotRewrap(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+
+	// A line long enough that nvim soft-wraps it inside the pane, with a word
+	// parked in the emulator's final two columns — exactly where the old box
+	// used to snap it onto its own line.
+	typeText(m.comp, "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen")
+	time.Sleep(300 * time.Millisecond)
+	m.render()
+
+	// The composer's span is the focused entry: top border, paneRows emulator
+	// rows, bottom border, then the thread's trailing blank line. Any
+	// re-wrapping by the box would add rows.
+	span := m.spans[m.at.entry]
+	if got := span.end - span.start + 1; got != paneRows+3 {
+		t.Fatalf("composer box occupies %d rows, want %d — the box is re-wrapping the emulator's lines", got, paneRows+3)
+	}
+
+	// The box's top border's dash count is its content width. It must be the
+	// emulator's width: narrower and lipgloss re-wraps, wider and the pane
+	// bleeds past the frame.
+	top := ansiRe.ReplaceAllString(m.render()[span.start], "")
+	if inner := strings.Count(top, "─"); inner != m.comp.em.Width() {
+		t.Fatalf("box content area is %d columns, emulator is %d — the box re-wraps the emulator's lines", inner, m.comp.em.Width())
+	}
+
+	// And the emulator's rows must appear in the box unchanged, not re-flowed.
+	// Each content row is gutterW spaces, the │ border, the emulator row, │.
+	em := strings.Split(plainScreen(m.comp.em), "\n")
+	for j := 0; j < paneRows; j++ {
+		row := ansiRe.ReplaceAllString(m.render()[span.start+1+j], "")
+		row = strings.TrimPrefix(row, strings.Repeat(" ", gutterW)+"│")
+		row = strings.TrimSuffix(row, "│")
+		if got := strings.TrimRight(row, " "); got != strings.TrimRight(em[j], " ") {
+			t.Errorf("box row %d = %q, emulator row = %q", j, got, em[j])
+		}
+	}
+}
+
 // TestFrameFitsTheTerminal keeps the frame from overflowing the screen.
 //
 // In the alternate screen a frame of exactly m.h lines is correct — it fills the

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (SCROLL-04 landed: mouse hover effects)
+Last updated: 2026-08-09 (composer wrapping misalignment fixed from feedback)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -78,6 +78,13 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** composer wrapping misalignment: the box rendering the
+      composer emulator was declared `Width(w-2*borderW)`, but lipgloss's
+      `Width` includes the border, so its content area was two columns narrower
+      than the emulator — lipgloss re-wrapped the emulator's already-wrapped
+      rows, orphaning words and pulling the cursor off the text. Now `Width(w)`
+      so the content area exactly matches the emulator. `[mech]` — see journal
+      2026-08-09.8 — done 2026-08-09
 - [x] **SCROLL-04** mouse hover effects: `tea.MouseMotionMsg` drives `m.hoveredEntry` via `hitTest`, rendering a dim `▌` in the gutter for the block under the pointer without moving `m.at`. `[felt]` — see journal 2026-08-09.7 — done 2026-08-09
 - [x] **SCROLL-03** mouse wheel support: scrolling the wheel shifts the document viewport directly (`m.scroll`), bypassing `clampScroll`'s snapping. Focus intentionally stays left where it is. A wheel event over an open composer scrolls the comment instead. `[felt]` — see journal 2026-08-09.6 — done 2026-08-09
 - [x] **SCROLL-02** page and half-page keys (`ctrl+d`/`u`, `pgup`/`pgdn`, `home`/`end`). Built to carry focus along with the viewport, matching vim's `ctrl+d` rather than a generic pager. `[felt]` — see journal 2026-08-09.5 — done 2026-08-09

@@ -1171,10 +1171,14 @@ func (m *model) render() []string {
 // coordinates as everything else.
 func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	focused := m.at.entry == i
+	// Width includes the border, so the content area is w-2*borderW — which is
+	// exactly the width the composer emulator was created at. Making it any
+	// narrower would let lipgloss re-wrap the emulator's already-wrapped lines,
+	// orphaning words and pulling the cursor off the text.
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
-		Width(w - 2*borderW)
+		Width(w)
 	if focused {
 		box = box.BorderForeground(lipgloss.Color("212"))
 	}
