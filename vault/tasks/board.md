@@ -1,9 +1,11 @@
 # Board
 
-Last updated: 2026-08-09 (composer wrapping misalignment fixed from feedback)
+Last updated: 2026-08-09 (deleted comments disappear by default, `V` reveals)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) deleted comments disappear by default; `V` (thread.showDeleted)
+  reveals them with the `[deleted]` marker — journal 2026-08-09.9
 - SCROLL-04 (mouse hover effects) — journal 2026-08-09.7
 - SCROLL-03 (mouse wheel) — journal 2026-08-09.6
 - SCROLL-02 (page and half-page movement) — journal 2026-08-09.5
@@ -78,6 +80,17 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** deleted comments disappear by default: tombstones no
+      longer render a `[deleted]` placeholder in the expanded thread or the
+      collapsed summary. New `thread.showDeleted` command, bound to `V` (and
+      palette `:` + "show"), reveals them still marked `[deleted]` — the
+      tombstone replaced the body on disk, so provenance is all there is. The
+      focus stop list and subspans filter through the same `visibleComments`
+      list as the renderer, so a hidden deleted comment cannot be focused,
+      clicked or counted; toggling `V` off while standing on one drops focus to
+      the thread entry. A thread whose comments are all tombstones renders
+      `comments deleted — V to reveal` instead of `no comments yet`. `[felt]` —
+      see journal 2026-08-09.9 — done 2026-08-09
 - [x] **(feedback fix)** composer wrapping misalignment: the box rendering the
       composer emulator was declared `Width(w-2*borderW)`, but lipgloss's
       `Width` includes the border, so its content area was two columns narrower

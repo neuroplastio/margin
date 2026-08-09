@@ -1,7 +1,6 @@
 # Feedback from maintainer review of TODO items — 2026-08-09
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
-- **Deleted comments:** Prefer for deleted comments to disappear altogether, with an explicit action/command to show deleted comments.
 - **Thread UX Improvements:**
   - Show existing comments when adding a comment to a thread (currently feels like writing a parallel thread).
   - `j`/`k` navigation eats focus on threads. Need a dedicated "dive" navigation type for diving into threads and multi-line blocks.

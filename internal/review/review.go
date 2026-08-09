@@ -145,6 +145,13 @@ type model struct {
 	quitting     bool
 	confirmDelete bool // true when the user must press the delete key again
 
+	// showDeleted controls whether tombstoned comments render at all. Default
+	// off: deleted comments disappear (maintainer feedback, 2026-08-09) and
+	// thread.showDeleted turns them back on — still marked [deleted], since
+	// the tombstone replaced the body on disk and there is no text left to
+	// recover.
+	showDeleted bool
+
 	paletteOpen     bool
 	paletteQuery    string
 	paletteSelected int
@@ -274,12 +281,28 @@ func (m *model) stops() []cursor {
 	for i, e := range m.entries {
 		cs = append(cs, cursor{entry: i, comment: commentNone})
 		if e.thread != nil {
-			for j := range e.thread.posted {
+			for _, j := range m.visibleComments(e.thread) {
 				cs = append(cs, cursor{entry: i, comment: j})
 			}
 		}
 	}
 	return cs
+}
+
+// visibleComments returns the posted comment indices that should render right
+// now: every comment, unless it is a tombstone and showDeleted is off.
+// Rendering, focus stops, hit-testing and the collapsed summary all agree
+// through this one list, so a hidden deleted comment can never be focused,
+// clicked or counted.
+func (m *model) visibleComments(t *thread) []int {
+	var out []int
+	for j := range t.posted {
+		if t.posted[j].deleted && !m.showDeleted {
+			continue
+		}
+		out = append(out, j)
+	}
+	return out
 }
 
 func (m *model) moveFocus(d int) {
@@ -1211,7 +1234,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		if t.draft(newCommentSlot) != "" || t.pendingEdit() >= 0 {
 			style = draftStyle
 		}
-		return []string{strings.Repeat(" ", gutterW) + marker + style.Render(t.summary())}
+		return []string{strings.Repeat(" ", gutterW) + marker + style.Render(t.summary(m.showDeleted))}
 	}
 
 	// Expanded: the whole exchange, ready to read. Comments are separately
@@ -1231,7 +1254,9 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		}
 		return "  "
 	}
-	for j, c := range t.posted {
+	visible := m.visibleComments(t)
+	for vi, j := range visible {
+		c := t.posted[j]
 		// +1 for the box's top border, which Render adds around this content.
 		commentStart := base + borderW + resolvedOffset + len(body)
 		head := mark(j) + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
@@ -1257,7 +1282,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		m.subspans[cursor{entry: i, comment: j}] = span{
 			start: commentStart, end: base + borderW + resolvedOffset + len(body) - 1,
 		}
-		if j < len(t.posted)-1 {
+		if vi < len(visible)-1 {
 			body = append(body, "")
 		}
 	}
@@ -1271,7 +1296,11 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		}
 	}
 	if len(body) == 0 {
-		body = []string{"  " + dimStyle.Render("no comments yet — c to write one")}
+		if t.hasDeleted() {
+			body = []string{"  " + dimStyle.Render("comments deleted — V to reveal")}
+		} else {
+			body = []string{"  " + dimStyle.Render("no comments yet — c to write one")}
+		}
 	}
 	if t.resolved {
 		body = append([]string{resolvedTxt.Render("✓ resolved"), ""}, body...)

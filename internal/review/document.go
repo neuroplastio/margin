@@ -349,6 +349,18 @@ func (t *thread) draft(target int) string {
 	return t.drafts[target]
 }
 
+// hasDeleted reports whether any posted comment is a tombstone — the hint an
+// otherwise-empty expanded thread shows instead of "no comments yet", since
+// the comments are not missing, they were deleted.
+func (t *thread) hasDeleted() bool {
+	for _, c := range t.posted {
+		if c.deleted {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *thread) setDraft(target int, body string) {
 	if strings.TrimSpace(body) == "" {
 		delete(t.drafts, target)
@@ -372,23 +384,39 @@ func (t *thread) pendingEdit() int {
 }
 
 // summary is the one-line form shown when the thread is not focused.
-func (t *thread) summary() string {
+// Tombstoned comments are skipped unless showDeleted is set, so a collapsed
+// line never reads "[deleted]" when the expanded thread hides it — the two
+// views always describe the same set of comments. A thread whose every
+// comment is tombstoned falls back to "no comments", accurate enough for a
+// line the reviewer can still expand to inspect with showDeleted on.
+func (t *thread) summary(showDeleted bool) string {
 	if d := t.draft(newCommentSlot); d != "" {
 		return "✎ draft · " + truncate(firstLine(d), 54)
 	}
 	if i := t.pendingEdit(); i >= 0 {
 		return "✎ editing · " + truncate(firstLine(t.draft(i)), 52)
 	}
-	if len(t.posted) == 0 {
+	first := -1
+	visible := 0
+	for j := range t.posted {
+		if t.posted[j].deleted && !showDeleted {
+			continue
+		}
+		if first < 0 {
+			first = j
+		}
+		visible++
+	}
+	if visible == 0 {
 		return "no comments"
 	}
-	first := t.posted[0]
-	body := first.body
-	if first.deleted {
+	c := t.posted[first]
+	body := c.body
+	if c.deleted {
 		body = "[deleted]"
 	}
-	s := first.author + " · " + truncate(firstLine(body), 52)
-	if n := len(t.posted) - 1; n > 0 {
+	s := c.author + " · " + truncate(firstLine(body), 52)
+	if n := visible - 1; n > 0 {
 		s += fmt.Sprintf("  (+%d)", n)
 	}
 	return s

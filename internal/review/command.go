@@ -171,6 +171,34 @@ var commands = []command{
 		Run:    func(m *model, val string) tea.Cmd { return m.deleteFocused() },
 	},
 	{
+		// thread.showDeleted toggles whether tombstoned comments render at
+		// all — deleted by default per the 2026-08-09 feedback, revealed by
+		// this command (`V`, or palette: `:` + "show"). A view toggle, so it
+		// applies to the whole document regardless of focus, the same way
+		// review.export does.
+		ID:          "thread.showDeleted",
+		Description: "Show or hide deleted comments",
+		Applicable:  func(m *model) bool { return true },
+		Run: func(m *model, val string) tea.Cmd {
+			m.showDeleted = !m.showDeleted
+			if m.showDeleted {
+				m.status = "showing deleted comments"
+				return nil
+			}
+			m.status = "hiding deleted comments"
+			// A comment that just became hidden can no longer hold focus:
+			// drop back to the thread entry so the cursor never lands where
+			// nothing renders.
+			if m.at.comment >= 0 {
+				t := m.threads[m.anchorAt()]
+				if t != nil && m.at.comment < len(t.posted) && t.posted[m.at.comment].deleted {
+					m.at.comment = commentNone
+				}
+			}
+			return nil
+		},
+	},
+	{
 		ID:          "review.export",
 		Description: "Copy the whole review to the clipboard",
 		Applicable:  func(m *model) bool { return true },
@@ -345,6 +373,7 @@ var keymap = map[string]string{
 	"space": "mark.cycle", " ": "mark.cycle",
 	"R": "thread.resolve",
 	"D": "thread.delete",
+	"V": "thread.showDeleted",
 	"Y": "review.export",
 	"m": "mark",
 	"s": "goto",

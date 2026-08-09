@@ -1063,6 +1063,137 @@ func TestFocusVisitsEveryComment(t *testing.T) {
 	}
 }
 
+// TestDeletedCommentsHiddenByDefault: the 2026-08-09 feedback asked for
+// tombstoned comments to disappear rather than render "[deleted]" — the
+// reveal is an explicit action (V / thread.showDeleted), not the default
+// view. Rendering, the focus stop list and the collapsed summary must all
+// skip a hidden tombstone, so the cursor can never land on something that
+// does not render.
+func TestDeletedCommentsHiddenByDefault(t *testing.T) {
+	m := newTestModel(t)
+	t1 := m.threads[convoAnchor]
+	t1.posted[0].deleted = true
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+	lines := m.render()
+
+	outer := m.spans[m.at.entry]
+	for i := outer.start; i <= outer.end; i++ {
+		if strings.Contains(lines[i], "[deleted]") {
+			t.Errorf("thread line %d = %q, want no [deleted] marker while hidden", i, lines[i])
+		}
+	}
+	if _, ok := m.subspans[cursor{entry: m.at.entry, comment: 0}]; ok {
+		t.Error("hidden deleted comment 0 still has a subspan")
+	}
+	if _, ok := m.subspans[cursor{entry: m.at.entry, comment: 1}]; !ok {
+		t.Error("live comment 1 lost its subspan")
+	}
+	for _, c := range m.stops() {
+		if c.entry == m.at.entry && c.comment == 0 {
+			t.Error("j/k can still stop on the hidden deleted comment 0")
+		}
+	}
+	if got := t1.summary(false); strings.Contains(got, "[deleted]") {
+		t.Errorf("collapsed summary = %q, want no [deleted] marker", got)
+	}
+}
+
+// TestThreadWithOnlyDeletedCommentsHintsTheReveal: a thread whose every
+// comment is a hidden tombstone must not claim "no comments yet" — the
+// comments exist, they were deleted, and the hint says how to see them.
+func TestThreadWithOnlyDeletedCommentsHintsTheReveal(t *testing.T) {
+	m := newTestModel(t)
+	m.threads[soloAnchor].posted[0].deleted = true
+	m.at = cursor{entry: entryFor(t, m, soloAnchor), comment: commentNone}
+	lines := m.render()
+
+	found := false
+	outer := m.spans[m.at.entry]
+	for i := outer.start; i <= outer.end; i++ {
+		if strings.Contains(lines[i], "V to reveal") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("all-deleted thread does not hint the V reveal")
+	}
+}
+
+// TestShowDeletedRevealsDeletedComments: the explicit reveal — tombstones
+// come back marked [deleted]. The tombstone replaced the body on disk (D11),
+// so the marker is all there is left to show.
+func TestShowDeletedRevealsDeletedComments(t *testing.T) {
+	m := newTestModel(t)
+	t1 := m.threads[convoAnchor]
+	t1.posted[0].deleted = true
+	m.showDeleted = true
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
+	lines := m.render()
+
+	found := false
+	outer := m.spans[m.at.entry]
+	for i := outer.start; i <= outer.end; i++ {
+		if strings.Contains(lines[i], "[deleted]") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("revealed tombstone does not render a [deleted] marker")
+	}
+	if _, ok := m.subspans[cursor{entry: m.at.entry, comment: 0}]; !ok {
+		t.Error("revealed deleted comment 0 has no subspan")
+	}
+}
+
+// TestShowDeletedCommandTogglesTheView: thread.showDeleted is a view toggle —
+// the command flips it on and off, and dropping focus off a comment that
+// just became hidden leaves the cursor on the thread entry rather than on
+// nothing.
+func TestShowDeletedCommandTogglesTheView(t *testing.T) {
+	m := newTestModel(t)
+	m.threads[convoAnchor].posted[0].deleted = true
+	i := entryFor(t, m, convoAnchor)
+
+	c, ok := commandByID("thread.showDeleted")
+	if !ok {
+		t.Fatal("thread.showDeleted not registered")
+	}
+	if m.showDeleted {
+		t.Fatal("a new model should start with deleted comments hidden")
+	}
+	c.Run(m, "")
+	if !m.showDeleted {
+		t.Fatal("first toggle did not reveal deleted comments")
+	}
+	m.at = cursor{entry: i, comment: 0}
+	c.Run(m, "")
+	if m.showDeleted {
+		t.Fatal("second toggle did not hide deleted comments again")
+	}
+	if m.at.comment != commentNone {
+		t.Fatalf("focus stayed on the now-hidden comment %d, want the thread entry", m.at.comment)
+	}
+	if m.at.entry != i {
+		t.Fatalf("focus jumped to entry %d, want to stay on the thread %d", m.at.entry, i)
+	}
+}
+
+// TestSummaryCountsVisibleNotDeleted: a collapsed line's (+N) count must
+// describe the comments a reviewer can actually see, not the raw file.
+func TestSummaryCountsVisibleNotDeleted(t *testing.T) {
+	th := &thread{anchor: "^z", posted: []comment{
+		{author: "a", body: "one"},
+		{author: "b", body: "two", deleted: true},
+		{author: "c", body: "three"},
+	}}
+	if got := th.summary(false); got != "a · one  (+1)" {
+		t.Errorf("hidden summary = %q, want %q", got, "a · one  (+1)")
+	}
+	if got := th.summary(true); !strings.Contains(got, "(+2)") {
+		t.Errorf("revealed summary = %q, want the full +2 count", got)
+	}
+}
+
 // TestCursorTracksScroll is the regression for the cursor drifting from the
 // text: paneTop comes from the same render pass that produced the lines, and
 // the cursor is offset by the same scroll applied to the viewport.
