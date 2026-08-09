@@ -53,7 +53,15 @@ Last updated: 2026-08-09 (mark visuals: gutter rules)
 
 ## In progress
 
-*(none)*
+- **(feedback) thread dive navigation** `[felt]` — j/k stops eating focus on
+  threads: block-level j/k walks blocks and thread rows only (a thread is
+  exactly one stop, however many comments), and a dedicated dive (`l`) steps
+  into the focused thread's comments, with `h` surfacing. Drains the
+  "j/k eats focus" and "single-comment thread stops twice" bullets of
+  `vault/feedback/2026-08-09-todo-review-feedback.md`; the file's other
+  bullets (vim-mode key combos, .margin location, palette separation,
+  J/K scroll, wheel speed, hover visibility) stay for future legs.
+  (claimed by toly, 2026-08-09)
 
 ## Backlog — M1
 
