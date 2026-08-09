@@ -47,7 +47,14 @@ Last updated: 2026-08-09 (sibling-section marking bug: identical bodies shared o
 
 ## In progress
 
-*(none)*
+- **(feedback) visual block selection + yank** `[felt]` — `V` starts a
+  blockwise selection (the maintainer's `Shift+V` ask), movement extends
+  it, `y` copies the selected blocks' markdown source to the clipboard,
+  `esc` cancels. `thread.showDeleted` gives up `V` and moves to `T`.
+  Drains the "Visual Line Selection" and "Yank Content" bullets of
+  `vault/feedback/2026-08-09-visual-mode-range-selection-feedback.md`;
+  the line-reference prepending, flexible placement and yank-reference
+  bullets stay in the file for future legs. (claimed by toly, 2026-08-09)
 
 ## Backlog — M1
 
