@@ -4,6 +4,11 @@ Last updated: 2026-08-09 (composer insert-after-line-ref)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) composer insert-after-line-ref: `c` after a visual selection
+  or a line dive opens the composer already in insert mode with the cursor
+  past the auto-appended `L3-6: ` reference — the first keystroke is a
+  character, not an `i`/`a` motion; the carve-out is shape-exact, so a prefix
+  with real text behind it still opens in normal mode — journal 2026-08-09.38
 - (feedback fix) esc-based composer exit: `<esc>` in normal mode closes the
   composer keeping a draft — a new comment opens in insert mode so it takes
   double `esc` (first leaves insert, second exits), an edit opens in normal
@@ -98,17 +103,7 @@ Last updated: 2026-08-09 (composer insert-after-line-ref)
 
 ## In progress
 
-- [ ] **(feedback fix)** composer insert-after-line-ref: a new comment whose
-      buffer holds nothing but the auto-prepended line reference (`L12: ` /
-      `L12-18: `) opens in insert mode with the cursor just past the prefix, so
-      typing starts immediately after `c` with a visual selection or a dive —
-      no `i`/`a` step. The reference is scaffolding, not text the reviewer
-      wrote, so the insert-iff-empty rule (interaction.md) is relaxed exactly
-      for this shape; a prefix with real text behind it still opens in normal
-      mode. Drains the first item of
-      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md` (four
-      items remain: edit cursor-at-end, cancel-early empty thread,
-      unchanged-edit draft, enter/esc dive bindings).
+*(none)*
 
 ## Backlog — M1
 
@@ -144,6 +139,26 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** composer insert-after-line-ref: `c` after a visual
+      selection or a line dive opens the composer already in insert mode with
+      the cursor past the auto-appended line reference (`L3-6: `), so the first
+      keystroke is a character instead of an `i`/`a` motion. One new branch in
+      `composerInit`'s `VimEnter` callback, ahead of the emptiness check: a
+      buffer that is a single line matching exactly `L12: ` / `L12-18: `
+      (trailing whitespace optional) opens with `:startinsert!` (the `A` form —
+      append at end of line then insert), because nvim clamps any cursor column
+      *onto* the last character and plain insert would sit the reviewer in
+      front of the reference's trailing space (F22). The carve-out is
+      shape-exact: a prefix with real text behind it — a resumed draft, an
+      edit — still opens in normal mode, the settled insert-iff-empty rule
+      unchanged. What I rejected: a host-side "I scaffolded this" flag threaded
+      through `newComposer`, keeping the whole mode decision in the one
+      callback. Drains the first item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
+      edit cursor-at-end, cancel-early-empty-thread, unchanged-edit-draft and
+      enter/esc dive items remain. `[felt]` — see journal 2026-08-09.38 — done
+      2026-08-09
 
 - [x] **(feedback fix)** esc-based composer exit: `<esc>` in normal mode closes
       the composer keeping a draft. One nvim mapping swap in `composerInit` —

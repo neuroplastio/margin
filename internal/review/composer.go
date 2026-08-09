@@ -172,9 +172,18 @@ map('n', '<leader>ck', discard, { desc = 'discard comment' })
 
 vim.cmd('autocmd BufEnter * setlocal filetype=markdown')
 
--- Insert mode iff there is nothing to read. A new comment wants to be typed
--- into; existing text — a resumed draft, or a comment being edited — wants
--- normal mode, so the first keystroke is a motion rather than an insertion.
+-- Insert mode iff there is nothing to read — with one carve-out: a comment
+-- scaffolded with a line reference (comment.new's L12: / L12-18: prefix) is
+-- *almost* empty. The reference is the host speaking for the reviewer — "about
+-- these lines" — not text the reviewer wrote, so the first keystroke should be
+-- a character, not a motion: open in insert mode with the cursor just past the
+-- prefix. The shape check is exact (a single line that is a prefix and nothing
+-- else), so a prefix with real text behind it — a resumed draft, or a comment
+-- being edited — still opens in normal mode, the settled rule.
+--
+-- A new comment wants to be typed into; existing text — a resumed draft, or a
+-- comment being edited — wants normal mode, so the first keystroke is a motion
+-- rather than an insertion.
 --
 -- This has to wait for VimEnter: an init script runs before nvim opens the file
 -- argument, so checking the buffer here would always find it empty and always
@@ -182,8 +191,17 @@ vim.cmd('autocmd BufEnter * setlocal filetype=markdown')
 vim.api.nvim_create_autocmd('VimEnter', {
   once = true,
   callback = function()
+    local buf = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+    if #buf == 1 and buf[1]:match('^L%d+%-?%d*: %s*$') then
+      -- startinsert! is "A": append at the end of the line and insert.
+      -- Plain cursor arithmetic cannot get past the last character (nvim
+      -- clamps the cursor onto it), and "insert at the last character"
+      -- would sit the reviewer in front of the reference's trailing space.
+      vim.cmd('startinsert!')
+      return
+    end
     local empty = true
-    for _, l in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+    for _, l in ipairs(buf) do
       if l:match('%S') then
         empty = false
         break

@@ -476,3 +476,26 @@ would break legitimate backgrounds the moment a real colorscheme or a visual
 selection wants one. `set_hl`'s valid keys are `bg`/`fg`, not `guibg`/`guifg`
 — the `gui` prefix names the *attribute source*, not the dictionary key, and
 `nvim_set_hl` errors `E5113: invalid key: guibg`.
+
+## F22 — you cannot put the cursor past the end of a line; `startinsert!` is how you append
+
+`nvim_win_set_cursor` (0-based column) and Vimscript's `cursor()` (1-based)
+both **clamp onto the last character** of the line — there is no column that
+lands the cursor *past* it. On `"L3-6: "` (length 6), columns 6, 7 and 8 all
+resolve to index 5, sitting on the trailing space. That matters because insert
+mode inserts **before the character under the cursor**, so "cursor at the end
+of the line" in the API sense is "typing lands in front of the trailing
+space": a comment typed after a visual selection came out `L3-6:ship it`
+instead of `L3-6: ship it`.
+
+The idiom that works is the documented one: `:startinsert` works like `i`
+(insert at the cursor), and **`:startinsert!` works like `A` — append at the
+end of the line** (`:help :startinsert`). The VimEnter autocmd's
+line-reference branch uses `vim.cmd('startinsert!')` and needs no cursor math
+at all. Worth remembering whenever the composer (or any nvim embedding) wants
+"open ready to type after existing text" — the 2026-08-09.37 leg used the
+plain form for empty buffers, and this one (2026-08-09.38) found the `!`
+variant the hard way. Probing tip: `mode()` inside headless `-c` command chains
+does not report insert mode reliably (it reads `n` even after a real
+`startinsert`), so the pty-backed Go tests — which see the DECSCUSR cursor
+shape the child really reports — are the honest check.

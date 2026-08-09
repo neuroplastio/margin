@@ -1435,6 +1435,84 @@ func TestModeFollowsCursorShape(t *testing.T) {
 	}
 }
 
+// TestLineRefPrefixOpensInInsertModeAfterThePrefix: the 2026-08-09 composer
+// feedback asked that commenting with a visual selection (or a line dive)
+// start typing immediately after the auto-appended L12-18: reference, with no
+// intermediate mode-switch step. The whole path is exercised: V then j selects
+// a range, c prepends the reference and opens the composer, which must come up
+// in INSERT mode with the cursor past the prefix — asserted by the body: the
+// typed text lands after the reference, not before it.
+func TestLineRefPrefixOpensInInsertModeAfterThePrefix(t *testing.T) {
+	m := newModelAt("sample.md", parseDoc([]byte(sampleDoc)), nil)
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: 1, comment: commentNone} // paragraph at line 3
+
+	pressKey(m, "V")
+	pressKey(m, "j")
+	a := m.anchorAt()
+	wantPrefix := m.selectionLineRef()
+	if a == "" || wantPrefix == "" {
+		t.Fatalf("before commenting: anchor = %q, prefix = %q — want both non-empty", a, wantPrefix)
+	}
+
+	pressKey(m, "c")
+	t.Cleanup(func() {
+		if m.comp != nil {
+			m.comp.close()
+		}
+	})
+	if !waitForMode(t, m.comp, "INSERT", 10*time.Second) {
+		t.Fatalf("mode = %s after c with a selection, want INSERT past the prefix; screen:\n%s", m.comp.mode(), plainScreen(m.comp.em))
+	}
+
+	typeText(m.comp, "ship it")
+	done := make(chan error, 1)
+	go func() { done <- m.comp.cmd.Wait() }()
+	typeKeys(m.comp, keyCtrlS)
+	select {
+	case err := <-done:
+		m.dismiss(err)
+	case <-time.After(10 * time.Second):
+		t.Fatalf("submit did not exit; screen:\n%s", plainScreen(m.comp.em))
+	}
+
+	posted := m.threads[a].posted
+	if len(posted) != 1 {
+		t.Fatalf("posted %d comments, want 1", len(posted))
+	}
+	if want := wantPrefix + "ship it"; posted[0].body != want {
+		t.Errorf("comment body = %q, want %q — the cursor must have sat past the prefix", posted[0].body, want)
+	}
+}
+
+// TestLineRefPrefixWithTextStillOpensNormalMode: the insert-after-prefix carve
+// out is exact — a buffer that is nothing but the reference. A draft carrying
+// real text behind the prefix (a resumed draft, or a comment being edited)
+// keeps the settled rule: normal mode, so a single <Esc> exits keeping the
+// draft.
+func TestLineRefPrefixWithTextStillOpensNormalMode(t *testing.T) {
+	m := newTestModel(t)
+	tr := m.ensureThread(freshAnchor)
+	tr.setDraft(newCommentSlot, "L12-18: the sharing claim looks wrong")
+
+	open(t, m, freshAnchor, newCommentSlot, "the sharing claim looks wrong")
+	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
+		t.Fatalf("mode = %s, want NORMAL for a prefixed draft with text", m.comp.mode())
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- m.comp.cmd.Wait() }()
+	typeKeys(m.comp, keyEsc)
+	select {
+	case err := <-done:
+		if got := outcomeFromExit(err); got != outcomeDraft {
+			t.Fatalf("single <Esc> from normal mode gave %v, want draft", got)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatalf("single <Esc> did not exit normal mode; screen:\n%s", plainScreen(m.comp.em))
+	}
+}
+
 // TestVtDropsModifiedKeys pins the upstream behaviour the workaround exists for.
 // vt.SendKey's fallback is `if key.Mod == 0 { seq += string(key.Code) }`, so a
 // shifted printable is silently dropped. Under Ghostty's Kitty keyboard protocol
