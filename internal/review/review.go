@@ -16,11 +16,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alecthomas/chroma/v2/quick"
 
@@ -105,6 +107,9 @@ type model struct {
 	threads map[string]*thread
 	marks   map[string]reviewMark
 	entries []entry
+
+	// codeScroll stores horizontal scroll offsets (in visual columns) per code block anchor.
+	codeScroll map[string]int
 
 	// includeResolved controls whether exportReview (Y and --stdout alike)
 	// includes resolved threads or leaves them out per D11's export-safety
@@ -217,6 +222,7 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	m := &model{
 		path: path, doc: doc, threads: threads,
 		marks:        map[string]reviewMark{},
+		codeScroll:   map[string]int{},
 		at:           cursor{entry: 0, comment: commentNone},
 		hoveredEntry: -1,
 		scrollAnchor: cursor{entry: -1, comment: commentNone},
@@ -1494,6 +1500,14 @@ func (m *model) render() []string {
 				// code and links: markup renders as markup, not as prose
 				// that happens to dim once reviewed.
 				out = highlightCode(e.b.lines, e.b.lang)
+				off := m.codeScroll[e.b.anchor]
+				if off > 0 || hasOverflow(out, w) {
+					scrolled := make([]string, len(out))
+					for idx, l := range out {
+						scrolled[idx] = scrollCodeLine(l, off, w)
+					}
+					out = scrolled
+				}
 				preStyled = true
 			case blockTable:
 				// A table is data, not markup, so it dims on review the same
@@ -2078,6 +2092,164 @@ func highlightCode(lines []string, lang string) []string {
 		return lines
 	}
 	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+}
+
+// focusedKind returns the blockKind of the currently focused entry,
+// or blockRaw if index is invalid.
+func (m *model) focusedKind() blockKind {
+	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
+		return blockRaw
+	}
+	return m.entries[m.at.entry].b.kind
+}
+
+// scrollCode shifts the horizontal scroll offset of the focused code block by delta.
+func (m *model) scrollCode(delta int) {
+	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
+		return
+	}
+	e := m.entries[m.at.entry]
+	if e.b.kind != blockCode {
+		return
+	}
+	anchor := e.b.anchor
+	if anchor == "" {
+		return
+	}
+
+	lines := highlightCode(e.b.lines, e.b.lang)
+	maxLen := 0
+	for _, l := range lines {
+		if w := visualWidth(l); w > maxLen {
+			maxLen = w
+		}
+	}
+
+	w := m.contentWidth()
+	maxScroll := maxLen - w
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+
+	if m.codeScroll == nil {
+		m.codeScroll = make(map[string]int)
+	}
+
+	curr := m.codeScroll[anchor]
+	next := curr + delta
+	if next < 0 {
+		next = 0
+	}
+	if next > maxScroll {
+		next = maxScroll
+	}
+
+	if curr == next && delta > 0 && maxScroll == 0 {
+		m.status = "code block fits within measure"
+		return
+	}
+
+	m.codeScroll[anchor] = next
+	if next == 0 {
+		m.status = "code block scrolled to left edge"
+	} else {
+		m.status = fmt.Sprintf("code block scrolled to col %d", next)
+	}
+}
+
+func hasOverflow(lines []string, w int) bool {
+	for _, l := range lines {
+		if visualWidth(l) > w {
+			return true
+		}
+	}
+	return false
+}
+
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// visualWidth returns the visual column width of an ANSI-formatted string.
+func visualWidth(s string) int {
+	return len([]rune(ansiRe.ReplaceAllString(s, "")))
+}
+
+// scrollCodeLine takes an ANSI-styled line of text (e.g. output from chroma),
+// skips offset visual columns, and returns at most width visual columns of text,
+// preserving ANSI graphics styling (color/bold) from before offset.
+func scrollCodeLine(line string, offset int, width int) string {
+	if offset <= 0 && width <= 0 {
+		return line
+	}
+	plainLen := visualWidth(line)
+	if offset <= 0 && plainLen <= width {
+		return line
+	}
+	if offset >= plainLen {
+		return ""
+	}
+
+	type chunk struct {
+		isANSI bool
+		text   string
+	}
+	var chunks []chunk
+	i := 0
+	for i < len(line) {
+		if line[i] == '\x1b' {
+			j := i + 1
+			if j < len(line) && line[j] == '[' {
+				j++
+				for j < len(line) && (line[j] < 'a' || line[j] > 'z') && (line[j] < 'A' || line[j] > 'Z') {
+					j++
+				}
+				if j < len(line) {
+					j++
+				}
+			}
+			chunks = append(chunks, chunk{isANSI: true, text: line[i:j]})
+			i = j
+		} else {
+			r, size := utf8.DecodeRuneInString(line[i:])
+			chunks = append(chunks, chunk{isANSI: false, text: string(r)})
+			i += size
+		}
+	}
+
+	var activeANSI strings.Builder
+	var result strings.Builder
+	visCol := 0
+	hasOutput := false
+	sawANSIInOutput := false
+
+	for _, c := range chunks {
+		if c.isANSI {
+			if visCol < offset {
+				activeANSI.WriteString(c.text)
+			} else if visCol < offset+width {
+				if !hasOutput {
+					result.WriteString(activeANSI.String())
+					hasOutput = true
+				}
+				result.WriteString(c.text)
+				sawANSIInOutput = true
+			}
+		} else {
+			if visCol >= offset && visCol < offset+width {
+				if !hasOutput {
+					result.WriteString(activeANSI.String())
+					hasOutput = true
+				}
+				result.WriteString(c.text)
+			}
+			visCol++
+		}
+	}
+
+	if hasOutput && (activeANSI.Len() > 0 || sawANSIInOutput) {
+		result.WriteString("\x1b[0m")
+	}
+
+	return result.String()
 }
 
 // renderFrontmatter draws a document's leading frontmatter (blockFrontmatter)

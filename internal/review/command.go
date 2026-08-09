@@ -127,21 +127,46 @@ var commands = []command{
 		// a thread is one stop however long its conversation; l steps into
 		// it, and h (move.surface) steps back out.
 		ID:          "move.dive",
-		Description: "Dive into the focused thread",
+		Description: "Dive into thread / scroll code block right",
 		Applicable: func(m *model) bool {
-			if m.visual || m.at.comment != commentNone {
+			if m.visual {
+				return false
+			}
+			if m.at.comment == commentNone && m.focusedKind() == blockCode {
+				return true
+			}
+			if m.at.comment != commentNone {
 				return false
 			}
 			t := m.threads[m.anchorAt()]
 			return t != nil && len(m.visibleComments(t)) > 0
 		},
-		Run: func(m *model, val string) tea.Cmd { m.dive(); return nil },
+		Run: func(m *model, val string) tea.Cmd {
+			if m.at.comment == commentNone && m.focusedKind() == blockCode {
+				m.scrollCode(4)
+				return nil
+			}
+			m.dive()
+			return nil
+		},
 	},
 	{
 		ID:          "move.surface",
-		Description: "Surface back to the thread",
-		Applicable:  func(m *model) bool { return m.at.comment != commentNone },
-		Run:         func(m *model, val string) tea.Cmd { m.surface(); return nil },
+		Description: "Surface back to thread / scroll code block left",
+		Applicable: func(m *model) bool {
+			if m.at.comment == commentNone && m.focusedKind() == blockCode && m.codeScroll[m.anchorAt()] > 0 {
+				return true
+			}
+			return m.at.comment != commentNone
+		},
+		Run: func(m *model, val string) tea.Cmd {
+			if m.at.comment == commentNone && m.focusedKind() == blockCode {
+				m.scrollCode(-4)
+				return nil
+			}
+			m.surface()
+			return nil
+		},
 	},
 	{
 		ID:          "comment.new",

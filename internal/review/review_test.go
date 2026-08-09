@@ -2,7 +2,6 @@ package review
 
 import (
 	"os/exec"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -41,8 +40,6 @@ func newTestModel(t *testing.T) *model {
 	m.w, m.h = 100, 60
 	return m
 }
-
-var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // plainScreen strips styling before matching. The emulator renders styled runs,
 // and nvim's spell checker splits words with underline codes mid-token, so a
@@ -1641,5 +1638,61 @@ func TestThreadCommentFocusHighlightsBodyText(t *testing.T) {
 		t.Errorf("unfocused body line %q contains focus bar", linesUnfocused[1])
 	}
 }
+
+// TestScrollCodeLineANSI verifies that scrollCodeLine correctly skips visual columns,
+// limits visual width, and preserves ANSI formatting.
+func TestScrollCodeLineANSI(t *testing.T) {
+	styled := "\x1b[31mhello\x1b[0m \x1b[32mworld\x1b[0m"
+
+	// 1. Offset 0, full width -> unchanged
+	if got := scrollCodeLine(styled, 0, 80); got != styled {
+		t.Errorf("scrollCodeLine(offset=0) = %q, want %q", got, styled)
+	}
+
+	// 2. Offset 4 -> skip "hell", start at 'o' (in red), then space, then "wor" (in green)
+	got := scrollCodeLine(styled, 4, 5)
+	plain := ansiRe.ReplaceAllString(got, "")
+	if plain != "o wor" {
+		t.Errorf("scrollCodeLine(offset=4, width=5) plain = %q, want %q (got raw %q)", plain, "o wor", got)
+	}
+
+	// 3. Offset beyond visual length -> empty string
+	if got := scrollCodeLine(styled, 20, 80); got != "" {
+		t.Errorf("scrollCodeLine(offset=20) = %q, want empty", got)
+	}
+}
+
+// TestCodeBlockHorizontalScroll verifies that l and h scroll code blocks horizontally.
+func TestCodeBlockHorizontalScroll(t *testing.T) {
+	doc := []block{
+		{
+			kind:   blockCode,
+			anchor: "^code1",
+			lines:  []string{"func veryLongFunctionNameThatExceedsTheMeasureWidth(ctx context.Context, req *Request) (*Response, error)"},
+			lang:   "go",
+		},
+	}
+	m := newModel(doc, nil)
+	m.at = cursor{entry: 0, comment: commentNone}
+	anchor := "^code1"
+
+	// 1. Initially offset is 0
+	if off := m.codeScroll[anchor]; off != 0 {
+		t.Fatalf("initial code scroll offset = %d, want 0", off)
+	}
+
+	// 2. Press l to scroll right
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'l', Text: "l"}))
+	if off := m.codeScroll[anchor]; off <= 0 {
+		t.Errorf("after 'l' press code scroll offset = %d, want > 0", off)
+	}
+
+	// 3. Press h to scroll left back to 0
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'h', Text: "h"}))
+	if off := m.codeScroll[anchor]; off != 0 {
+		t.Errorf("after 'h' press code scroll offset = %d, want 0", off)
+	}
+}
+
 
 

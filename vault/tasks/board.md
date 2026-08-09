@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (deleted comments keep content and restore option)
+Last updated: 2026-08-09 (code block horizontal scroll)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) code block horizontal scroll: code blocks don't wrap lines, h/l scroll code blocks horizontally inside the block (offset up to max visual line length - measure width) — journal 2026-08-09.27
 - (feedback fix) deleted comments keep content & restore option: deleted comments keep body text dimmed on screen and in thread files, D toggles delete/restore without confirmation — journal 2026-08-09.26
 - (feedback fix) thread comment focus highlight: focusing a comment places focus bar and highlight on comment body text lines rather than author header — journal 2026-08-09.25
 - (feedback fix) palette visual separation & hover visibility: dim horizontal rule ─ above command palette, hover indicator color brightened to 248 for clear visibility — journal 2026-08-09.24
@@ -66,7 +67,7 @@ Last updated: 2026-08-09 (deleted comments keep content and restore option)
 
 ## In progress
 
-- [ ] **(feedback fix)** code block horizontal scroll: code blocks don't wrap lines, h/l scroll code blocks horizontally inside the block (Anatoly Rugalev, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -102,6 +103,12 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** code block horizontal scroll: code blocks don't wrap lines,
+      `h`/`l` (`move.dive`/`move.surface`) scroll code blocks horizontally inside the block
+      (4 columns per press, bounded by max visual width - content width). Drains
+      `vault/feedback/2026-08-09-deleted-comments-and-code-hscroll-feedback.md`.
+      `[felt]` — see journal 2026-08-09.27 — done 2026-08-09
 
 - [x] **(feedback fix)** deleted comments keep content & restore option:
       `deleteComment` preserves comment body, `marshalThread` writes `[deleted]` in
