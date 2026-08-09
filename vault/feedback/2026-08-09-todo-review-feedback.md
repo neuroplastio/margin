@@ -4,10 +4,11 @@
 bullets landed in journal 2026-08-09.18 — block-level `j`/`k` walk blocks and
 thread rows only (a thread is exactly one stop, whatever its length), `l`
 dives into the focused thread's comments, `h` surfaces, and j/k inside a dive
-flow back out at the ends. Diving into *multi-line blocks* was deferred: no
-verb acts on a line today, so a per-line focus would be a stop with nothing
-to do — it lands naturally with the line-reference work (L12-18 prepending)
-in the visual-mode feedback file. The vim-mode key-combos bullet landed in
+flow back out at the ends. Diving into *multi-line blocks* landed in journal
+2026-08-09.28 — `l` on a table or raw block dives into its source lines, j/k
+walk them, `h` surfaces, and `c`/`gy` anchor a comment to the line under focus,
+the payload the L12-18 line-reference work (journal 2026-08-09.22) supplied.
+The vim-mode key-combos bullet landed in
 journal 2026-08-09.19 — the host now encodes every modified-key family itself
 (ctrl+backspace and friends reach nvim as CSI-u; alt combos ride the verified
 legacy meta form instead of collapsing to a bare ESC), and the composer binds
@@ -22,7 +23,7 @@ What remains:)*
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
 - **Thread UX Improvements:**
-  - **Dive into multi-line blocks:** the dive mechanism (`l`/`h`) currently enters threads only. Per-line focus inside a long block had no payload when the dive was built; revisit alongside the line-reference (L12-18) work.
+  - **Dive into multi-line blocks:** *(drained 2026-08-09 — journal 2026-08-09.28: `l` on a table or raw block dives into its source lines, j/k walk them, `h` surfaces, and `c`/`gy` anchor a comment to the line under focus. The L12-18 line-reference work is what gave a line a payload.)*
 
 ## 2. EXPORT-04 & Persistence Location
 - **Locator format:** Approved (`## file.md:line (^anchor)` is good and actionable).

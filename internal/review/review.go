@@ -93,12 +93,17 @@ type span struct{ start, end int }
 
 // cursor is where focus sits: an entry, and within a focused thread, which
 // posted comment. commentNone means the entry itself rather than one of its
-// comments.
+// comments. line is the source line a dive into a multi-line block sits on
+// (the 2026-08-09 todo-review "multi-line blocks" bullet): 0 at block or
+// comment level, a 1-based source line number once l has dived into a table
+// or raw block. The comment and line dives are mutually exclusive — line is
+// only ever set alongside commentNone.
 const commentNone = -1
 
 type cursor struct {
 	entry   int
 	comment int
+	line    int
 }
 
 type model struct {
@@ -358,6 +363,34 @@ func (m *model) moveFocus(d int) {
 	if len(m.entries) == 0 {
 		return
 	}
+	// Dived into a multi-line block's lines: j/k walk its source lines, and
+	// flow back out at the ends like the thread dive — down past the last
+	// line lands on the next entry, up past the first surfaces back onto the
+	// block. The alternative, clamping inside the block until h is pressed,
+	// re-creates the thread-dive feedback's complaint inside the line dive: a
+	// j that goes nowhere.
+	if m.at.line != 0 {
+		lo, hi, ok := m.lineDiveRange()
+		if !ok {
+			// The block the dive is standing on shrank or vanished; surface
+			// rather than strand focus on a line that no longer renders.
+			m.at.line = 0
+			return
+		}
+		np := m.at.line + d
+		if np >= lo && np <= hi {
+			m.at.line = np
+			return
+		}
+		if d > 0 {
+			if m.at.entry+1 < len(m.entries) {
+				m.at = cursor{entry: m.at.entry + 1, comment: commentNone}
+			}
+		} else {
+			m.at.line = 0
+		}
+		return
+	}
 	// Dived into a thread: j/k walk its visible comments, and flow back out
 	// at the ends rather than trapping — down past the last comment lands on
 	// the next entry, up past the first lands back on the thread row. The
@@ -409,23 +442,53 @@ func (m *model) moveFocus(d int) {
 	m.at = cursor{entry: j, comment: commentNone}
 }
 
-// dive steps into the thread at focus: focus moves onto its first visible
-// comment — the only way j/k ever reach one (the feedback's "dedicated dive
-// navigation type"). It resolves the thread by anchor, so it works from the
-// block or from its thread row, the same way c, R and D already find the
-// thread at focus. Anywhere else it is a quiet no-op with a hint why.
+// lineDiveRange returns the 1-based source-line range a line-dive would walk
+// for the focused entry, or ok=false when the block cannot be dived into line
+// by line. Only block kinds where a source line is a rendered row can: a
+// wrapped paragraph or quote has no line identity once re-wrapped, so diving
+// them would be stops with nothing to see. Code blocks are deliberately left
+// out too — l/h already scroll a focused code block horizontally (the code
+// block horizontal scroll feedback), and layering a line dive on top of that
+// would make one key do two jobs.
+func (m *model) lineDiveRange() (lo, hi int, ok bool) {
+	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
+		return 0, 0, false
+	}
+	b := m.entries[m.at.entry].b
+	if b.kind != blockTable && b.kind != blockRaw {
+		return 0, 0, false
+	}
+	return b.line, b.endLine, b.line > 0 && b.endLine > b.line
+}
+
+// dive steps into the thread at focus — the only way j/k ever reach a
+// comment (the feedback's "dedicated dive navigation type") — or, on a
+// block whose source lines each render as a row, into its lines (the
+// "dive into multi-line blocks" bullet). It resolves the thread by anchor,
+// so it works from the block or from its thread row, the same way c, R and D
+// already find the thread at focus. Anywhere else it is a quiet no-op with a
+// hint why.
 func (m *model) dive() {
-	if m.visual || m.at.comment != commentNone {
+	if m.visual || m.at.comment != commentNone || m.at.line != 0 {
+		return
+	}
+	// A multi-line block whose lines are individually visible dives into
+	// them first: j/k walk the source lines and c/gy anchor a comment to the
+	// one under focus (L12-18). A block with a thread still reaches it — the
+	// thread row spliced beneath the block is its own entry, and l there
+	// dives into the conversation, one j away.
+	if lo, _, ok := m.lineDiveRange(); ok {
+		m.at.line = lo
 		return
 	}
 	a := m.anchorAt()
 	if a == "" {
-		m.status = "no thread here to dive into"
+		m.status = "no thread or lines here to dive into"
 		return
 	}
 	t := m.threads[a]
 	if t == nil {
-		m.status = "no thread here to dive into"
+		m.status = "no thread or lines here to dive into"
 		return
 	}
 	vis := m.visibleComments(t)
@@ -441,10 +504,11 @@ func (m *model) dive() {
 	}
 }
 
-// surface steps back out of a dive: focus leaves the comment for its thread
-// row, putting j/k back at block level. Outside a dive there is no level
-// above the document, so it does nothing.
+// surface steps back out of a dive: focus leaves a focused line for its
+// block, or a comment for its thread row, putting j/k back at block level.
+// Outside a dive there is no level above the document, so it does nothing.
 func (m *model) surface() {
+	m.at.line = 0
 	m.at.comment = commentNone
 }
 
@@ -785,6 +849,11 @@ func (m *model) selectionLineRef() string {
 // yankRef copies the line number / range reference to the clipboard (selection.yankRef / gy / yr).
 func (m *model) yankRef() tea.Cmd {
 	startLine, endLine := m.selectionLineRange()
+	if m.at.line != 0 {
+		// Dived into a block's lines: the reference is the line under focus,
+		// not the whole block (see comment.new — same payload).
+		startLine, endLine = m.at.line, m.at.line
+	}
 	if m.visual {
 		m.visual = false
 	}
@@ -1523,7 +1592,18 @@ func (m *model) render() []string {
 					body = rawStyle
 				}
 			}
-			for _, l := range out {
+			// A line dive (a table or raw block whose lines are walked
+			// individually) moves the focus bar onto the dived source line's
+			// rendered row — at block level the whole block carries it. Row
+			// and source line coincide 1:1 for the diveable kinds, so the
+			// offset is the source line minus the block's first line.
+			focusedRow := -1
+			if focused && m.at.line != 0 {
+				if r := m.at.line - e.b.line; r >= 0 && r < len(out) {
+					focusedRow = r
+				}
+			}
+			for row, l := range out {
 				text := l
 				if !preStyled {
 					text = body.Render(l)
@@ -1532,8 +1612,9 @@ func (m *model) render() []string {
 				if selected {
 					text = selLine(text)
 				}
+				rowFocused := focused && m.at.comment == commentNone && (m.at.line == 0 || row == focusedRow)
 				lines = append(lines,
-					m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, false)+text)
+					m.gutter(rowFocused, hovered, selected, mark, false)+text)
 			}
 			// A blockListItem gets its trailing blank line only once, after
 			// the list's last item, so a six-item list still reads as one

@@ -12,6 +12,7 @@
 package review
 
 import (
+	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -125,9 +126,13 @@ var commands = []command{
 		// navigation type": the only way focus reaches a comment from the
 		// keyboard. j/k at block level walk blocks and thread rows only, so
 		// a thread is one stop however long its conversation; l steps into
-		// it, and h (move.surface) steps back out.
+		// it, and h (move.surface) steps back out. It also steps into a
+		// multi-line table or raw block line by line (the same feedback's
+		// "dive into multi-line blocks" bullet) — a line dive walks the
+		// block's source lines and c/gy anchor a comment to the one under
+		// focus.
 		ID:          "move.dive",
-		Description: "Dive into thread / scroll code block right",
+		Description: "Dive into thread or block lines / scroll code block right",
 		Applicable: func(m *model) bool {
 			if m.visual {
 				return false
@@ -135,8 +140,11 @@ var commands = []command{
 			if m.at.comment == commentNone && m.focusedKind() == blockCode {
 				return true
 			}
-			if m.at.comment != commentNone {
+			if m.at.comment != commentNone || m.at.line != 0 {
 				return false
+			}
+			if _, _, ok := m.lineDiveRange(); ok {
+				return true
 			}
 			t := m.threads[m.anchorAt()]
 			return t != nil && len(m.visibleComments(t)) > 0
@@ -152,12 +160,12 @@ var commands = []command{
 	},
 	{
 		ID:          "move.surface",
-		Description: "Surface back to thread / scroll code block left",
+		Description: "Surface back to block / thread / scroll code block left",
 		Applicable: func(m *model) bool {
 			if m.at.comment == commentNone && m.focusedKind() == blockCode && m.codeScroll[m.anchorAt()] > 0 {
 				return true
 			}
-			return m.at.comment != commentNone
+			return m.at.comment != commentNone || m.at.line != 0
 		},
 		Run: func(m *model, val string) tea.Cmd {
 			if m.at.comment == commentNone && m.focusedKind() == blockCode {
@@ -185,6 +193,11 @@ var commands = []command{
 			if m.visual {
 				ref = m.selectionLineRef()
 				m.visual = false
+			} else if m.at.line != 0 {
+				// Dived into a block's lines: the comment is about the line
+				// under focus, so it carries the single-line reference (the
+				// L12-18 payload that made a line dive worth building).
+				ref = fmt.Sprintf("L%d: ", m.at.line)
 			}
 			if ref != "" {
 				t := m.ensureThread(a)
@@ -296,8 +309,10 @@ var commands = []command{
 			}
 			m.visual = true
 			m.visualFrom = m.at.entry
-			// Visual mode operates blockwise — lift any comment focus onto its block.
+			// Visual mode operates blockwise — lift any comment or line
+			// dive onto its block.
 			m.at.comment = commentNone
+			m.at.line = 0
 			m.status = ""
 			return nil
 		},
