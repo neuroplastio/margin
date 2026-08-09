@@ -50,7 +50,13 @@ Last updated: 2026-08-09 (visual block selection + yank)
 
 ## In progress
 
-*(none)*
+- **(feedback) mark visuals in gutter** `[felt]` — replace the per-line
+  mark icons (✓/! repeated on every line of a marked block) with a
+  vertical rule in the gutter, coloured by mark. Drains the "Mark
+  Visuals in Gutter" bullet of
+  `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`; the
+  file's other bullets stay for future legs. (claimed by toly,
+  2026-08-09)
 
 ## Backlog — M1
 
