@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (SCROLL-02 landed: page and half-page movement)
+Last updated: 2026-08-09 (SCROLL-03 landed: mouse wheel support)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- SCROLL-03 (mouse wheel) — journal 2026-08-09.6
 - SCROLL-02 (page and half-page movement) — journal 2026-08-09.5
 - CMD-05 (staged value commands and key-opens-a-stage) — journal 2026-08-09.4
 - CMD-03 (command palette UI: renders at bottom, 7 items shown, typed filtering) — journal 2026-08-09.3
@@ -39,13 +40,7 @@ Last updated: 2026-08-09 (SCROLL-02 landed: page and half-page movement)
 
 ## In progress
 
-- **SCROLL-03** `[felt]` Mouse wheel. Almost certainly scroll-only with focus
-  left where it is, since that is how a wheel behaves everywhere — but that makes
-  it deliberately inconsistent with SCROLL-02, which is worth deciding on purpose
-  rather than by accident. Also: a wheel over an open composer should probably
-  scroll the comment rather than the document. *Asked for again 2026-08-08 after
-  a real review — scrolling is otherwise fine, the wheel is what is missing.*
-  (claimed by self, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -85,6 +80,7 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **SCROLL-03** mouse wheel support: scrolling the wheel shifts the document viewport directly (`m.scroll`), bypassing `clampScroll`'s snapping. Focus intentionally stays left where it is. A wheel event over an open composer scrolls the comment instead. `[felt]` — see journal 2026-08-09.6 — done 2026-08-09
 - [x] **SCROLL-02** page and half-page keys (`ctrl+d`/`u`, `pgup`/`pgdn`, `home`/`end`). Built to carry focus along with the viewport, matching vim's `ctrl+d` rather than a generic pager. `[felt]` — see journal 2026-08-09.5 — done 2026-08-09
 - [x] **CMD-05** staged value commands and key-opens-a-stage. `mark` and `goto` staged commands added. `m` and `s` keys open the palette partway through. Backspace rewinds predictably. `[felt]` — see journal 2026-08-09.4 — done 2026-08-09
 - [x] **CMD-03** the palette itself: `:` opens it, rendered at the bottom of the screen without dimming the document, showing up to 7 ranked items, supporting typed filtering and navigation. `[felt]` — see journal 2026-08-09.3 — done 2026-08-09

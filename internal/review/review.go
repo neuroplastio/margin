@@ -25,6 +25,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 )
 
 const (
@@ -723,6 +724,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		return m, m.handleClick(msg.Mouse())
 
+	case tea.MouseWheelMsg:
+		return m, m.handleWheel(tea.Mouse(msg))
+
 	case tea.KeyPressMsg:
 		if m.paletteOpen {
 			return m, m.handlePaletteKey(msg)
@@ -905,6 +909,28 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	}
 	if ok {
 		m.at = target
+	}
+	return nil
+}
+
+// handleWheel scrolls the document, or passes the wheel event to an open
+// composer if the pointer is over it. Focus is explicitly left alone.
+func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
+	line := mo.Y + m.scroll
+
+	if m.comp != nil && m.paneTop >= 0 {
+		relY, relX := line-m.paneTop, mo.X-(gutterW+borderW)
+		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
+			m.comp.sendMouse(relX, relY, mo.Button, false)
+			return nil
+		}
+	}
+
+	delta := 3 // three lines per wheel tick is a common default
+	if mo.Button == uv.MouseWheelUp {
+		m.scroll -= delta
+	} else if mo.Button == uv.MouseWheelDown {
+		m.scroll += delta
 	}
 	return nil
 }
