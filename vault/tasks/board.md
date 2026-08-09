@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (esc-based composer exit)
+Last updated: 2026-08-09 (composer insert-after-line-ref)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -98,7 +98,17 @@ Last updated: 2026-08-09 (esc-based composer exit)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** composer insert-after-line-ref: a new comment whose
+      buffer holds nothing but the auto-prepended line reference (`L12: ` /
+      `L12-18: `) opens in insert mode with the cursor just past the prefix, so
+      typing starts immediately after `c` with a visual selection or a dive —
+      no `i`/`a` step. The reference is scaffolding, not text the reviewer
+      wrote, so the insert-iff-empty rule (interaction.md) is relaxed exactly
+      for this shape; a prefix with real text behind it still opens in normal
+      mode. Drains the first item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md` (four
+      items remain: edit cursor-at-end, cancel-early empty thread,
+      unchanged-edit draft, enter/esc dive bindings).
 
 ## Backlog — M1
 
