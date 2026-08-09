@@ -67,7 +67,10 @@ Last updated: 2026-08-09 (code block horizontal scroll)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** dive into multi-line blocks: `l` on a table or raw
+      block dives into its source lines, j/k walk them, `h` surfaces, and
+      `c`/`gy` anchor a comment to the line under focus (Anatoly Rugalev,
+      2026-08-09)
 
 ## Backlog — M1
 
