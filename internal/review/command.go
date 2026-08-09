@@ -37,9 +37,12 @@ type command struct {
 	// description alone — Applicable can be true (a thread exists) while
 	// there is nothing more specific to name (no comment focused, no draft).
 	Target func(m *model) string
+	// Values returns a list of values this command accepts, if it is a staged command.
+	// If nil, the command takes no value.
+	Values func(m *model) []string
 	// Run performs the command against m, returning whatever tea.Cmd the
-	// action needs — identical to what the pre-registry switch case did.
-	Run func(m *model) tea.Cmd
+	// action needs. If the command is staged, the selected value is passed as val.
+	Run func(m *model, val string) tea.Cmd
 }
 
 // commands is the registry, in a fixed display order. Order does not reorder
@@ -51,19 +54,19 @@ var commands = []command{
 		ID:          "move.down",
 		Description: "Move focus down",
 		Applicable:  func(m *model) bool { return true },
-		Run:         func(m *model) tea.Cmd { m.moveFocus(1); return nil },
+		Run:         func(m *model, val string) tea.Cmd { m.moveFocus(1); return nil },
 	},
 	{
 		ID:          "move.up",
 		Description: "Move focus up",
 		Applicable:  func(m *model) bool { return true },
-		Run:         func(m *model) tea.Cmd { m.moveFocus(-1); return nil },
+		Run:         func(m *model, val string) tea.Cmd { m.moveFocus(-1); return nil },
 	},
 	{
 		ID:          "move.first",
 		Description: "Jump to the first block",
 		Applicable:  func(m *model) bool { return true },
-		Run: func(m *model) tea.Cmd {
+		Run: func(m *model, val string) tea.Cmd {
 			m.at = cursor{entry: 0, comment: commentNone}
 			return nil
 		},
@@ -72,7 +75,7 @@ var commands = []command{
 		ID:          "move.last",
 		Description: "Jump to the last block",
 		Applicable:  func(m *model) bool { return true },
-		Run: func(m *model) tea.Cmd {
+		Run: func(m *model, val string) tea.Cmd {
 			m.at = cursor{entry: len(m.entries) - 1, comment: commentNone}
 			return nil
 		},
@@ -82,7 +85,7 @@ var commands = []command{
 		Description: "New comment on the focused block",
 		Applicable:  func(m *model) bool { return m.anchorAt() != "" },
 		Target:      commentTarget,
-		Run: func(m *model) tea.Cmd {
+		Run: func(m *model, val string) tea.Cmd {
 			// A new comment always starts a reply, never edits, wherever
 			// focus is.
 			if a := m.anchorAt(); a != "" {
@@ -100,28 +103,28 @@ var commands = []command{
 			return a != "" && m.threads[a] != nil
 		},
 		Target: editTarget,
-		Run:    func(m *model) tea.Cmd { return m.editFocused() },
+		Run:    func(m *model, val string) tea.Cmd { return m.editFocused() },
 	},
 	{
 		ID:          "mark.reviewed",
 		Description: "Mark reviewed",
 		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
 		Target:      markTarget,
-		Run:         func(m *model) tea.Cmd { m.toggleMark(markOK); return nil },
+		Run:         func(m *model, val string) tea.Cmd { m.toggleMark(markOK); return nil },
 	},
 	{
 		ID:          "mark.flagged",
 		Description: "Flag for later",
 		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
 		Target:      markTarget,
-		Run:         func(m *model) tea.Cmd { m.toggleMark(markFlag); return nil },
+		Run:         func(m *model, val string) tea.Cmd { m.toggleMark(markFlag); return nil },
 	},
 	{
 		ID:          "mark.cycle",
 		Description: "Cycle the review mark",
 		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
 		Target:      markTarget,
-		Run:         func(m *model) tea.Cmd { m.cycleMark(); return nil },
+		Run:         func(m *model, val string) tea.Cmd { m.cycleMark(); return nil },
 	},
 	{
 		ID:          "thread.resolve",
@@ -131,7 +134,7 @@ var commands = []command{
 			return a != "" && m.threads[a] != nil
 		},
 		Target: resolveTarget,
-		Run:    func(m *model) tea.Cmd { m.toggleResolved(); return nil },
+		Run:    func(m *model, val string) tea.Cmd { m.toggleResolved(); return nil },
 	},
 	{
 		ID:          "thread.delete",
@@ -141,21 +144,62 @@ var commands = []command{
 			return a != "" && m.threads[a] != nil
 		},
 		Target: deleteTarget,
-		Run:    func(m *model) tea.Cmd { return m.deleteFocused() },
+		Run:    func(m *model, val string) tea.Cmd { return m.deleteFocused() },
 	},
 	{
 		ID:          "review.export",
 		Description: "Copy the whole review to the clipboard",
 		Applicable:  func(m *model) bool { return true },
-		Run:         func(m *model) tea.Cmd { return m.exportToClipboard() },
+		Run:         func(m *model, val string) tea.Cmd { return m.exportToClipboard() },
 	},
 	{
 		ID:          "app.quit",
 		Description: "Quit",
 		Applicable:  func(m *model) bool { return true },
-		Run: func(m *model) tea.Cmd {
+		Run: func(m *model, val string) tea.Cmd {
 			m.quitting = true
 			return tea.Quit
+		},
+	},
+	{
+		ID:          "mark",
+		Description: "Apply a review mark",
+		Applicable:  func(m *model) bool { return len(m.sectionAnchors(m.at.entry)) > 0 },
+		Target:      markTarget,
+		Values: func(m *model) []string {
+			return []string{"reviewed", "flagged"}
+		},
+		Run: func(m *model, val string) tea.Cmd {
+			switch val {
+			case "reviewed":
+				m.toggleMark(markOK)
+			case "flagged":
+				m.toggleMark(markFlag)
+			}
+			return nil
+		},
+	},
+	{
+		ID:          "goto",
+		Description: "Jump to a section",
+		Applicable:  func(m *model) bool { return true },
+		Values: func(m *model) []string {
+			var sections []string
+			for _, e := range m.entries {
+				if e.b.kind == blockHeading {
+					sections = append(sections, string(e.b.text))
+				}
+			}
+			return sections
+		},
+		Run: func(m *model, val string) tea.Cmd {
+			for i, e := range m.entries {
+				if e.b.kind == blockHeading && string(e.b.text) == val {
+					m.at = cursor{entry: i, comment: commentNone}
+					break
+				}
+			}
+			return nil
 		},
 	},
 }
@@ -274,5 +318,7 @@ var keymap = map[string]string{
 	"R": "thread.resolve",
 	"D": "thread.delete",
 	"Y": "review.export",
+	"m": "mark",
+	"s": "goto",
 	"q": "app.quit", "ctrl+c": "app.quit",
 }

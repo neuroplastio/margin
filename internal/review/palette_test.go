@@ -198,7 +198,7 @@ func TestPaletteRowsExcludesInapplicableCommands(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
 
-	rows := paletteRows(m, commands)
+	rows := paletteRows(m, commands, "")
 	got := make([]string, len(rows))
 	for i, r := range rows {
 		got[i] = r.Command.ID
@@ -222,7 +222,7 @@ func TestPaletteRowsExcludesMarkCommandsOnAThreadEntry(t *testing.T) {
 	m := newTestModel(t)
 	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: commentNone}
 
-	rows := paletteRows(m, commands)
+	rows := paletteRows(m, commands, "")
 	got := make([]string, len(rows))
 	for i, r := range rows {
 		got[i] = r.Command.ID

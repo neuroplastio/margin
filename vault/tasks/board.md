@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (CMD-03 landed: command palette at the bottom of the screen)
+Last updated: 2026-08-09 (CMD-05 landed: staged value commands)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- CMD-05 (staged value commands and key-opens-a-stage) — journal 2026-08-09.4
 - CMD-03 (command palette UI: renders at bottom, 7 items shown, typed filtering) — journal 2026-08-09.3
 - EXPORT-04 (export wording and shape, agent instructions) — journal 2026-08-09.2
 - THREAD-04 (delete thread/comment with confirmation and tombstone) — journal 2026-08-09.1
@@ -53,8 +54,7 @@ Not part of a milestone; cross-cutting infrastructure the palette feedback
 asked for. Split per the feedback's own suggested ordering — see
 `vault/journal/2026-08-07.6.md` for why CMD-01 alone is this leg.
 
-- **CMD-05** Staged value commands and key-opens-a-stage (requirement 5) —
-  later; depends on CMD-03 existing first.
+- *(none)*
 
 ## Backlog — M3 (navigation)
 
@@ -88,6 +88,7 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **CMD-05** staged value commands and key-opens-a-stage. `mark` and `goto` staged commands added. `m` and `s` keys open the palette partway through. Backspace rewinds predictably. `[felt]` — see journal 2026-08-09.4 — done 2026-08-09
 - [x] **CMD-03** the palette itself: `:` opens it, rendered at the bottom of the screen without dimming the document, showing up to 7 ranked items, supporting typed filtering and navigation. `[felt]` — see journal 2026-08-09.3 — done 2026-08-09
 - [x] **EXPORT-04** agent instructions added to the export preamble, and locator includes the anchor ID `## file:line (^id)` so agents can successfully read/write thread files and resolve threads without guessing. `[felt]` — see journal 2026-08-09.2 — done 2026-08-09
 - [x] **THREAD-04** what deletion looks like and what confirms it: D bound to

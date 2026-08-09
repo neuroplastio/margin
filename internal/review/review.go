@@ -734,7 +734,13 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	return cmd.Run(m)
+	if cmd.Values != nil {
+		m.paletteOpen = true
+		m.paletteQuery = cmd.ID + " "
+		m.paletteSelected = 0
+		return nil
+	}
+	return cmd.Run(m, "")
 }
 
 func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
@@ -744,13 +750,23 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.paletteQuery = ""
 		return nil
 	case "enter":
-		cmds := matchCommands(commands, m.paletteQuery)
-		rows := paletteRows(m, cmds)
+		rows := paletteRows(m, commands, m.paletteQuery)
 		if len(rows) > 0 && m.paletteSelected >= 0 && m.paletteSelected < len(rows) {
 			cmd := rows[m.paletteSelected].Command
+			if rows[m.paletteSelected].IsValue {
+				val := rows[m.paletteSelected].Value
+				m.paletteOpen = false
+				m.paletteQuery = ""
+				return cmd.Run(m, val)
+			}
+			if cmd.Values != nil {
+				m.paletteQuery = cmd.ID + " "
+				m.paletteSelected = 0
+				return nil
+			}
 			m.paletteOpen = false
 			m.paletteQuery = ""
-			return cmd.Run(m)
+			return cmd.Run(m, "")
 		}
 		return nil
 	case "up", "ctrl+k":
@@ -760,8 +776,7 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case "down", "ctrl+j", "tab":
-		cmds := matchCommands(commands, m.paletteQuery)
-		rows := paletteRows(m, cmds)
+		rows := paletteRows(m, commands, m.paletteQuery)
 		m.paletteSelected++
 		if m.paletteSelected >= len(rows) {
 			m.paletteSelected = len(rows) - 1
@@ -771,6 +786,13 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case "backspace":
+		for _, c := range commands {
+			if c.Values != nil && m.paletteQuery == c.ID+" " {
+				m.paletteQuery = c.ID
+				m.paletteSelected = 0
+				return nil
+			}
+		}
 		if len(m.paletteQuery) > 0 {
 			m.paletteQuery = m.paletteQuery[:len(m.paletteQuery)-1]
 			m.paletteSelected = 0
@@ -1817,8 +1839,7 @@ func Run(path string, opts RunOptions) error {
 }
 
 func (m *model) renderPalette(w int) string {
-	cmds := matchCommands(commands, m.paletteQuery)
-	rows := paletteRows(m, cmds)
+	rows := paletteRows(m, commands, m.paletteQuery)
 	
 	if m.paletteSelected >= len(rows) {
 		m.paletteSelected = max(0, len(rows)-1)

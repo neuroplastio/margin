@@ -134,6 +134,8 @@ func isWordBoundary(r rune) bool {
 type paletteRow struct {
 	Command command
 	Title   string
+	IsValue bool
+	Value   string
 }
 
 // paletteRows produces the palette's rows for m's current focus: every
@@ -147,7 +149,43 @@ type paletteRow struct {
 // compose, and which one narrows first — or whether composing them even
 // matters, since both are pure filters over the same list — is not something
 // this leg decides without a screen to judge it on.
-func paletteRows(m *model, cmds []command) []paletteRow {
+func paletteRows(m *model, cmds []command, query string) []paletteRow {
+	for _, c := range cmds {
+		if c.Values != nil && strings.HasPrefix(query, c.ID+" ") {
+			if !c.Applicable(m) {
+				return nil
+			}
+			valQuery := strings.TrimPrefix(query, c.ID+" ")
+			var matches []string
+			if valQuery == "" {
+				matches = c.Values(m)
+			} else {
+				type scored struct {
+					val   string
+					score int
+				}
+				var scoredVals []scored
+				for _, v := range c.Values(m) {
+					if s, ok := fuzzyScore(v, valQuery); ok {
+						scoredVals = append(scoredVals, scored{v, s})
+					}
+				}
+				sort.SliceStable(scoredVals, func(i, j int) bool {
+					return scoredVals[i].score > scoredVals[j].score
+				})
+				for _, sv := range scoredVals {
+					matches = append(matches, sv.val)
+				}
+			}
+			var out []paletteRow
+			for _, v := range matches {
+				out = append(out, paletteRow{Command: c, Title: v, IsValue: true, Value: v})
+			}
+			return out
+		}
+	}
+
+	cmds = matchCommands(cmds, query)
 	out := make([]paletteRow, 0, len(cmds))
 	for _, c := range cmds {
 		if !c.Applicable(m) {
