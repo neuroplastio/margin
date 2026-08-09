@@ -1,6 +1,11 @@
 package review
 
-import "testing"
+import (
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
+)
 
 // TestMatchCommandsEmptyQueryReturnsRegistryOrder: nothing typed yet means no
 // ranking has happened, so the result is just the registry, unreordered —
@@ -244,4 +249,96 @@ func containsID(ids []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// paletteBackspace sends one backspace to the open palette.
+func paletteBackspace(m *model) {
+	m.handlePaletteKey(tea.KeyPressMsg(tea.Key{Code: uv.KeyBackspace}))
+}
+
+// TestPaletteBackspaceCancelsOnEmptyQuery pins the 2026-08-09
+// palette-backspace-cancel feedback: `:` opens the palette, and backspace
+// with nothing typed erases the `:` — the palette closes rather than
+// sitting open.
+func TestPaletteBackspaceCancelsOnEmptyQuery(t *testing.T) {
+	m := newTestModel(t)
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: ':', Text: ":"}))
+	if !m.paletteOpen {
+		t.Fatal("':' did not open the palette")
+	}
+	paletteBackspace(m)
+	if m.paletteOpen {
+		t.Error("backspace on an empty query left the palette open, want it cancelled")
+	}
+	if m.paletteQuery != "" {
+		t.Errorf("paletteQuery = %q after cancel, want empty", m.paletteQuery)
+	}
+}
+
+// TestPaletteBackspaceDeletesTypedCharacters: cancelling only happens where
+// there is nothing left to edit — characters actually typed still delete
+// one by one, and the palette stays open until they are all gone and
+// backspace is pressed once more.
+func TestPaletteBackspaceDeletesTypedCharacters(t *testing.T) {
+	m := newTestModel(t)
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: ':', Text: ":"}))
+	for _, r := range "mar" {
+		m.handlePaletteKey(tea.KeyPressMsg(tea.Key{Code: r, Text: string(r)}))
+	}
+	if m.paletteQuery != "mar" {
+		t.Fatalf("paletteQuery = %q after typing, want %q", m.paletteQuery, "mar")
+	}
+	paletteBackspace(m)
+	if m.paletteQuery != "ma" || !m.paletteOpen {
+		t.Errorf("after one backspace: query = %q open = %v, want %q open", m.paletteQuery, m.paletteOpen, "ma")
+	}
+	paletteBackspace(m)
+	paletteBackspace(m)
+	if m.paletteQuery != "" || !m.paletteOpen {
+		t.Errorf("after deleting all three: query = %q open = %v, want empty query, still open", m.paletteQuery, m.paletteOpen)
+	}
+	paletteBackspace(m)
+	if m.paletteOpen {
+		t.Error("backspace past the last character left the palette open, want it cancelled")
+	}
+}
+
+// TestPaletteBackspaceAtStagedSeedCancels pins the todo-review feedback's
+// backspace-rewind bullet: a staged command opened by its key seeds the
+// query ("mark "), and backspace at that seed closes the palette like esc
+// instead of rewinding to the bare command list.
+func TestPaletteBackspaceAtStagedSeedCancels(t *testing.T) {
+	m := newTestModel(t)
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'm', Text: "m"}))
+	if !m.paletteOpen || m.paletteQuery != "mark " {
+		t.Fatalf("'m' opened palette with query %q (open=%v), want staged %q", m.paletteQuery, m.paletteOpen, "mark ")
+	}
+	paletteBackspace(m)
+	if m.paletteOpen {
+		t.Error("backspace at the staged seed left the palette open, want it cancelled (esc-like)")
+	}
+	if m.paletteQuery != "" {
+		t.Errorf("paletteQuery = %q after cancel, want empty", m.paletteQuery)
+	}
+}
+
+// TestPaletteBackspaceInValueStageDeletesThenCancels: inside a staged
+// command a typed value character is ordinary text — backspace deletes it
+// first; only the next backspace, at the bare seed, backs out of the
+// palette entirely.
+func TestPaletteBackspaceInValueStageDeletesThenCancels(t *testing.T) {
+	m := newTestModel(t)
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'm', Text: "m"}))
+	m.handlePaletteKey(tea.KeyPressMsg(tea.Key{Code: 'r', Text: "r"}))
+	if m.paletteQuery != "mark r" {
+		t.Fatalf("paletteQuery = %q after typing, want %q", m.paletteQuery, "mark r")
+	}
+	paletteBackspace(m)
+	if m.paletteQuery != "mark " || !m.paletteOpen {
+		t.Errorf("after deleting the value char: query = %q open = %v, want %q open", m.paletteQuery, m.paletteOpen, "mark ")
+	}
+	paletteBackspace(m)
+	if m.paletteOpen {
+		t.Error("backspace at the bare seed left the palette open, want it cancelled")
+	}
 }

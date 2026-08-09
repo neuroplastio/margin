@@ -1,9 +1,11 @@
 # Board
 
-Last updated: 2026-08-09 (ephemeral stdin reviews: `margin -` / `--stdin`)
+Last updated: 2026-08-09 (palette backspace cancels the palette)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) palette backspace cancels: `:`+backspace closes; staged-seed
+  backspace closes like `esc` instead of rewinding — journal 2026-08-09.14
 - (feedback fix) new-comment composer shows the thread's comments above the
   editor, dim rule between; edit stays solo — journal 2026-08-09.12
 - (feedback fix) deleted comments disappear by default; `V` (thread.showDeleted)
@@ -45,12 +47,7 @@ Last updated: 2026-08-09 (ephemeral stdin reviews: `margin -` / `--stdin`)
 
 ## In progress
 
-- **(feedback) palette backspace cancels** `[felt]` — `:` then backspace
-  should cancel the palette (erase the `:`), and backspacing out of a staged
-  command's seed should close/reset like `esc` rather than rewinding to the
-  command list. Drains `vault/feedback/2026-08-09-palette-backspace-cancel-feedback.md`
-  and the "Backspace Rewind" bullet of the todo-review feedback. (claimed by
-  toly, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -87,6 +84,20 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** palette backspace cancels the palette: `:` then
+      backspace now closes the palette (the `:` is "erased"), and backspace
+      at a staged command's seed (`mark ` / `goto `) closes like `esc`
+      instead of rewinding to the bare command list — the same want stated
+      in two inbox files, the palette-backspace-cancel file and the
+      todo-review file's "Backspace Rewind" bullet, both drained here.
+      Typed characters still delete one by one, and inside a value stage a
+      typed value character deletes before the bare-seed backspace cancels,
+      so editing text never closes anything. One uniform rule in
+      `handlePaletteKey` (`internal/review/review.go`): backspace cancels
+      exactly where there is nothing left to edit — applied whether the
+      seed came from the `m`/`s` keys or from typing `:mark ` by hand, a
+      distinction the model does not record and the feedback does not ask
+      for. `[felt]` — see journal 2026-08-09.14 — done 2026-08-09
 - [x] **(feedback fix)** ephemeral stdin reviews: `margin -` (or `--stdin`)
       reads the document from stdin and reviews it with no persistence — no
       thread files are read or written (the store stays nil, so saves are

@@ -14,7 +14,6 @@
 - **Palette Position & Size:** Bottom position and 7-item limit are both approved.
 - **Visual Separation:** Main document rendering is fine, but extra visual separation between palette and document wouldn't hurt.
 - **Staged Commands UX (`m`/`s`):** Seeding via `m` and `s` keys is good enough for now.
-- **Backspace Rewind (`ef57ce`):** Backspacing out of a staged command should have the same effect as pressing `Esc` (close/reset), rather than rewinding.
 - **Marking Bug (`ccd3fc`):** Marking `CMD-05` (or any single header section) incorrectly marks all sibling headers instead of only the target header section.
 
 ## 4. SCROLL-02, SCROLL-03, SCROLL-04 — Scrolling & Mouse Interactions

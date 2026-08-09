@@ -874,17 +874,25 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case "backspace":
+		// Backspace cancels where there is nothing left to edit, and only
+		// there — the maintainer's call (2026-08-09 palette-backspace
+		// feedback): `:` then backspace erases the `:`, closing the
+		// palette; and backing out of a staged command's seed closes too,
+		// the same as esc, rather than rewinding to the command list.
+		// Characters actually typed still delete one by one.
 		for _, c := range commands {
 			if c.Values != nil && m.paletteQuery == c.ID+" " {
-				m.paletteQuery = c.ID
-				m.paletteSelected = 0
+				m.paletteOpen = false
+				m.paletteQuery = ""
 				return nil
 			}
 		}
-		if len(m.paletteQuery) > 0 {
-			m.paletteQuery = m.paletteQuery[:len(m.paletteQuery)-1]
-			m.paletteSelected = 0
+		if m.paletteQuery == "" {
+			m.paletteOpen = false
+			return nil
 		}
+		m.paletteQuery = m.paletteQuery[:len(m.paletteQuery)-1]
+		m.paletteSelected = 0
 		return nil
 	default:
 		if len(msg.String()) == 1 {
