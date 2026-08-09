@@ -45,7 +45,12 @@ Last updated: 2026-08-09 (ephemeral stdin reviews: `margin -` / `--stdin`)
 
 ## In progress
 
-*(none)*
+- **(feedback) palette backspace cancels** `[felt]` — `:` then backspace
+  should cancel the palette (erase the `:`), and backspacing out of a staged
+  command's seed should close/reset like `esc` rather than rewinding to the
+  command list. Drains `vault/feedback/2026-08-09-palette-backspace-cancel-feedback.md`
+  and the "Backspace Rewind" bullet of the todo-review feedback. (claimed by
+  toly, 2026-08-09)
 
 ## Backlog — M1
 
