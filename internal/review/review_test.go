@@ -490,6 +490,67 @@ func TestSingleEscapeExitsEdit(t *testing.T) {
 	}
 }
 
+// TestUnchangedEditCreatesNoDraft pins the "no diff, no draft" rule: editing a
+// posted comment and exiting keeping a draft, without changing anything, must
+// not mark the comment as an unsaved draft — nothing changed, so there is
+// nothing to keep. The posted comment is untouched and neither the thread nor
+// the draft cache holds text for the target.
+func TestUnchangedEditCreatesNoDraft(t *testing.T) {
+	m := newTestModel(t)
+	original := m.threads[convoAnchor].posted[0].body
+
+	open(t, m, convoAnchor, 0, "noisy neighbour")
+	typeKeys(m.comp, keyEsc)
+
+	err := waitExit(t, m.comp, 10*time.Second)
+	if got := outcomeFromExit(err); got != outcomeDraft {
+		t.Fatalf("single <Esc> on an edit gave outcome %v, want draft", got)
+	}
+	m.dismiss(err)
+	tr := m.threads[convoAnchor]
+	if tr.posted[0].body != original {
+		t.Fatalf("posted comment was mutated by an unchanged edit: %q", tr.posted[0].body)
+	}
+	if got := tr.draft(0); got != "" {
+		t.Fatalf("an unchanged edit left a draft %q — no diff means no draft", got)
+	}
+	if got, _ := loadDraft(convoAnchor, 0); got != "" {
+		t.Fatalf("an unchanged edit persisted draft %q to disk", got)
+	}
+	if m.status != "no changes" {
+		t.Fatalf("status = %q, want %q", m.status, "no changes")
+	}
+}
+
+// TestUnchangedEditClearsStaleDraft: an edit that reverts to exactly the posted
+// text clears whatever draft the target held. The old behaviour could leave a
+// draft whose text was identical to the comment it shadowed; resuming it and
+// exiting unchanged now recognises there is no diff and drops it, in the thread
+// and on disk alike.
+func TestUnchangedEditClearsStaleDraft(t *testing.T) {
+	m := newTestModel(t)
+	original := m.threads[convoAnchor].posted[0].body
+	tr := m.threads[convoAnchor]
+	tr.setDraft(0, original)
+	if err := saveDraft(convoAnchor, 0, original); err != nil {
+		t.Fatal(err)
+	}
+
+	open(t, m, convoAnchor, 0, "noisy neighbour")
+	typeKeys(m.comp, keyEsc)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	if got := tr.draft(0); got != "" {
+		t.Fatalf("a revert-to-posted edit left draft %q behind", got)
+	}
+	if got, _ := loadDraft(convoAnchor, 0); got != "" {
+		t.Fatalf("a revert-to-posted edit left draft %q on disk", got)
+	}
+	if tr.posted[0].body != original {
+		t.Fatalf("posted comment was mutated: %q", tr.posted[0].body)
+	}
+}
+
 func TestSpacemacsDiscard(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, draftAnchor, newCommentSlot, "contradicts")

@@ -1141,14 +1141,26 @@ func (m *model) dismiss(err error) tea.Cmd {
 		t.setDraft(target, "")
 		_ = clearDraft(t.anchor, target)
 	case out == outcomeDraft:
-		t.setDraft(target, body)
-		_ = saveDraft(t.anchor, target, body)
-		if body == "" {
-			m.status = "closed"
-		} else if target == newCommentSlot {
-			m.status = "draft kept on " + t.anchor
+		// Editing a comment and exiting without changing anything must not
+		// mark it as an unsaved draft — there is no diff to keep (feedback
+		// 2026-08-09). The baseline is the posted comment itself: only an
+		// edit of a posted comment has one, so a new comment keeps a draft
+		// whenever it has text, and an edit that reverts to the posted text
+		// clears a pre-existing edit draft rather than leaving stale text.
+		if target != newCommentSlot && target < len(t.posted) && body == t.posted[target].body {
+			t.setDraft(target, "")
+			_ = clearDraft(t.anchor, target)
+			m.status = "no changes"
 		} else {
-			m.status = "edit kept unsaved"
+			t.setDraft(target, body)
+			_ = saveDraft(t.anchor, target, body)
+			if body == "" {
+				m.status = "closed"
+			} else if target == newCommentSlot {
+				m.status = "draft kept on " + t.anchor
+			} else {
+				m.status = "edit kept unsaved"
+			}
 		}
 	default:
 		t.setDraft(target, "")

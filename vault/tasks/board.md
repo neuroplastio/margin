@@ -1,9 +1,15 @@
 # Board
 
-Last updated: 2026-08-09 (cancel-early empty thread)
+Last updated: 2026-08-10 (unchanged-edit no draft)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) save-less exit on an unchanged edit: `e` on a posted comment
+  then `esc` with nothing changed no longer marks it "unsaved draft" — the
+  draft path diffs the body against the posted comment, and a byte-identical
+  close clears the target's draft (thread and cache) and reports `no changes`;
+  a reverted stale draft is cleared too, while a changed abandoned edit still
+  keeps its draft — journal 2026-08-10.1
 - (feedback fix) cancel-early empty thread: `c` on a thread-less block then an
   immediate cancel no longer leaves a "no comments yet" thread behind — the
   thread `ensureThread` created for the open is dropped unless a comment was
@@ -112,12 +118,7 @@ Last updated: 2026-08-09 (cancel-early empty thread)
 
 ## In progress
 
-- **(feedback fix)** save-less exit on an unchanged edit: editing a comment and
-      exiting without changing anything currently marks it "unsaved draft". If
-      there is no diff, no draft should be created. Drains the
-      unchanged-edit-draft item of
-      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
-      enter/esc dive item remains. `[felt]` — claimed 2026-08-10
+*(none)*
 
 ## Backlog — M1
 
@@ -153,6 +154,22 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** save-less exit on an unchanged edit: `e` on a posted
+      comment, then any draft-path exit (`esc` in normal mode, `:q`, `SPC c d`,
+      blur) with the text untouched, used to store a draft identical to the
+      comment and report "edit kept unsaved" — nothing changed, but a `✎
+      draft` marker still appeared. `dismiss`'s `outcomeDraft` branch now diffs
+      the body against the posted comment: a byte-identical close clears the
+      target's draft (thread and draft cache) and reports `no changes`. A
+      resumed edit that *reverts* to the posted text clears its stale draft
+      too — same statement from the other direction, and it cleans up the
+      identical-to-posted drafts the old behaviour could leave behind. New
+      comments are untouched (no baseline to diff), as is the empty-buffer
+      close. Drains the unchanged-edit-draft item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
+      enter/esc dive item remains. `[felt]` — see journal 2026-08-10.1 — done
+      2026-08-10
 
 - [x] **(feedback fix)** cancel-early empty thread: `c` on a thread-less block
       opens the composer through `ensureThread`, which creates an empty thread;
