@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (thread comment focus highlight)
+Last updated: 2026-08-09 (deleted comments keep content and restore option)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) deleted comments keep content & restore option: deleted comments keep body text dimmed on screen and in thread files, D toggles delete/restore without confirmation — journal 2026-08-09.26
 - (feedback fix) thread comment focus highlight: focusing a comment places focus bar and highlight on comment body text lines rather than author header — journal 2026-08-09.25
 - (feedback fix) palette visual separation & hover visibility: dim horizontal rule ─ above command palette, hover indicator color brightened to 248 for clear visibility — journal 2026-08-09.24
 - (feedback fix) focus retained on comment exit: exiting composer leaves focus on the comment so pressing e immediately re-edits it — journal 2026-08-09.23
@@ -65,7 +66,7 @@ Last updated: 2026-08-09 (thread comment focus highlight)
 
 ## In progress
 
-- (feedback fix) deleted comments keep content and restore option [felt] — claimed 2026-08-09 by ant-agent
+*(none)*
 
 ## Backlog — M1
 
@@ -101,6 +102,13 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** deleted comments keep content & restore option:
+      `deleteComment` preserves comment body, `marshalThread` writes `[deleted]` in
+      header line, `appendComments` renders body text dimmed, `D` toggles delete/restore
+      immediately without confirmation. Drains "Deleted comments keep their content"
+      bullet in `vault/feedback/2026-08-09-deleted-comments-and-code-hscroll-feedback.md`.
+      `[felt]` — see journal 2026-08-09.26 — done 2026-08-09
 
 - [x] **(feedback fix)** thread comment focus highlight: focusing a comment
       places focus bar and highlight on comment body text lines rather than author

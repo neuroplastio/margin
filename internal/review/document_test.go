@@ -196,8 +196,7 @@ func TestNewModelReattachesOnOpen(t *testing.T) {
 	}
 }
 
-// TestDeleteCommentTombstones pins D11's shape: author and timestamp survive,
-// body does not.
+// TestDeleteCommentTombstones pins D11's shape: author, timestamp, and body survive.
 func TestDeleteCommentTombstones(t *testing.T) {
 	at := time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC)
 	th := &thread{posted: []comment{
@@ -210,8 +209,8 @@ func TestDeleteCommentTombstones(t *testing.T) {
 	if !th.posted[0].deleted {
 		t.Error("posted[0].deleted = false, want true")
 	}
-	if th.posted[0].body != "" {
-		t.Errorf("posted[0].body = %q, want empty after deletion", th.posted[0].body)
+	if th.posted[0].body != "why thirty seconds?" {
+		t.Errorf("posted[0].body = %q, want preserved body after deletion", th.posted[0].body)
 	}
 	if th.posted[0].author != "toly" {
 		t.Errorf("posted[0].author = %q, want kept as toly", th.posted[0].author)
@@ -225,8 +224,45 @@ func TestDeleteCommentTombstones(t *testing.T) {
 	}
 }
 
+// TestRestoreComment covers restoring deleted comments and toggling delete state.
+func TestRestoreComment(t *testing.T) {
+	th := &thread{posted: []comment{
+		{author: "toly", body: "first comment"},
+	}}
+
+	th.deleteComment(0)
+	if !th.posted[0].deleted {
+		t.Error("want comment deleted")
+	}
+
+	th.restoreComment(0)
+	if th.posted[0].deleted {
+		t.Error("want comment restored")
+	}
+
+	// Toggle comment
+	del := th.toggleDeleteComment(0)
+	if !del || !th.posted[0].deleted {
+		t.Error("toggleDeleteComment want deleted = true")
+	}
+	del = th.toggleDeleteComment(0)
+	if del || th.posted[0].deleted {
+		t.Error("toggleDeleteComment want deleted = false")
+	}
+
+	// Toggle thread
+	delTh := th.toggleDeleteThread()
+	if !delTh || !th.posted[0].deleted {
+		t.Error("toggleDeleteThread want deleted = true")
+	}
+	delTh = th.toggleDeleteThread()
+	if delTh || th.posted[0].deleted {
+		t.Error("toggleDeleteThread want deleted = false")
+	}
+}
+
 // TestDeleteCommentClearsPendingEdit covers the case an edit draft targets the
-// comment being deleted: editing a now-bodyless comment makes no sense, so the
+// comment being deleted: editing a deleted comment makes no sense, so the
 // draft should not survive it.
 func TestDeleteCommentClearsPendingEdit(t *testing.T) {
 	th := &thread{posted: []comment{{author: "toly", body: "orig"}}}
@@ -251,8 +287,7 @@ func TestDeleteCommentOutOfRangeIsNoop(t *testing.T) {
 }
 
 // TestDeleteThreadTombstonesEveryComment covers "delete a whole thread" (D11):
-// the same tombstone treatment applied to every posted comment, since there is
-// nothing else per-thread to mark deleted.
+// deleting every posted comment while preserving bodies.
 func TestDeleteThreadTombstonesEveryComment(t *testing.T) {
 	th := &thread{posted: []comment{
 		{author: "toly", body: "first"},
@@ -262,8 +297,8 @@ func TestDeleteThreadTombstonesEveryComment(t *testing.T) {
 	th.deleteThread()
 
 	for i, c := range th.posted {
-		if !c.deleted || c.body != "" {
-			t.Errorf("posted[%d] = %+v, want tombstoned", i, c)
+		if !c.deleted || c.body == "" {
+			t.Errorf("posted[%d] = %+v, want deleted with body kept", i, c)
 		}
 	}
 }

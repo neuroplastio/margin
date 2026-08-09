@@ -168,14 +168,14 @@ func TestParseThreadFileResolvedCaseInsensitive(t *testing.T) {
 	}
 }
 
-// TestMarshalParseThreadRoundTripTombstonedComment covers THREAD-03/D11: a
-// deleted comment's author and timestamp round-trip, its body does not.
+// TestMarshalParseThreadRoundTripTombstonedComment covers deleted comment round-trip:
+// author, timestamp, body and deleted flag round-trip cleanly.
 func TestMarshalParseThreadRoundTripTombstonedComment(t *testing.T) {
 	want := &thread{
 		anchor: "^deleted1",
 		quote:  "a paragraph",
 		posted: []comment{
-			{author: "toly", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC), deleted: true},
+			{author: "toly", body: "original deleted text", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC), deleted: true},
 			{author: "agent", body: "still here", at: time.Date(2026, 8, 7, 9, 5, 0, 0, time.UTC)},
 		},
 	}
@@ -188,17 +188,18 @@ func TestMarshalParseThreadRoundTripTombstonedComment(t *testing.T) {
 	sameThread(t, got, want)
 }
 
-// TestMarshalThreadWritesTombstoneMarkerForDeletedComment pins the on-disk
-// shape: a deleted comment's body is replaced with the tombstone marker, not
-// left blank — a human or agent reading the file directly should be able to
-// tell "deleted" apart from "posted with nothing in it."
-func TestMarshalThreadWritesTombstoneMarkerForDeletedComment(t *testing.T) {
+// TestMarshalThreadWritesDeletedHeaderMarker pins the on-disk shape for deleted comments:
+// the header includes `[deleted]` and preserves the comment body.
+func TestMarshalThreadWritesDeletedHeaderMarker(t *testing.T) {
 	th := &thread{anchor: "^x", posted: []comment{
-		{author: "toly", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC), deleted: true},
+		{author: "toly", body: "kept body", at: time.Date(2026, 8, 7, 9, 0, 0, 0, time.UTC), deleted: true},
 	}}
 	data := string(marshalThread("doc.md", th))
-	if !strings.Contains(data, tombstoneMarker) {
-		t.Errorf("marshalled tombstoned comment does not contain the marker %q:\n%s", tombstoneMarker, data)
+	if !strings.Contains(data, "[deleted]") {
+		t.Errorf("marshalled deleted comment does not contain [deleted] header marker:\n%s", data)
+	}
+	if !strings.Contains(data, "kept body") {
+		t.Errorf("marshalled deleted comment does not contain body:\n%s", data)
 	}
 }
 
