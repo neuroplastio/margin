@@ -188,6 +188,18 @@ type model struct {
 	paletteQuery    string
 	paletteSelected int
 
+	// searchOpen is the `/` prompt being shown at the bottom of the screen.
+	// While it is open, every key routes to handleSearchKey (search.go):
+	// printable characters append to searchDraft, and the matches — recomputed
+	// from the draft every render — highlight the document live. enter commits
+	// searchDraft as searchQuery and jumps to the next match; esc abandons the
+	// edit, leaving the previous searchQuery and its highlight untouched.
+	searchOpen    bool
+	searchDraft   string
+	searchQuery   string
+	searchMatches []searchMatch
+	searchCurrent int
+
 	spans    []span
 	subspans map[cursor]span // comment-level spans of the expanded thread
 	paneTop  int             // line index of the first emulator row; -1 when idle
@@ -1093,6 +1105,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.handleMotion(tea.Mouse(msg))
 
 	case tea.KeyPressMsg:
+		if m.searchOpen {
+			return m, m.handleSearchKey(msg)
+		}
 		if m.paletteOpen {
 			return m, m.handlePaletteKey(msg)
 		}
@@ -1149,6 +1164,14 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.paletteOpen = true
 		m.paletteQuery = ""
 		m.paletteSelected = 0
+		return nil
+	}
+	if msg.String() == "/" && m.comp == nil {
+		m.visual = false
+		m.pendingKey = ""
+		m.searchOpen = true
+		m.searchDraft = ""
+		m.searchCurrent = 0
 		return nil
 	}
 
@@ -1641,6 +1664,11 @@ func (m *model) render() []string {
 
 		m.spans[i] = span{start: start, end: len(lines) - 1}
 	}
+	// A search query paints its matches across the rendered lines and
+	// recomputes the match list, so the highlight and n/N's walk always
+	// describe the same screen (search.go). Runs after the entry loop because
+	// it needs the spans just computed to map each line back to its entry.
+	lines = m.applySearch(lines)
 	return lines
 }
 
@@ -1868,8 +1896,14 @@ func (m *model) View() tea.View {
 		paletteBox = m.renderPalette(m.w)
 		paletteHeight = strings.Count(paletteBox, "\n") + 1
 	}
+	var searchBox string
+	searchHeight := 0
+	if m.searchOpen {
+		searchBox = m.renderSearchPrompt(m.w)
+		searchHeight = strings.Count(searchBox, "\n") + 1
+	}
 
-	viewport := max(m.h-footerRows-paletteHeight, 1)
+	viewport := max(m.h-footerRows-paletteHeight-searchHeight, 1)
 	m.scroll = m.clampScroll(len(lines), viewport)
 	visible := lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
 
@@ -1885,6 +1919,8 @@ func (m *model) View() tea.View {
 			"  "+what+"  ·  ctrl+s save · esc esc keep · SPC c k discard · click away to blur"))
 	} else if m.paletteOpen {
 		b.WriteString(paletteBox)
+	} else if m.searchOpen {
+		b.WriteString(searchBox)
 	} else if m.visual {
 		n := 0
 		if lo, hi, ok := m.selectionRange(); ok {

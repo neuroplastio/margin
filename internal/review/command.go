@@ -122,6 +122,18 @@ var commands = []command{
 		},
 	},
 	{
+		ID:          "search.next",
+		Description: "Jump to the next search match",
+		Applicable:  func(m *model) bool { return m.searchQuery != "" },
+		Run:         func(m *model, val string) tea.Cmd { m.searchStep(1); return nil },
+	},
+	{
+		ID:          "search.prev",
+		Description: "Jump to the previous search match",
+		Applicable:  func(m *model) bool { return m.searchQuery != "" },
+		Run:         func(m *model, val string) tea.Cmd { m.searchStep(-1); return nil },
+	},
+	{
 		// move.dive is the 2026-08-09 todo-review feedback's "dedicated dive
 		// navigation type": the only way focus reaches a comment from the
 		// keyboard. j/k at block level walk blocks and thread rows only, so
@@ -501,6 +513,8 @@ var keymap = map[string]string{
 	"ctrl+b": "move.pageUp", "pgup": "move.pageUp",
 	"g":     "move.first", "home": "move.first",
 	"G":     "move.last", "end": "move.last",
+	"n":     "search.next",
+	"N":     "search.prev",
 	"c":     "comment.new",
 	"e":     "comment.edit",
 	"r":     "mark.reviewed",

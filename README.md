@@ -52,6 +52,8 @@ detectably orphaned rather than silently misplaced.
 | --- | --- |
 | `j` / `k` | Move between blocks and thread rows (a thread is one stop) |
 | `l` / `h` | Dive into the focused thread's comments, or a table/raw block's lines / surface back out |
+| `/` | Search: type to highlight matches live, `enter` to jump, `esc` to cancel |
+| `n` / `N` | Jump to the next / previous search match |
 | `V` | Select blocks (visual mode): movement extends, `esc` cancels |
 | `y` | Yank the selected blocks' markdown to the clipboard |
 | `c` | New comment on the focused block (opens in insert mode) |

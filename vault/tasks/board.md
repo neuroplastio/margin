@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-08-09 (CLI comment add for agent automation)
+Last updated: 2026-08-09 (/ search)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) `/` search: `/` opens a bottom prompt, typing highlights
+  every match live (background-only SGR 94 over rendered lines), enter commits
+  and jumps to the next match after focus, `n`/`N` walk with wrap, esc cancels
+  the edit — journal 2026-08-09.32
 - (feedback fix) composer background artifacts: the composer pane no longer
   paints nvim's own dark background — Normal/NormalFloat/EndOfBuffer forced to
   transparent in composerInit, so the pane shows the terminal's background like
@@ -115,6 +119,25 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** `/` search with match highlighting: `/` opens a
+      prompt in the palette's slot (dim rule, `/draft█`, live count); typing
+      highlights every match as it is typed, case-insensitively, over the
+      *rendered* lines (wrapped prose, aligned tables, chroma code — the query
+      searches what is on screen) with a background-only SGR (`48;5;94`, warm
+      brown — distinct from the selection's slate and the mark colours) so the
+      line's own foreground survives, reasserting across inner resets the way
+      selLine does. `enter` commits the draft and jumps to the next match
+      strictly after the current focus line, centring it in the viewport with
+      `scrollAnchor` updated so clampScroll does not yank the offset back;
+      `n`/`N` (`search.next`/`search.prev`, new registry commands) walk the
+      list with wrap; `esc` cancels the prompt's edit without committing (a
+      previous query and highlight survive); backspace deletes a rune and
+      cancels at an empty draft like the palette. Frontmatter excluded from
+      the match list, the same call rebuild already makes. Drains feature 1 of
+      `vault/feedback/2026-08-09-navigation-feature-requests.md`; the
+      `<num>gg` and rich/raw-toggle features remain.
+      `[felt]` — see journal 2026-08-09.32 — done 2026-08-09
 
 - [x] **(feedback fix)** CLI comment add for agent automation: new `margin
       comment add FILE.md --anchor ^abc --text "..." [--author agent]`
