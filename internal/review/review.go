@@ -1284,8 +1284,10 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 
-	// esc cancels an active selection and does nothing otherwise — outside
-	// visual mode esc has no binding at all (the composer owns its own esc).
+	// esc cancels an active selection first — vim's rule, the composer's own
+	// esc (owned by the child while it is open) is untouched. Outside visual
+	// mode esc is move.surface: the undive key, a no-op where there is no
+	// dive.
 	if m.visual && msg.String() == "esc" {
 		m.visual = false
 		m.pendingKey = ""
@@ -1517,7 +1519,7 @@ func (m *model) editFocused() tea.Cmd {
 	if i := t.pendingEdit(); i >= 0 {
 		return m.openComposer(anchor, i)
 	}
-	m.status = "l to dive into the thread and pick a comment, or c to write a new one"
+	m.status = "enter to dive into the thread and pick a comment, or c to write a new one"
 	return nil
 }
 

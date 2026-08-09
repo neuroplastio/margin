@@ -1,9 +1,15 @@
 # Board
 
-Last updated: 2026-08-10 (enter/esc dive bindings)
+Last updated: 2026-08-10 (enter/esc dive bindings — done)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) enter/esc dive bindings: `enter` dives, `esc` undives, as
+  straight aliases of `l`/`h` — the whole dive flow is now reachable as
+  `enter`/`j`/`esc`. esc still cancels a visual selection first, is inert
+  outside a dive, and the composer owns its own esc; on a code block or the
+  frontmatter the alias means enter/esc scroll horizontally rather than dive —
+  journal 2026-08-10.2
 - (feedback fix) save-less exit on an unchanged edit: `e` on a posted comment
   then `esc` with nothing changed no longer marks it "unsaved draft" — the
   draft path diffs the body against the posted comment, and a byte-identical
@@ -118,11 +124,7 @@ Last updated: 2026-08-10 (enter/esc dive bindings)
 
 ## In progress
 
-- **(feedback fix)** dive/undive also binds to `enter`/`esc`: `enter` dives,
-      `esc` undives, in addition to the existing `l`/`h` bindings. Drains the
-      last item of
-      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`.
-      `[felt]` — claimed 2026-08-10
+*(none)*
 
 ## Backlog — M1
 
@@ -158,6 +160,16 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** dive/undive also binds to `enter`/`esc`: `enter` dives,
+      `esc` undives, in addition to the existing `l`/`h` bindings. Straight
+      aliases of `move.dive`/`move.surface` (one command id, one behaviour);
+      esc cancels a visual selection first, is a quiet no-op outside a dive,
+      and the composer owns its own esc while open; on a code block or the
+      frontmatter the alias means enter/esc scroll horizontally, exactly as
+      l/h. Drains the last item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
+      file is deleted. `[felt]` — see journal 2026-08-10.2 — done 2026-08-10
 
 - [x] **(feedback fix)** save-less exit on an unchanged edit: `e` on a posted
       comment, then any draft-path exit (`esc` in normal mode, `:q`, `SPC c d`,

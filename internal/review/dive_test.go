@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 )
 
 // The dive navigation model, from the 2026-08-09 todo-review feedback:
@@ -150,12 +151,13 @@ func TestDiveWithNoVisibleCommentsIsANoop(t *testing.T) {
 	}
 }
 
-// TestDiveKeysRouteThroughTheRegistry: l/h and the arrow keys resolve to
-// the dive commands, and pressing l then h really dives and surfaces.
+// TestDiveKeysRouteThroughTheRegistry: l/h, the arrow keys, and enter/esc
+// resolve to the dive commands, and pressing l then h really dives and
+// surfaces.
 func TestDiveKeysRouteThroughTheRegistry(t *testing.T) {
 	for key, want := range map[string]string{
-		"l": "move.dive", "right": "move.dive",
-		"h": "move.surface", "left": "move.surface",
+		"l": "move.dive", "right": "move.dive", "enter": "move.dive",
+		"h": "move.surface", "left": "move.surface", "esc": "move.surface",
 	} {
 		if got := keymap[key]; got != want {
 			t.Errorf("keymap[%q] = %q, want %q", key, got, want)
@@ -173,6 +175,39 @@ func TestDiveKeysRouteThroughTheRegistry(t *testing.T) {
 	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'h', Text: "h"}))
 	if m.at != (cursor{entry: threadRow, comment: commentNone}) {
 		t.Fatalf("h = %+v, want the thread row", m.at)
+	}
+}
+
+// TestEnterEscDiveAndSurface: the 2026-08-09 feedback's "enter = dive,
+// esc = undive" bindings, end to end through handleKey. enter steps into the
+// thread's comments like l does; esc steps back out to the thread row like h;
+// esc outside a dive is a no-op (no focus change, no status).
+func TestEnterEscDiveAndSurface(t *testing.T) {
+	m := newTestModel(t)
+	threadRow := entryFor(t, m, convoAnchor)
+	m.at = cursor{entry: threadRow, comment: commentNone}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: uv.KeyEnter}))
+	if m.at != (cursor{entry: threadRow, comment: 0}) {
+		t.Fatalf("enter = %+v, want the first comment", m.at)
+	}
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: uv.KeyEscape}))
+	if m.at != (cursor{entry: threadRow, comment: commentNone}) {
+		t.Fatalf("esc = %+v, want the thread row", m.at)
+	}
+
+	before := m.at
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: uv.KeyEscape}))
+	if m.at != before {
+		t.Fatalf("esc outside a dive moved focus: %+v -> %+v", before, m.at)
+	}
+
+	// esc in visual mode still cancels the selection, not surfaces — vim's
+	// rule, and the precondition the enter/esc bindings must not break.
+	m.visual = true
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: uv.KeyEscape}))
+	if m.visual {
+		t.Fatal("esc in visual mode did not cancel the selection")
 	}
 }
 
