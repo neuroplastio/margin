@@ -57,7 +57,11 @@ Last updated: 2026-08-09 (composer modified keys)
 
 ## In progress
 
-*(none)*
+- **(feedback fix) J/K incremental viewport scrolling** `[felt]` — add `J`/`K`
+  incremental viewport scrolling (3 lines per press) so the user can scroll
+  the document viewport without moving focus `m.at`. Drains the
+  "Incremental Scroll Keys" bullet of
+  `vault/feedback/2026-08-09-todo-review-feedback.md`. (claimed by 1d4c2720, 2026-08-09)
 
 ## Backlog — M1
 
