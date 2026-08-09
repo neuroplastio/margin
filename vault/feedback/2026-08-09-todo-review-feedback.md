@@ -11,10 +11,9 @@ in the visual-mode feedback file. The vim-mode key-combos bullet landed in
 journal 2026-08-09.19 — the host now encodes every modified-key family itself
 (ctrl+backspace and friends reach nvim as CSI-u; alt combos ride the verified
 legacy meta form instead of collapsing to a bare ESC), and the composer binds
-`<C-BS>`/`<M-BS>` to delete-word. One residual, recorded as F19: an
-*unbound* alt combo still collapses to Escape, as in any terminal vim — only
-a binding or the kitty keyboard protocol (unimplemented in x/vt) changes
-that. What remains:)*
+`<C-BS>`/`<M-BS>` to delete-word. The incremental scroll keys landed in journal
+2026-08-09.20 — `J`/`K` scroll the viewport down/up 3 lines per press without
+changing focus (`m.at`). What remains:)*
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
 - **Thread UX Improvements:**
@@ -31,6 +30,5 @@ that. What remains:)*
 
 ## 4. SCROLL-02, SCROLL-03, SCROLL-04 — Scrolling & Mouse Interactions
 - **Focus & Viewport Separation:** Separating focus and scrolling is approved ("perfect").
-- **Incremental Scroll Keys:** Add incremental viewport scrolling using `J`/`K` (or similar) to allow scrolling the view without changing the focus.
 - **Mouse Wheel Speed:** Mouse wheel speed (3 lines per tick) should be tunable.
 - **Mouse Hover Visibility (`SCROLL-04`):** The dim hover indicator `▌` is not visible enough—feels like it's not working.

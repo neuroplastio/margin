@@ -87,6 +87,18 @@ var commands = []command{
 		Run:         func(m *model, val string) tea.Cmd { m.pageScroll(true, false); return nil },
 	},
 	{
+		ID:          "move.scrollDown",
+		Description: "Scroll viewport down incrementally",
+		Applicable:  func(m *model) bool { return true },
+		Run:         func(m *model, val string) tea.Cmd { m.scrollViewport(3); return nil },
+	},
+	{
+		ID:          "move.scrollUp",
+		Description: "Scroll viewport up incrementally",
+		Applicable:  func(m *model) bool { return true },
+		Run:         func(m *model, val string) tea.Cmd { m.scrollViewport(-3); return nil },
+	},
+	{
 		ID:          "move.first",
 		Description: "Jump to the first block",
 		Applicable:  func(m *model) bool { return true },
@@ -420,6 +432,8 @@ func markTarget(m *model) string {
 var keymap = map[string]string{
 	"j": "move.down", "down": "move.down",
 	"k": "move.up", "up": "move.up",
+	"J": "move.scrollDown",
+	"K": "move.scrollUp",
 	"l": "move.dive", "right": "move.dive",
 	"h": "move.surface", "left": "move.surface",
 	"ctrl+d": "move.halfPageDown",

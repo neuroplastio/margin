@@ -1,9 +1,11 @@
 # Board
 
-Last updated: 2026-08-09 (composer modified keys)
+Last updated: 2026-08-09 (J/K incremental scrolling)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) J/K incremental scrolling: J/K scroll the document viewport
+  3 lines per press without moving focus — journal 2026-08-09.20
 - (feedback fix) thread dive navigation: block-level `j`/`k` walk blocks and
   thread rows only (a thread is one stop whatever its length), `l` dives
   into the focused thread's comments, `h` surfaces, dived j/k pop out at the
@@ -57,11 +59,7 @@ Last updated: 2026-08-09 (composer modified keys)
 
 ## In progress
 
-- **(feedback fix) J/K incremental viewport scrolling** `[felt]` — add `J`/`K`
-  incremental viewport scrolling (3 lines per press) so the user can scroll
-  the document viewport without moving focus `m.at`. Drains the
-  "Incremental Scroll Keys" bullet of
-  `vault/feedback/2026-08-09-todo-review-feedback.md`. (claimed by 1d4c2720, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -97,6 +95,14 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** J/K incremental viewport scrolling: `J`/`K` scroll
+      the document viewport 3 lines per press without changing focus (`m.at`).
+      Registered as `move.scrollDown` and `move.scrollUp` commands. Drains the
+      "Incremental Scroll Keys" bullet of `vault/feedback/2026-08-09-todo-review-feedback.md`;
+      the file's other bullets (.margin location, palette separation, wheel
+      speed, hover visibility, multi-line block dive) stay for future legs.
+      `[felt]` — see journal 2026-08-09.20 — done 2026-08-09
 
 - [x] **(feedback fix)** composer modified-key forwarding: the composer
       silently dropped every modified key vt's SendKey has no case for

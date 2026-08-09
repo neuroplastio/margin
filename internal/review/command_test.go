@@ -241,3 +241,27 @@ func TestMarkTargetNamesSectionSize(t *testing.T) {
 		t.Errorf("markTarget on a thread entry = %q, want \"\" (nothing markable there)", got)
 	}
 }
+
+// TestIncrementalScrollKeys: J and K scroll the viewport down and up without
+// changing focus (m.at).
+func TestIncrementalScrollKeys(t *testing.T) {
+	m := newTestModel(t)
+	startAt := m.at
+	startScroll := m.scroll
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'J', Text: "J"}))
+	if m.scroll != startScroll+3 {
+		t.Fatalf("J did not scroll down by 3, got scroll=%d want %d", m.scroll, startScroll+3)
+	}
+	if m.at != startAt {
+		t.Fatalf("J changed focus to %+v, want %+v", m.at, startAt)
+	}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'K', Text: "K"}))
+	if m.scroll != startScroll {
+		t.Fatalf("K did not scroll back up to %d, got scroll=%d", startScroll, m.scroll)
+	}
+	if m.at != startAt {
+		t.Fatalf("K changed focus to %+v, want %+v", m.at, startAt)
+	}
+}

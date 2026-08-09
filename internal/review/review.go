@@ -484,6 +484,11 @@ func (m *model) pageScroll(half, down bool) {
 	m.scrollAnchor = m.at
 }
 
+// scrollViewport shifts the viewport offset directly without changing focus (m.at).
+func (m *model) scrollViewport(delta int) {
+	m.scroll += delta
+}
+
 // anchorAt is the document anchor the focus currently sits on, "" for headings.
 func (m *model) anchorAt() string {
 	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
