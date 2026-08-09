@@ -59,7 +59,10 @@ Last updated: 2026-08-09 (.margin directory location project root detection)
 
 ## In progress
 
-*(none)*
+- (feedback fix) line/range prepending in comments & yank reference (gy/yr) —
+  in progress by agent (2026-08-09) `[felt]`
+
+
 
 ## Backlog — M1
 
