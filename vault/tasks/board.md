@@ -62,7 +62,8 @@ Last updated: 2026-08-09 (line/range prepending in comments & yank reference gy/
 
 ## In progress
 
-*(none)*
+- (feedback fix) focus retained on comment exit (Antigravity 2026-08-09)
+
 
 ## Backlog — M1
 
