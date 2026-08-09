@@ -60,6 +60,31 @@ func AddComment(path, anchor, author, text string) (string, error) {
 	return threadFilePath(root, docPath, anchor), nil
 }
 
+// Export renders the review of path as it stands on disk: parse the document,
+// load its threads, reattach them, and return the same exportReview text Y and
+// --stdout produce — without running the interface. It is the extract half of
+// the CLI-automation feedback: an agent pulls the current state of a review in
+// a pipe (CI, a script, a hook) with no terminal, no keystrokes, no window.
+//
+// Marks are session-only — nothing persists which blocks a reviewer has marked
+// reviewed or flagged — so a headless export cannot report them. The summary
+// line therefore reads "0 of N blocks reviewed" and no block is marked
+// "flagged, needs attention": what the export carries is what is on disk, the
+// threads, which is exactly what an agent acts on.
+func Export(path string, includeResolved bool) (string, error) {
+	doc, err := loadDoc(path)
+	if err != nil {
+		return "", err
+	}
+	root, docPath := resolveReviewRoot(path)
+	threads, err := loadThreadsForDoc(root, docPath)
+	if err != nil {
+		return "", err
+	}
+	reattach(doc, threads)
+	return exportReview(path, doc, threads, map[string]reviewMark{}, includeResolved, false), nil
+}
+
 // normalizeAnchor accepts an anchor with or without the leading `^` the export
 // prints: an agent copying `(^a1b2c3)` from a block header and one copying
 // `a1b2c3` from a thread filename mean the same block.

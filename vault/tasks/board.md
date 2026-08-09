@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (/ search)
+Last updated: 2026-08-09 (CLI export for agent automation)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -80,10 +80,7 @@ Last updated: 2026-08-09 (/ search)
 
 ## In progress
 
-- [ ] **(feedback fix)** CLI commands for agent automation — the extract half:
-      a dedicated non-interactive `margin export FILE.md` command that prints
-      the review as it stands on disk without driving the TUI
-      (agent-2, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -119,6 +116,17 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** CLI commands for agent automation — the extract half:
+      a dedicated non-interactive `margin export FILE.md [--include-resolved]`
+      command (`review.Export` + a top-level `export` subcommand) prints the
+      review as it stands on disk without driving the TUI — the same
+      `exportReview` text `Y`/`--stdout` produce, byte-identical, so an agent
+      reads the current state of a review in a pipe with no terminal. Marks are
+      session-only, so a headless export reports no marks (summary reads `0 of
+      N blocks reviewed`) — decided, not raised. Drains the last bullet of
+      `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`; the file
+      is deleted. `[mech]` — see journal 2026-08-09.33 — done 2026-08-09
 
 - [x] **(feedback feature)** `/` search with match highlighting: `/` opens a
       prompt in the palette's slot (dim rule, `/draft█`, live count); typing

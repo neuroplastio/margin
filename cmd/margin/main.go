@@ -15,7 +15,7 @@ import (
 var version = "dev"
 
 func main() {
-	if err := newRootCmd(review.Run, review.AddComment, review.DefaultAuthor).Execute(); err != nil {
+	if err := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor).Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -24,7 +24,7 @@ func main() {
 // non-interactive command handlers as arguments and is a function rather than a
 // package var so tests can construct an isolated command with its own I/O,
 // args, and handlers that do not open a terminal or touch disk.
-func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), defaultAuthor func() string) *cobra.Command {
+func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), exportReview func(path string, includeResolved bool) (string, error), defaultAuthor func() string) *cobra.Command {
 	var stdout bool
 	var includeResolved bool
 	var stdin bool
@@ -55,6 +55,11 @@ requiring Y — the same content Y produces — so it can be piped straight into
 an agent:
 
   margin --stdout FILE.md | agent -p "address this review"
+
+margin export FILE.md is the non-interactive half: it prints the same review
+straight away, without opening the interface, for a script or CI pipeline with
+no terminal (the review's marks are session-only, so the export reflects the
+threads on disk, not which blocks a reviewer had marked).
 
 Or pipe markdown straight in for an ephemeral review — margin - (or
 --stdin) reads the document from stdin, saves nothing to .margin/threads,
@@ -104,6 +109,7 @@ a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).`,
 	root.Flags().IntVar(&wheelSpeed, "wheel-speed", 0, "lines one mouse wheel tick scrolls (default 3)")
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	root.AddCommand(newCommentCmd(addComment, defaultAuthor))
+	root.AddCommand(newExportCmd(exportReview))
 	return root
 }
 
@@ -155,5 +161,35 @@ func newCommentCmd(addComment func(path, anchor, author, text string) (string, e
 		Short: "Read and write comments without opening the interface",
 	}
 	cmd.AddCommand(add)
+	return cmd
+}
+
+// newExportCmd builds the `margin export` subcommand: the extract half of CLI
+// agent automation. It prints the review of a document as it stands on disk —
+// the same text Y and --stdout produce — without running the interface, so an
+// agent reads the current state of a review in a pipe with no terminal. Marks
+// are session-only, so the export reports threads but no reviewed/flagged
+// state; see review.Export.
+func newExportCmd(exportReview func(path string, includeResolved bool) (string, error)) *cobra.Command {
+	var includeResolved bool
+	cmd := &cobra.Command{
+		Use:   "export FILE.md",
+		Short: "Print the review of a document as it stands on disk",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Same runtime-error discipline as the other subcommands: a
+			// missing file or unreadable thread is a runtime error that
+			// should not bury its message under the help text, while getting
+			// the invocation wrong still prints usage.
+			cmd.SilenceUsage = true
+			out, err := exportReview(args[0], includeResolved)
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(cmd.OutOrStdout(), out)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&includeResolved, "include-resolved", false, "include resolved threads in the export, instead of leaving them out")
 	return cmd
 }

@@ -87,12 +87,21 @@ sets a different step size (`--wheel-speed 1` for fine-grained scrolling).
 
 ### Agent automation
 
-An agent can also write into a review without driving the interface — the same
-thread file the reviewer would have written:
+An agent can also read and write a review without driving the interface — the
+same thread files the reviewer would have written, and the same export the
+reviewer's `Y` produces:
 
 ```
+margin export spec.md            # print the review as it stands on disk
 margin comment add spec.md --anchor ^abc123 --text "fixed in rev 3" --author agent
 ```
+
+`margin export FILE.md` is non-interactive: it parses the document, loads its
+threads from `.margin/threads/`, and prints the review straight to stdout, so a
+script or CI pipeline reads the current state of a review with no terminal.
+Marks are session-only, so the export carries threads but not which blocks a
+reviewer had marked; `--include-resolved` brings resolved threads back the same
+way it does for `Y` and `--stdout`.
 
 The anchor is the `(^id)` shown in a block's export header. `--author` defaults
 to the current user. The reply appears on the reviewer's next open (or live, via

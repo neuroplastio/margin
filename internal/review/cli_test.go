@@ -157,3 +157,85 @@ func TestDefaultAuthorFallsBackToAgent(t *testing.T) {
 		t.Error("DefaultAuthor() returned empty")
 	}
 }
+
+// --- export ------------------------------------------------------------------
+
+func TestExportPrintsTheReviewFromDisk(t *testing.T) {
+	_, docPath := writeDocUnderRoot(t, "# Title\n\nA commentable paragraph.\n")
+	anchor := firstParagraphAnchor(t, docPath)
+	if _, err := AddComment(docPath, anchor, "toly", "keep the retry budget"); err != nil {
+		t.Fatalf("AddComment: %v", err)
+	}
+
+	out, err := Export(docPath, false)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if !strings.Contains(out, "# Review of "+docPath) {
+		t.Errorf("export has no document header:\n%s", out)
+	}
+	if !strings.Contains(out, "doc.md:3 ("+anchor+")") {
+		t.Errorf("export does not name the commented block's locator:\n%s", out)
+	}
+	if !strings.Contains(out, "**toly:** keep the retry budget") {
+		t.Errorf("export does not carry the comment:\n%s", out)
+	}
+	if !strings.Contains(out, "0 of 1 blocks reviewed") {
+		t.Errorf("export summary should read 0 reviewed (marks are session-only):\n%s", out)
+	}
+}
+
+// A headless export reports what is on disk: threads, not session marks. A
+// document nobody has commented on and nothing is flagged reads as untouched,
+// the same way Y on a fresh session does.
+func TestExportFromDiskOfAnUntouchedDocumentSaysSo(t *testing.T) {
+	_, docPath := writeDocUnderRoot(t, "# Title\n\nA commentable paragraph.\n")
+	out, err := Export(docPath, false)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if !strings.Contains(out, "No comments and nothing flagged") {
+		t.Errorf("empty export is not self-explanatory:\n%s", out)
+	}
+}
+
+func TestExportHonoursIncludeResolved(t *testing.T) {
+	root, docPath := writeDocUnderRoot(t, "# Title\n\nA commentable paragraph.\n")
+	anchor := firstParagraphAnchor(t, docPath)
+	if _, err := AddComment(docPath, anchor, "agent", "this is handled"); err != nil {
+		t.Fatalf("AddComment: %v", err)
+	}
+	// Mark the thread resolved the way an agent would: add `resolved: true`
+	// to the frontmatter and let the next load pick it up.
+	threads, err := loadThreadsForDoc(root, "doc.md")
+	if err != nil {
+		t.Fatalf("loadThreadsForDoc: %v", err)
+	}
+	th := threads[anchor]
+	th.resolved = true
+	if err := writeThreadFile(root, "doc.md", th); err != nil {
+		t.Fatalf("writeThreadFile: %v", err)
+	}
+
+	out, err := Export(docPath, false)
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if strings.Contains(out, "this is handled") || !strings.Contains(out, "every commented block is resolved") {
+		t.Errorf("default export should hide the resolved thread:\n%s", out)
+	}
+
+	out, err = Export(docPath, true)
+	if err != nil {
+		t.Fatalf("Export --include-resolved: %v", err)
+	}
+	if !strings.Contains(out, "**agent:** this is handled") || !strings.Contains(out, "— resolved") {
+		t.Errorf("--include-resolved export should show the resolved thread:\n%s", out)
+	}
+}
+
+func TestExportRejectsMissingFile(t *testing.T) {
+	if _, err := Export(filepath.Join(t.TempDir(), "nope.md"), false); err == nil {
+		t.Fatal("Export of a nonexistent file reported success")
+	}
+}

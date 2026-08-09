@@ -2591,10 +2591,10 @@ type RunOptions struct {
 	//
 	//	margin --stdout FILE.md | agent -p "address this review"
 	//
-	// Threads are session-only until STORE-01's persistence is read back
-	// without opening the interface, so this always runs the review
-	// interactively first; there is no non-interactive "just print what's on
-	// disk" mode yet.
+	// This always runs the review interactively first — the whole point is
+	// that the printed review reflects the session that just happened, marks
+	// included. For a non-interactive dump of what is on disk (threads, not
+	// session marks), use `margin export FILE.md`, which is Export.
 	Stdout bool
 
 	// IncludeResolved, when set, includes resolved threads in the export (Y

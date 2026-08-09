@@ -16,7 +16,7 @@ func exec(t *testing.T, run func(string, review.RunOptions) error, args ...strin
 		run = func(string, review.RunOptions) error { return nil }
 	}
 	var out bytes.Buffer
-	root := newRootCmd(run, nil, nil)
+	root := newRootCmd(run, nil, nil, nil)
 	root.SetOut(&out)
 	root.SetErr(&out)
 	root.SetArgs(args)
@@ -277,7 +277,7 @@ func execComment(t *testing.T, args []string) (path, anchor, author, text string
 		return "/root/.margin/threads/doc.md/x.md", nil
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, addComment, nil)
+	root := newRootCmd(nil, addComment, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs(args)
@@ -353,7 +353,7 @@ func TestCommentAddSurfacesRuntimeError(t *testing.T) {
 		return "", errors.New("no commentable block with anchor ^abc in spec.md")
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, addComment, nil)
+	root := newRootCmd(nil, addComment, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs([]string{"comment", "add", "spec.md", "--anchor", "^abc", "--text", "hi"})
@@ -376,5 +376,90 @@ func TestHelpMentionsCommentAdd(t *testing.T) {
 	}
 	if !strings.Contains(out, "comment") {
 		t.Errorf("help does not mention the comment subcommand:\n%s", out)
+	}
+}
+
+// --- export ------------------------------------------------------------------
+
+// execExport runs `export` with a stub Export handler, capturing the arguments
+// it received and the output.
+func execExport(t *testing.T, args []string) (path string, includeResolved bool, out string, err error) {
+	t.Helper()
+	var gotP string
+	var gotInc bool
+	exportReview := func(p string, inc bool) (string, error) {
+		gotP, gotInc = p, inc
+		return "# Review of " + p + "\n", nil
+	}
+	var buf bytes.Buffer
+	root := newRootCmd(nil, nil, exportReview, nil)
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs(args)
+	err = root.Execute()
+	return gotP, gotInc, buf.String(), err
+}
+
+func TestExportReachesTheHandler(t *testing.T) {
+	path, inc, out, err := execExport(t, []string{"export", "spec.md"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if path != "spec.md" || inc {
+		t.Errorf("handler got (path=%q, includeResolved=%v), want (spec.md, false)", path, inc)
+	}
+	if !strings.Contains(out, "# Review of spec.md") {
+		t.Errorf("output does not carry the export:\n%s", out)
+	}
+}
+
+func TestExportIncludeResolvedFlagReachesTheHandler(t *testing.T) {
+	_, inc, _, err := execExport(t, []string{"export", "spec.md", "--include-resolved"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !inc {
+		t.Error("--include-resolved did not reach the handler")
+	}
+}
+
+func TestExportRequiresAFile(t *testing.T) {
+	_, _, out, err := execExport(t, []string{"export"})
+	if err == nil {
+		t.Fatal("export without a file reported success")
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("misuse did not show usage:\n%s", out)
+	}
+}
+
+func TestExportSurfacesRuntimeError(t *testing.T) {
+	exportReview := func(string, bool) (string, error) {
+		return "", errors.New("open nope.md: no such file or directory")
+	}
+	var buf bytes.Buffer
+	root := newRootCmd(nil, nil, exportReview, nil)
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"export", "nope.md"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("a failing export reported success")
+	}
+	if !strings.Contains(buf.String(), "no such file or directory") {
+		t.Errorf("the actual error is missing:\n%s", buf.String())
+	}
+	if strings.Contains(buf.String(), "Usage:") {
+		t.Errorf("runtime error printed the usage block:\n%s", buf.String())
+	}
+}
+
+func TestHelpMentionsExport(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "export") {
+		t.Errorf("help does not mention the export subcommand:\n%s", out)
 	}
 }
