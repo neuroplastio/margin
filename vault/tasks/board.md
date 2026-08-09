@@ -59,7 +59,8 @@ Last updated: 2026-08-09 (J/K incremental scrolling)
 
 ## In progress
 
-*(none)*
+- (feedback fix) .margin directory location (project root detection) — claimed 2026-08-09
+
 
 ## Backlog — M1
 
