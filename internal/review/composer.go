@@ -210,7 +210,14 @@ vim.api.nvim_create_autocmd('VimEnter', {
     if empty then
       vim.cmd('startinsert')
     else
-      vim.api.nvim_win_set_cursor(0, { 1, 0 })
+      -- Existing text — an edit, or a resumed draft — opens in normal mode
+      -- with the cursor on the last character of the text, so an append
+      -- (a/A) lands at the end. nvim clamps the column onto the last
+      -- character (F22), so asking for one past the end is exactly right;
+      -- putting the cursor at {1,0} used to make every append land after
+      -- the first character.
+      local last = #buf
+      vim.api.nvim_win_set_cursor(0, { last, #buf[last] })
     end
   end,
 })

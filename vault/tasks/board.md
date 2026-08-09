@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-08-09 (composer insert-after-line-ref)
+Last updated: 2026-08-09 (composer edit cursor-at-end)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) composer edit cursor-at-end: `e` on an existing comment opens
+  the composer in normal mode with the cursor on the last character of the
+  comment text, so an `a`/`A` append lands at the end; the same fix lands the
+  settled draft-resume rule that was never implemented — journal 2026-08-09.39
 - (feedback fix) composer insert-after-line-ref: `c` after a visual selection
   or a line dive opens the composer already in insert mode with the cursor
   past the auto-appended `L3-6: ` reference — the first keystroke is a
@@ -103,13 +107,7 @@ Last updated: 2026-08-09 (composer insert-after-line-ref)
 
 ## In progress
 
-- [ ] **(feedback fix)** composer edit cursor-at-end: `e` on an existing comment
-      opens the composer in normal mode with the cursor on the last character of
-      the comment text, so an `a`/`A` append lands at the end instead of the
-      start. Drains the edit-cursor-at-end item of
-      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md` (three
-      items remain: cancel-early empty thread, unchanged-edit draft, enter/esc
-      dive bindings).
+*(none)*
 
 ## Backlog — M1
 
@@ -145,6 +143,19 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** composer edit cursor-at-end: `e` on a posted comment
+      opens the composer in normal mode with the cursor on the last character
+      of the comment text — `nvim_win_set_cursor(0, {last, #buf[last]})`, one
+      column past the last byte, which nvim clamps onto the last character
+      (F22) — so `a` appends at the end instead of after the first character.
+      The same branch change lands interaction.md's settled draft-resume rule
+      ("cursor after the existing text") that the code had quietly never
+      implemented for non-empty buffers; empty and line-ref-prefix branches
+      untouched. Drains the edit-cursor-at-end item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
+      cancel-early-empty-thread, unchanged-edit-draft and enter/esc dive items
+      remain. `[felt]` — see journal 2026-08-09.39 — done 2026-08-09
 
 - [x] **(feedback fix)** composer insert-after-line-ref: `c` after a visual
       selection or a line dive opens the composer already in insert mode with

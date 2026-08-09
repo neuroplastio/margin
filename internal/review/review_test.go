@@ -311,6 +311,68 @@ func TestResumedDraftStartsInNormalMode(t *testing.T) {
 	}
 }
 
+// TestEditPlacesCursorAtTheEnd is the 2026-08-09 composer feedback's
+// "editing a comment should place the cursor at the end" item: `e` on a posted
+// comment must open with the cursor on the last character of the comment text,
+// so an append (`a`) lands at the end rather than after the first character.
+// Asserted through the submitted body — if the cursor sat at {1,0}, `a` would
+// insert " tail" after the opening "S" and the body would come out
+// "S tailhouldn't be global...".
+func TestEditPlacesCursorAtTheEnd(t *testing.T) {
+	m := newTestModel(t)
+	original := m.threads[convoAnchor].posted[0].body
+
+	open(t, m, convoAnchor, 0, "Shouldn't be global")
+	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
+		t.Fatalf("editing opened in %s, want NORMAL", m.comp.mode())
+	}
+
+	typeKeys(m.comp, tea.Key{Code: 'a', Text: "a"})
+	typeText(m.comp, " tail")
+	typeKeys(m.comp, keyEsc, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	got := m.threads[convoAnchor].posted[0].body
+	if !strings.HasSuffix(got, " tail") {
+		t.Fatalf("edited comment = %q, want %q — `a` must have appended at the very end, so the cursor was on the last character", got, original+" tail")
+	}
+	if !strings.HasPrefix(got, original) {
+		t.Fatalf("edited comment = %q, want the original text preserved at the start", got)
+	}
+}
+
+// TestResumedDraftPlacesCursorAtTheEnd pins the settled contract
+// (interaction.md) that a resumed draft puts the cursor after the existing
+// text — the same {1,0} → end-of-text fix as the edit path, since both open a
+// non-empty buffer through the same VimEnter branch. Submitting the resumed
+// draft posts it, so the assertion reads the posted comment's body.
+func TestResumedDraftPlacesCursorAtTheEnd(t *testing.T) {
+	m := newTestModel(t)
+	original := m.threads[draftAnchor].draft(newCommentSlot)
+
+	open(t, m, draftAnchor, newCommentSlot, "contradicts")
+	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
+		t.Fatalf("resumed draft opened in %s, want NORMAL", m.comp.mode())
+	}
+
+	typeKeys(m.comp, tea.Key{Code: 'a', Text: "a"})
+	typeText(m.comp, " tail")
+	typeKeys(m.comp, keyEsc, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	posted := m.threads[draftAnchor].posted
+	if len(posted) != 1 {
+		t.Fatalf("posted %d comments, want 1 — the resumed draft should submit as a new comment", len(posted))
+	}
+	got := posted[0].body
+	if !strings.HasSuffix(got, " tail") {
+		t.Fatalf("resumed draft = %q, want %q — `a` must have appended at the very end, so the cursor was on the last character", got, original+" tail")
+	}
+	if !strings.HasPrefix(got, original) {
+		t.Fatalf("resumed draft = %q, want the original text preserved at the start", got)
+	}
+}
+
 // --- the buffer is only the comment -----------------------------------------
 
 // TestBufferHoldsOnlyTheComment: no instruction comments, no quoted context.
