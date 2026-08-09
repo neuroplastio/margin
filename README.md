@@ -80,6 +80,9 @@ and prints the review to stdout on quit (`--stdout` is implied):
 agent -p "draft a plan" | margin - | agent -p "address this review"
 ```
 
+The mouse wheel scrolls the document three lines per tick. `--wheel-speed N`
+sets a different step size (`--wheel-speed 1` for fine-grained scrolling).
+
 The export leaves resolved threads out by default — it's a list of what still
 needs doing, not a transcript of everything ever said. Pass `--include-resolved`
 (with `Y` or `--stdout` alike) to get the full history back, including what

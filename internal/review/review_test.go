@@ -1694,5 +1694,65 @@ func TestCodeBlockHorizontalScroll(t *testing.T) {
 	}
 }
 
+// --- mouse wheel speed ------------------------------------------------------
+
+// TestWheelScrollUsesWheelSpeed is the regression for the maintainer's "mouse
+// wheel speed (3 lines per tick) should be tunable" ask: handleWheel scrolls by
+// m.wheelSpeed, not a hardcoded 3, and a configured value takes effect through
+// RunOptions.
+func TestWheelScrollUsesWheelSpeed(t *testing.T) {
+	m := newTestModel(t)
+	start := 50
+
+	m.wheelSpeed = 5
+	m.scroll = start
+	m.handleWheel(tea.Mouse{Button: uv.MouseWheelDown})
+	if m.scroll != start+5 {
+		t.Errorf("wheel down with wheelSpeed 5: scroll = %d, want %d", m.scroll, start+5)
+	}
+	m.handleWheel(tea.Mouse{Button: uv.MouseWheelUp})
+	if m.scroll != start {
+		t.Errorf("wheel up with wheelSpeed 5: scroll = %d, want %d", m.scroll, start)
+	}
+
+	// A smaller configured value is honoured too.
+	m.wheelSpeed = 1
+	m.scroll = start
+	m.handleWheel(tea.Mouse{Button: uv.MouseWheelDown})
+	if m.scroll != start+1 {
+		t.Errorf("wheel down with wheelSpeed 1: scroll = %d, want %d", m.scroll, start+1)
+	}
+}
+
+// TestWheelScrollDefaultsToThree pins the default step at 3 lines per tick, as
+// the maintainer described it, and that a zero configured value does not clamp
+// the wheel to nothing.
+func TestWheelScrollDefaultsToThree(t *testing.T) {
+	m := newTestModel(t)
+	if m.wheelSpeed != 3 {
+		t.Fatalf("default wheelSpeed = %d, want 3", m.wheelSpeed)
+	}
+	start := 50
+	m.scroll = start
+	m.handleWheel(tea.Mouse{Button: uv.MouseWheelDown})
+	if m.scroll != start+3 {
+		t.Errorf("wheel down at default speed: scroll = %d, want %d", m.scroll, start+3)
+	}
+}
+
+// TestWheelSpeedZeroMeansDefault pins the RunOptions contract: 0 (a test-built
+// model or an invocation without --wheel-speed) leaves the model's default in
+// place rather than disabling the wheel.
+func TestWheelSpeedZeroMeansDefault(t *testing.T) {
+	m := newTestModel(t)
+	m.wheelSpeed = 0
+	start := 50
+	m.scroll = start
+	m.handleWheel(tea.Mouse{Button: uv.MouseWheelDown})
+	if m.scroll != start+1 {
+		t.Errorf("wheel down with wheelSpeed 0: scroll = %d, want %d (clamped to 1)", m.scroll, start+1)
+	}
+}
+
 
 

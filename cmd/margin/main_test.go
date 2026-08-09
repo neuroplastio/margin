@@ -231,3 +231,36 @@ func TestHelpMentionsIncludeResolved(t *testing.T) {
 		t.Errorf("help does not mention --include-resolved:\n%s", out)
 	}
 }
+
+// --- --wheel-speed -----------------------------------------------------------
+
+func TestWheelSpeedFlagReachesTheRunner(t *testing.T) {
+	var got review.RunOptions
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "--wheel-speed", "5", "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got.WheelSpeed != 5 {
+		t.Errorf("--wheel-speed 5 gave RunOptions.WheelSpeed = %d, want 5", got.WheelSpeed)
+	}
+}
+
+func TestWithoutWheelSpeedFlagDefaultsZero(t *testing.T) {
+	var got review.RunOptions
+	got.WheelSpeed = 7 // prove the zero value, not a leftover
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got.WheelSpeed != 0 {
+		t.Errorf("RunOptions.WheelSpeed = %d without --wheel-speed, want 0 (the default is the model's job)", got.WheelSpeed)
+	}
+}
+
+func TestHelpMentionsWheelSpeed(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "--wheel-speed") {
+		t.Errorf("help does not mention --wheel-speed:\n%s", out)
+	}
+}

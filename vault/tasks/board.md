@@ -4,6 +4,8 @@ Last updated: 2026-08-09 (tunable mouse wheel speed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) tunable mouse wheel speed: `--wheel-speed N` sets lines per
+  tick (default 3, clamp at 1) — journal 2026-08-09.29
 - (feedback fix) dive into multi-line blocks: `l` on a table/raw block dives
   into its source lines, j/k walk them, `h` surfaces, `c`/`gy` anchor a
   comment to the focused line — journal 2026-08-09.28
@@ -70,9 +72,7 @@ Last updated: 2026-08-09 (tunable mouse wheel speed)
 
 ## In progress
 
-- [ ] **(feedback fix)** tunable mouse wheel speed: mouse wheel scrolls a
-      configurable number of lines per tick (`--wheel-speed N`, default 3)
-      (Anatoly Rugalev, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -108,6 +108,15 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** tunable mouse wheel speed: mouse wheel scrolls a
+      configurable number of lines per tick (`--wheel-speed N`, default 3,
+      clamped to at least 1; 0 means the default). `handleWheel` reads
+      `m.wheelSpeed` instead of a literal 3, `RunOptions.WheelSpeed` threads
+      the value through from `cmd/margin`. Drains the "Mouse Wheel Speed"
+      bullet of `vault/feedback/2026-08-09-todo-review-feedback.md` — the
+      file's last undrained item, so the file is deleted.
+      `[felt]` — see journal 2026-08-09.29 — done 2026-08-09
 
 - [x] **(feedback fix)** dive into multi-line blocks: `l` on a table or raw
       block dives into its source lines, `j`/`k` walk them within the block's

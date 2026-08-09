@@ -152,6 +152,10 @@ type model struct {
 
 	w, h   int
 	scroll int
+	// wheelSpeed is how many lines one mouse wheel tick scrolls the document
+	// viewport. Defaults to 3 (a common terminal default); tunable per run via
+	// RunOptions.WheelSpeed.
+	wheelSpeed int
 	// scrollAnchor is the last focus position clampScroll pulled the viewport
 	// to. Re-anchoring only fires when m.at has moved since — otherwise a
 	// scroll offset the user set directly (SCROLL-02/03) would snap straight
@@ -232,6 +236,7 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 		hoveredEntry: -1,
 		scrollAnchor: cursor{entry: -1, comment: commentNone},
 		paneTop:      -1,
+		wheelSpeed:   3,
 	}
 	m.rebuild()
 	return m
@@ -1357,7 +1362,10 @@ func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
 		}
 	}
 
-	delta := 3 // three lines per wheel tick is a common default
+	delta := m.wheelSpeed
+	if delta < 1 {
+		delta = 1
+	}
 	if mo.Button == uv.MouseWheelUp {
 		m.scroll -= delta
 	} else if mo.Button == uv.MouseWheelDown {
@@ -2567,6 +2575,14 @@ type RunOptions struct {
 	// implied — the review is printed on quit, since the pipe is the whole
 	// point. The export names the document "stdin".
 	Stdin bool
+
+	// WheelSpeed is how many lines one mouse wheel tick scrolls the document
+	// viewport. 0 means the default of 3 lines per tick — the maintainer's
+	// "mouse wheel speed should be tunable" ask (2026-08-09), satisfied with
+	// a per-invocation --wheel-speed flag rather than a session command, since
+	// the wheel's step size is a hardware/perception preference about how the
+	// document moves, not an act on it.
+	WheelSpeed int
 }
 
 // openTTY opens the controlling terminal for the TUI when a pipe has taken
@@ -2629,6 +2645,9 @@ func Run(path string, opts RunOptions) error {
 	m := newModelAt(path, doc, threads)
 	m.includeResolved = opts.IncludeResolved
 	m.ephemeral = opts.Stdin
+	if opts.WheelSpeed > 0 {
+		m.wheelSpeed = opts.WheelSpeed
+	}
 	if !opts.Stdin {
 		m.store = &threadStore{root: root, docPath: docPath}
 		// Live reload is a nice-to-have on top of a working review, not a

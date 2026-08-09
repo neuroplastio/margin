@@ -27,6 +27,7 @@ func newRootCmd(run func(path string, opts review.RunOptions) error) *cobra.Comm
 	var stdout bool
 	var includeResolved bool
 	var stdin bool
+	var wheelSpeed int
 
 	root := &cobra.Command{
 		Use:     "margin FILE.md",
@@ -62,7 +63,10 @@ and prints the review to stdout on quit (so --stdout is implied):
 
 The export leaves out resolved threads by default — it is a list of what
 still needs doing, not a transcript of everything ever said. --include-resolved
-adds them back, for an agent that wants to see what it already addressed.`,
+adds them back, for an agent that wants to see what it already addressed.
+
+The mouse wheel scrolls the document three lines per tick; --wheel-speed sets
+a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if stdin {
 				if len(args) > 0 {
@@ -89,12 +93,14 @@ adds them back, for an agent that wants to see what it already addressed.`,
 				Stdout:          stdout || ephemeral,
 				IncludeResolved: includeResolved,
 				Stdin:           ephemeral,
+				WheelSpeed:      wheelSpeed,
 			})
 		},
 	}
 	root.Flags().BoolVar(&stdout, "stdout", false, "write the review to stdout on quit, instead of requiring Y")
 	root.Flags().BoolVar(&includeResolved, "include-resolved", false, "include resolved threads in the export, instead of leaving them out")
 	root.Flags().BoolVar(&stdin, "stdin", false, "read the document from stdin for an ephemeral review: nothing is saved, and the review is printed on quit (implies --stdout)")
+	root.Flags().IntVar(&wheelSpeed, "wheel-speed", 0, "lines one mouse wheel tick scrolls (default 3)")
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	return root
 }
