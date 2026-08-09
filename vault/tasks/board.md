@@ -40,7 +40,10 @@ Last updated: 2026-08-09 (SCROLL-03 landed: mouse wheel support)
 
 ## In progress
 
-*(none)*
+- **SCROLL-04** `[felt]` Mouse hover effects — highlight the block under the
+  pointer without moving focus. Explicitly "a stretch"; do not take it ahead of
+  the wheel, and note it sits awkwardly against the rule that the mouse only
+  moves focus on click. (claimed by toly, 2026-08-09)
 
 ## Backlog — M1
 
@@ -63,10 +66,7 @@ asked for. Split per the feedback's own suggested ordering — see
 Independent of the tree view (D10): these are about moving around one
 document, regardless of the order the tree-view work itself lands in.
 
-- **SCROLL-04** `[felt]` Mouse hover effects — highlight the block under the
-  pointer without moving focus. Explicitly "a stretch"; do not take it ahead of
-  the wheel, and note it sits awkwardly against the rule that the mouse only
-  moves focus on click.
+*(none)*
 
 ## Blocked
 
