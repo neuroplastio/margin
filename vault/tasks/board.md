@@ -35,7 +35,10 @@ Last updated: 2026-08-09 (THREAD-04 landed: D bound to thread.delete, confirmati
 
 ## In progress
 
-*(none)*
+- **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
+  an agent and seeing whether it acts correctly. *First round addressed
+  2026-08-07 (line locators, structure-preserving quotes); still wants a real
+  agent to act on one.* (claimed by Antigravity, 2026-08-09)
 
 ## Backlog — M1
 
@@ -43,10 +46,7 @@ Last updated: 2026-08-09 (THREAD-04 landed: D bound to thread.delete, confirmati
 
 ## Backlog — M2
 
-- **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
-  an agent and seeing whether it acts correctly. *First round addressed
-  2026-08-07 (line locators, structure-preserving quotes); still wants a real
-  agent to act on one.*
+*(none)*
 
 ## Backlog — Commands (from feedback, 2026-08-07-command-palette)
 
