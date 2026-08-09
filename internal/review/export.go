@@ -34,6 +34,7 @@ const maxQuoteLines = 6
 func exportReview(path string, doc []block, threads map[string]*thread, marks map[string]reviewMark, includeResolved bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Review of %s\n\n", path)
+	fmt.Fprintf(&b, "**Agent instructions:** to reply or resolve a thread, edit its markdown file in `.margin/threads/%s/<id>.md`. The anchor id is in parentheses in the block header. To resolve, add `resolved: true` to the frontmatter.\n\n", path)
 
 	done, flagged, total, drafts, resolvedHidden := 0, 0, 0, 0, 0
 	for _, blk := range doc {
@@ -122,7 +123,7 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 // locator names the block in the way most useful to whoever has to find it.
 func locator(path string, b block) string {
 	if b.line > 0 {
-		return fmt.Sprintf("%s:%d", path, b.line)
+		return fmt.Sprintf("%s:%d (%s)", path, b.line, b.anchor)
 	}
 	return b.anchor
 }

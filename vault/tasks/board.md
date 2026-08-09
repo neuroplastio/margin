@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (THREAD-04 landed: D bound to thread.delete, confirmation required, tombstones render as dim [deleted])
+Last updated: 2026-08-09 (EXPORT-04 landed: agent instructions added to export preamble, locators include anchor ID)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- EXPORT-04 (export wording and shape, agent instructions) — journal 2026-08-09.2
 - THREAD-04 (delete thread/comment with confirmation and tombstone) — journal 2026-08-09.1
 - RENDER-05 (heading hierarchy: weight + colour by depth) — journal
   2026-08-08.2
@@ -35,10 +36,7 @@ Last updated: 2026-08-09 (THREAD-04 landed: D bound to thread.delete, confirmati
 
 ## In progress
 
-- **EXPORT-04** `[felt]` The export's wording and shape, judged by pasting it at
-  an agent and seeing whether it acts correctly. *First round addressed
-  2026-08-07 (line locators, structure-preserving quotes); still wants a real
-  agent to act on one.* (claimed by Antigravity, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -93,6 +91,7 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **EXPORT-04** agent instructions added to the export preamble, and locator includes the anchor ID `## file:line (^id)` so agents can successfully read/write thread files and resolve threads without guessing. `[felt]` — see journal 2026-08-09.2 — done 2026-08-09
 - [x] **THREAD-04** what deletion looks like and what confirms it: D bound to
       thread.delete, requiring a second press to confirm. Deleted comments
       render their body as `[deleted]` with a dim style, both in expanded and
