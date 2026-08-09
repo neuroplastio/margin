@@ -103,7 +103,13 @@ Last updated: 2026-08-09 (composer insert-after-line-ref)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** composer edit cursor-at-end: `e` on an existing comment
+      opens the composer in normal mode with the cursor on the last character of
+      the comment text, so an `a`/`A` append lands at the end instead of the
+      start. Drains the edit-cursor-at-end item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md` (three
+      items remain: cancel-early empty thread, unchanged-edit draft, enter/esc
+      dive bindings).
 
 ## Backlog — M1
 
