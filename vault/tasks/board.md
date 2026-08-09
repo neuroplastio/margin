@@ -1,6 +1,7 @@
 # Board
 
-Last updated: 2026-08-09 (deleted comments disappear by default, `V` reveals)
+Last updated: 2026-08-09 (ctrl+enter decode path pinned; terminal reporting is
+the remaining variable)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -80,6 +81,15 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** ctrl+enter in the composer: the handler was already
+      correct; what was missing was a test pinning the decode half of the chain.
+      `TestCtrlEnterDecodesThroughRealReader` feeds the raw kitty `CSI 13;5u`
+      sequence through the same `uv.TerminalReader` bubbletea v2 uses, asserts it
+      decodes to `{Code:13, Mod:ModCtrl}`, routes it through `handleKey` into the
+      live composer and asserts a submit. Verified end-to-end against the real
+      binary in a pty. The maintainer's report answers the 08-06.3 open question:
+      on their terminal the modifier is not reported (see F16), which no margin
+      change can fix. `[mech]` — see journal 2026-08-09.10 — done 2026-08-09
 - [x] **(feedback fix)** deleted comments disappear by default: tombstones no
       longer render a `[deleted]` placeholder in the expanded thread or the
       collapsed summary. New `thread.showDeleted` command, bound to `V` (and

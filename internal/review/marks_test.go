@@ -1,6 +1,7 @@
 package review
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -107,12 +108,62 @@ func TestExportIsBoundToShiftY(t *testing.T) {
 // TestCtrlEnterSubmits: a plain terminal sends CR for both enter and
 // ctrl+enter, so nvim cannot tell them apart and the host has to. This asserts
 // our half — that the key resolves to the same submit path as every other
-// gesture. Whether Ghostty actually reports the modifier is a human check.
+// gesture.
 func TestCtrlEnterSubmits(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
 	typeText(m.comp, "ship it")
 	typeKeys(m.comp, tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl})
+
+	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeSubmit {
+		t.Fatalf("ctrl+enter gave outcome %v, want submit", got)
+	}
+	if body := m.comp.body(); body != "ship it" {
+		t.Fatalf("body = %q, want the text saved on submit", body)
+	}
+}
+
+// TestCtrlEnterDecodesThroughRealReader pins the whole real path for ctrl+enter
+// in the composer, not just our half of it. TestCtrlEnterSubmits above builds
+// the key by hand, which validates the composer's handling but skips the decode
+// the real terminal produces. Ghostty (which margin is built against, see F1)
+// reports ctrl+enter under the kitty keyboard protocol as CSI 13;5u; feeding
+// those exact bytes through the same uv terminal reader bubbletea v2 uses must
+// come out as a KeyPressMsg the model routes to the composer, which must submit.
+//
+// What this does NOT prove is that the maintainer's terminal actually reports
+// the modifier — the journal 2026-08-06.3 flagged that as unverifiable, and a
+// plain terminal sends plain CR for both enter and ctrl+enter, so the intercept
+// can never fire there. This pins our side of that contract: a kitty-speaking
+// terminal's ctrl+enter reaches the submit path untouched.
+func TestCtrlEnterDecodesThroughRealReader(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m.comp, "ship it")
+
+	tr := uv.NewTerminalReader(strings.NewReader("\x1b[13;5u"), "xterm-256color")
+	evc := make(chan uv.Event, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = tr.StreamEvents(context.Background(), evc)
+	}()
+	select {
+	case ev := <-evc:
+		kev, ok := ev.(uv.KeyPressEvent)
+		if !ok {
+			t.Fatalf("decoded %T, want KeyPressEvent", ev)
+		}
+		if kev.Code != uv.KeyEnter || kev.Mod&uv.ModCtrl == 0 {
+			t.Fatalf("decoded %#v, want ctrl+enter", kev)
+		}
+		m.handleKey(tea.KeyPressMsg(tea.Key(kev)))
+	case <-done:
+		t.Fatal("terminal reader produced no event for CSI 13;5u")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the reader to decode")
+	}
 
 	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeSubmit {
 		t.Fatalf("ctrl+enter gave outcome %v, want submit", got)

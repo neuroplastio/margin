@@ -353,3 +353,24 @@ content width instead double-counts the border and makes lipgloss re-wrap.
 state-inspection test sees: the fix only shows in a rendered frame, and
 `TestComposerBoxDoesNotRewrap` had to compare rendered rows against emulator
 rows to catch it.
+
+## F16 — the ctrl+enter modifier only exists if the terminal reports it
+
+`ctrl+enter` submits the composer, but only because the host intercepts the
+key before nvim does: a plain terminal sends CR for both enter and ctrl+enter,
+so nvim cannot tell them apart. The host sees the difference only when the
+terminal reports the modifier — under Ghostty, via the kitty keyboard protocol
+(`CSI 13;5u`, which decodes to `{Code:13, Mod:ModCtrl}`) or xterm
+modifyOtherKeys (`CSI 27;5;13~`, same decode). On any terminal that reports
+neither, ctrl+enter is indistinguishable from enter and the intercept never
+fires; the key just inserts a newline.
+
+The test suite had a blind spot here that mirrors F1's: `TestCtrlEnterSubmits`
+built the key by hand (`tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl}`) and fed it
+straight to the composer, which proves our *handling* but not that the real
+terminal path ever produces that key. `TestCtrlEnterDecodesThroughRealReader`
+(2026-08-09.10) closes it: it feeds the raw kitty sequence through the same
+`uv.TerminalReader` bubbletea v2 uses, decodes it, routes it through
+`handleKey`, and asserts the composer submits. The decode is now pinned — what
+remains untestable is the maintainer's terminal actually reporting the
+modifier, which is a property of the terminal, not of margin.
