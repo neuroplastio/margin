@@ -66,7 +66,7 @@ Last updated: 2026-08-09 (deleted comments keep content and restore option)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** code block horizontal scroll: code blocks don't wrap lines, h/l scroll code blocks horizontally inside the block (Anatoly Rugalev, 2026-08-09)
 
 ## Backlog — M1
 
