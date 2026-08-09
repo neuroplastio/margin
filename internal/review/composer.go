@@ -143,6 +143,13 @@ abbrev('wqa', 'MarginSubmit')
 
 local map = vim.keymap.set
 map({ 'n', 'i' }, '<C-s>', submit, { desc = 'submit comment' })
+-- Terminals that distinguish ctrl+backspace from plain backspace deliver it
+-- as <C-BS>, and alt+backspace arrives as <M-BS>; nvim leaves both unbound.
+-- The host now forwards them (see encodeModifiedKey), so give them the
+-- meaning every other editor gives them — and, for <M-BS>, a mapping is also
+-- what stops nvim collapsing the unbound meta combo into a bare <Esc>.
+map('i', '<C-BS>', '<C-W>', { desc = 'delete word before cursor' })
+map('i', '<M-BS>', '<C-W>', { desc = 'delete word before cursor' })
 map('n', 'ZZ', submit, { desc = 'submit comment' })
 map('n', '<Esc><Esc>', draft, { desc = 'close, keeping a draft' })
 map('n', '<leader>cc', submit, { desc = 'submit comment' })
@@ -328,7 +335,7 @@ func (c *composer) close() {
 // Under Ghostty, which speaks the Kitty keyboard protocol, Bubble Tea decodes
 // shift+o as {Code:'o', Mod:ModShift} rather than a bare 'O' — so capitals and
 // every shifted punctuation vanish. Hence: printable text goes as text, and
-// modified special keys get encoded here.
+// every key carrying a modifier goes through encodeModifiedKey.
 func (c *composer) sendKey(k tea.Key) {
 	// ctrl+enter submits.
 	//
@@ -354,22 +361,14 @@ func (c *composer) sendKey(k tea.Key) {
 		return
 	}
 
-	// Special keys with modifiers: vt drops these, so emit the xterm form
-	// CSI 1 ; <mod> <final>, which nvim understands. Gets you shift+arrow
-	// selection and ctrl+arrow word motions.
+	// Keys carrying modifiers are encoded here rather than handed to
+	// vt.SendKey. vt's fallback drops any modified key it has no explicit
+	// case for (F1) — ctrl+backspace, shift+enter, ctrl+shift+letter — and,
+	// worse, an alt combo carrying a second modifier comes out as a bare
+	// ESC, which throws nvim into normal mode mid-typing.
 	if k.Mod != 0 {
-		if final, ok := xtermFinal[k.Code]; ok {
-			mod := 1
-			if k.Mod&uv.ModShift != 0 {
-				mod++
-			}
-			if k.Mod&uv.ModAlt != 0 {
-				mod += 2
-			}
-			if k.Mod&uv.ModCtrl != 0 {
-				mod += 4
-			}
-			c.em.SendText(fmt.Sprintf("\x1b[1;%d%c", mod, final))
+		if seq, ok := encodeModifiedKey(k); ok {
+			c.em.SendText(seq)
 			return
 		}
 	}
@@ -377,9 +376,179 @@ func (c *composer) sendKey(k tea.Key) {
 	c.em.SendKey(uv.KeyPressEvent(uv.Key(k)))
 }
 
+// encodeModifiedKey renders a key with modifiers into bytes a child nvim
+// decodes as that key. Every form used below was fed to a real nvim on a pty
+// (TERM=xterm-256color, no kitty advertisement) and confirmed to decode as
+// the intended key — see journal 2026-08-09.19.
+//
+//   - alt combos: ESC + the legacy encoding of the key without alt (the meta
+//     form terminal vim has always used: ESC x is <M-x>, ESC X is <M-S-x>,
+//     ESC ^X is <C-M-x>, ESC DEL is <M-BS>). nvim resolves meta keys only
+//     when a mapping names them, whatever the encoding — CSI-u with alt in
+//     the modifier included — so the modern form buys nothing here.
+//   - arrows, home, end:              CSI 1 ; <mod> <final>   (xterm)
+//   - insert, delete, pgup, pgdn, F5-F12:  CSI <n> ; <mod> ~
+//   - F1-F4:                          CSI 1 ; <mod> <P/Q/R/S>
+//   - everything else — ctrl+backspace, shift+enter, ctrl+shift+letter:
+//     CSI <code> ; <mod> u  (kitty's CSI-u form)
+//
+// The one family left to vt.SendKey (ok=false) is ctrl-only combos vt has a
+// control-byte case for (ctrl+a..z, ctrl+space, ctrl+[ et al.). Those bytes
+// double as other keys in every terminal — ctrl+m is CR, ctrl+[ is ESC — so
+// they keep the legacy encoding rather than becoming distinct CSI-u keys.
+func encodeModifiedKey(k tea.Key) (string, bool) {
+	if k.Mod&uv.ModAlt != 0 {
+		return encodeMetaKey(k)
+	}
+	if final, ok := xtermFinal[k.Code]; ok {
+		return fmt.Sprintf("\x1b[1;%d%c", xtermModParam(k.Mod), final), true
+	}
+	if n, ok := xtermTilde[k.Code]; ok {
+		return fmt.Sprintf("\x1b[%d;%d~", n, xtermModParam(k.Mod)), true
+	}
+	if final, ok := xtermF1toF4[k.Code]; ok {
+		return fmt.Sprintf("\x1b[1;%d%c", xtermModParam(k.Mod), final), true
+	}
+	if k.Mod == uv.ModCtrl && vtCtrlAlias(k.Code) {
+		return "", false // vt's legacy control byte
+	}
+	return fmt.Sprintf("\x1b[%d;%du", k.Code, xtermModParam(k.Mod)), true
+}
+
+// encodeMetaKey renders an alt combo as ESC + the encoding of the key without
+// alt. vt.SendKey already does this for alt-only keys, but an alt combo
+// carrying a second modifier falls through vt's fallback and comes out as a
+// bare ESC — nvim reads that as Escape and drops out of insert mode, the
+// "dropping into normal mode unexpectedly" half of the feedback.
+func encodeMetaKey(k tea.Key) (string, bool) {
+	inner := tea.Key{Code: k.Code, Mod: k.Mod &^ uv.ModAlt, ShiftedCode: k.ShiftedCode}
+	switch inner.Mod {
+	case 0:
+		// alt+key: ESC + the key's plain legacy bytes.
+		if s, ok := legacyPlain(k.Code); ok {
+			return "\x1b" + s, true
+		}
+	case uv.ModShift:
+		// alt+shift+printable: ESC + the shifted literal (ESC X is <M-S-x>).
+		if r, ok := shiftedRune(inner); ok {
+			return "\x1b" + string(r), true
+		}
+	case uv.ModCtrl:
+		// alt+ctrl+letter et al.: ESC + the control byte (ESC ^X is <C-M-x>).
+		if b, ok := ctrlByte(k.Code); ok {
+			return "\x1b" + string([]byte{b}), true
+		}
+	}
+	// Everything else: ESC + the no-alt encoding (ESC ESC[3~ is <M-Del>,
+	// ESC ESC[97;5u is <C-M-a> — both verified).
+	if seq, ok := encodeModifiedKey(inner); ok {
+		return "\x1b" + seq, true
+	}
+	return "", false
+}
+
+// legacyPlain is the unmodified encoding of a special key, as terminals have
+// sent it since xterm: control bytes for the ascii specials, CSI/SS3 forms
+// for navigation and function keys.
+func legacyPlain(code rune) (string, bool) {
+	switch code {
+	case ' ':
+		return " ", true
+	case uv.KeyEnter:
+		return "\r", true
+	case uv.KeyTab:
+		return "\t", true
+	case uv.KeyBackspace:
+		return "\x7f", true
+	case uv.KeyEscape:
+		return "\x1b", true
+	}
+	if final, ok := xtermFinal[code]; ok {
+		return "\x1b[" + string(final), true
+	}
+	if n, ok := xtermTilde[code]; ok {
+		return fmt.Sprintf("\x1b[%d~", n), true
+	}
+	if final, ok := xtermF1toF4[code]; ok {
+		return "\x1bO" + string(final), true
+	}
+	if code > ' ' && code < 0x7f {
+		return string(code), true
+	}
+	return "", false
+}
+
+// shiftedRune returns the shifted literal of a key: the shifted codepoint the
+// terminal reported if there is one, else the uppercase letter. Digits and
+// punctuation without a reported shifted form give up rather than guess a
+// keyboard layout.
+func shiftedRune(k tea.Key) (rune, bool) {
+	if k.ShiftedCode > ' ' && k.ShiftedCode < 0x7f {
+		return k.ShiftedCode, true
+	}
+	if k.Code >= 'a' && k.Code <= 'z' {
+		return k.Code - 'a' + 'A', true
+	}
+	return 0, false
+}
+
+// ctrlByte is the legacy control byte for a ctrl combo: ctrl+space is NUL,
+// ctrl+a..z are 0x01-0x1a, and ctrl+[ \ ] ^ _ are 0x1b-0x1f — the same table
+// vt.SendKey's explicit cases encode.
+func ctrlByte(code rune) (byte, bool) {
+	switch {
+	case code == ' ':
+		return 0x00, true
+	case code >= 'a' && code <= 'z':
+		return byte(code - 'a' + 1), true
+	case code >= '[' && code <= '_':
+		return byte(code - '[' + 0x1b), true
+	}
+	return 0, false
+}
+
+// xtermModParam is the CSI modifier parameter: 1, plus 1 for shift, 2 for
+// alt, 4 for ctrl, 8 for meta.
+func xtermModParam(mod uv.KeyMod) int {
+	n := 1
+	if mod&uv.ModShift != 0 {
+		n++
+	}
+	if mod&uv.ModAlt != 0 {
+		n += 2
+	}
+	if mod&uv.ModCtrl != 0 {
+		n += 4
+	}
+	if mod&uv.ModMeta != 0 {
+		n += 8
+	}
+	return n
+}
+
+// vtCtrlAlias reports whether code is one of the keys vt.SendKey encodes as a
+// legacy control byte when combined with ctrl alone (its explicit ctrl table:
+// space, a-z, and [ \ ] ^ _). Those bytes double as other keys in every
+// terminal — ctrl+m is CR, ctrl+[ is ESC — so they keep the legacy encoding
+// rather than becoming distinct CSI-u keys.
+func vtCtrlAlias(code rune) bool {
+	_, ok := ctrlByte(code)
+	return ok
+}
+
 var xtermFinal = map[rune]byte{
 	uv.KeyUp: 'A', uv.KeyDown: 'B', uv.KeyRight: 'C', uv.KeyLeft: 'D',
 	uv.KeyHome: 'H', uv.KeyEnd: 'F',
+}
+
+var xtermTilde = map[rune]int{
+	uv.KeyInsert: 2, uv.KeyDelete: 3, uv.KeyPgUp: 5, uv.KeyPgDown: 6,
+	uv.KeyF5: 15, uv.KeyF6: 17, uv.KeyF7: 18, uv.KeyF8: 19,
+	uv.KeyF9: 20, uv.KeyF10: 21, uv.KeyF11: 23, uv.KeyF12: 24,
+}
+
+var xtermF1toF4 = map[rune]byte{
+	uv.KeyF1: 'P', uv.KeyF2: 'Q', uv.KeyF3: 'R', uv.KeyF4: 'S',
 }
 
 // parseComment trims the buffer. There is no fold to strip any more — the buffer

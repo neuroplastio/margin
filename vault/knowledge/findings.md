@@ -30,6 +30,12 @@ vanishes**. `O`, `A`, `D`, `!`, `?` — all silently ignored.
 in `Key.Text`, so send that with `SendText` and skip vt's encoder entirely.
 Special keys with modifiers get encoded by hand as xterm `CSI 1;<mod><final>`.
 
+*2026-08-09 addition:* the same fallback has a sharper failure mode for alt —
+vt prefixes ESC for alt and strips the bit before matching, so an alt combo
+carrying a second modifier it has no case for emits a **bare ESC** (nvim reads
+it as Escape and leaves insert mode). `encodeModifiedKey` now encodes every
+modified-key family itself; see F19 for what the child actually decodes.
+
 `TestVtDropsModifiedKeys` pins the upstream behaviour: it *skips* if vt is ever
 fixed, so the workaround can be revisited rather than silently kept forever.
 
@@ -405,3 +411,45 @@ inner reset instead of wrapping. `selLine` (`review.go`, visual selection,
 2026-08-09.16) is the working example: open the background, replace every
 inner reset with reset+opener, terminate at the end. The same trap applies to
 chroma's own output, which resets per token.
+
+## F19 — what a child nvim decodes, and the meta-key catch
+
+Verified against nvim 0.12 on a pty, `TERM=xterm-256color`, no kitty
+advertisement, by feeding bytes and watching mapped callbacks fire
+(2026-08-09.19):
+
+- nvim's input layer decodes xterm (`CSI 1;<mod><final>`), tilde
+  (`CSI <n>;<mod>~`) and kitty CSI-u (`CSI <code>;<mod>u`) forms **without any
+  protocol negotiation** — for shift and ctrl modifiers. `CSI 127;5u` arrives
+  as `<C-BS>`, `CSI 97;6u` as `<C-S-a>`, `CSI 3;5~` as `<C-Del>`. So the host
+  can forward modified keys in these forms and they just work.
+- **Meta (alt) keys are different: nvim resolves them only when a mapping
+  names the key, in every encoding tried** — legacy ESC-prefix (`ESC x`),
+  ESC+CSI, and CSI-u with alt in the modifier all behave alike. Unbound, the
+  combo collapses: nvim processes a bare `<Esc>` (insert mode ends) and the
+  remaining bytes execute as normal-mode commands. This is terminal-vim
+  semantics, not a margin bug, and no byte encoding fixes it from the host
+  side. What fixes it for a specific key is *binding* it — the composer maps
+  `<C-BS>` and `<M-BS>` to `<C-W>` — or the emulator speaking the kitty
+  keyboard protocol to the child, which x/vt does not implement (its TODO
+  covers the encode side too, F1).
+- vt.SendKey's own alt path (ESC prefix + strip alt) is correct for alt-only
+  keys but emits a **lone ESC** for alt plus a second modifier — the "drops
+  into normal mode unexpectedly" report. `encodeModifiedKey` handles every
+  alt family itself now.
+
+Probe methodology that worked: spawn nvim with the real `composerInit` plus a
+`vim.keymap.set` whose callback writes a mark file, wait for a `VimEnter`
+ready-file, write the candidate bytes to the pty in one write, and check the
+mark. A mapping firing is unambiguous — nvim decoded exactly that key.
+`vim.on_key` is *not* a reliable substitute: it logs what nvim processed, and
+for unbound meta combos that is a lone `<Esc>` with the rest silently
+consumed, which reads as if the bytes never arrived.
+
+## F20 — the emulator's output is a synchronous io.Pipe
+
+`vt.Emulator`'s `SendText`/`SendKey` write into an `io.Pipe`: the call blocks
+until something Reads. The composer never notices because its
+`io.Copy(ptmx, c.em)` goroutine is always reading. A test that calls
+`sendKey` without a concurrent reader deadlocks — start the read goroutine
+*before* the send (see `sendKeyBytes` in composer_keys_test.go).

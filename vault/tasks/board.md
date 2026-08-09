@@ -57,19 +57,7 @@ Last updated: 2026-08-09 (composer modified keys)
 
 ## In progress
 
-- **(feedback) composer modified-key forwarding** `[mech]` — the composer
-  silently drops (or mangles into a bare ESC) every modified key vt's SendKey
-  has no explicit case for: ctrl+backspace, ctrl+shift+letter, shift+enter,
-  ctrl+delete, and any alt combo carrying a second modifier (the bare ESC is
-  what drops nvim into normal mode "unexpectedly"). Encode those ourselves —
-  xterm forms for navigation/function keys, CSI-u for everything else —
-  verified against a real nvim, and map `<C-BS>` to `<C-W>` in the composer
-  so the newly-delivered key does what hands expect. Drains the "vim mode
-  key combos" bullet of
-  `vault/feedback/2026-08-09-todo-review-feedback.md`; the file's other
-  bullets (multi-line block dive residue, .margin location, palette
-  separation, J/K scroll, wheel speed, hover visibility) stay for future
-  legs. (claimed by toly, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -106,6 +94,35 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** composer modified-key forwarding: the composer
+      silently dropped every modified key vt's SendKey has no case for
+      (ctrl+backspace, shift+enter, ctrl+shift+letter, ctrl+delete, modified
+      F-keys — the "vim mode doesn't receive ctrl+backspace" half of the
+      feedback) and, worse, mangled any alt combo carrying a second modifier
+      into a bare ESC — vt prefixes ESC for alt, strips the bit, and its
+      fallback then appends nothing — which nvim reads as Escape, the
+      "dropping into normal mode unexpectedly" half. `sendKey`'s modifier
+      branch is now `encodeModifiedKey` (`internal/review/composer.go`),
+      encoding every family in forms fed to a real nvim on a pty and
+      confirmed to decode as the intended key (F19): xterm
+      `CSI 1;<mod><final>` for arrows/home/end, tilde forms for
+      insert/delete/pgup/pgdn/F5–F12, CSI-u for the remaining shift/ctrl
+      combos, and legacy meta (ESC + the no-alt encoding) for alt. ctrl-only
+      aliases (ctrl+a..z, ctrl+space, ctrl+[) keep vt's legacy control bytes
+      so ctrl+m stays CR and ctrl+[ stays ESC. `composerInit` binds `<C-BS>`
+      and `<M-BS>` to `<C-W>` so both delete-word combos do what hands
+      expect — the `<M-BS>` binding doing double duty, since nvim resolves
+      meta keys only when a mapping names them, whatever the encoding.
+      Residual, recorded as F19: an *unbound* alt combo still collapses to
+      Escape, as in any terminal vim; only a binding or the kitty keyboard
+      protocol (unimplemented in x/vt) changes that. Tests pin the exact
+      emitted bytes per key family (`TestSendKeyEmitsBytes`), both
+      delete-word behaviours end to end against a real nvim, and the raw
+      `CSI 127;5u` chain through the real terminal reader. Drains the "vim
+      mode key combos" bullet of the todo-review feedback file; the
+      multi-line-block-dive residue, .margin location, palette separation,
+      J/K scroll, wheel speed and hover visibility bullets remain. `[mech]` —
+      see journal 2026-08-09.19 — done 2026-08-09
 - [x] **(feedback fix)** thread dive navigation: j/k no longer eat focus on
       threads — the old flat stop list (block → thread row → every comment)
       cost three presses to pass a two-comment thread and stopped twice on a

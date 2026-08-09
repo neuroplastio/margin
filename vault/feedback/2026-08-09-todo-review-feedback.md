@@ -7,11 +7,17 @@ dives into the focused thread's comments, `h` surfaces, and j/k inside a dive
 flow back out at the ends. Diving into *multi-line blocks* was deferred: no
 verb acts on a line today, so a per-line focus would be a stop with nothing
 to do — it lands naturally with the line-reference work (L12-18 prepending)
-in the visual-mode feedback file. What remains:)*
+in the visual-mode feedback file. The vim-mode key-combos bullet landed in
+journal 2026-08-09.19 — the host now encodes every modified-key family itself
+(ctrl+backspace and friends reach nvim as CSI-u; alt combos ride the verified
+legacy meta form instead of collapsing to a bare ESC), and the composer binds
+`<C-BS>`/`<M-BS>` to delete-word. One residual, recorded as F19: an
+*unbound* alt combo still collapses to Escape, as in any terminal vim — only
+a binding or the kitty keyboard protocol (unimplemented in x/vt) changes
+that. What remains:)*
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
 - **Thread UX Improvements:**
-  - Fix vim mode key combos: Vim mode doesn't receive `ctrl+backspace` or other key combos, dropping into normal mode unexpectedly.
   - **Dive into multi-line blocks:** the dive mechanism (`l`/`h`) currently enters threads only. Per-line focus inside a long block had no payload when the dive was built; revisit alongside the line-reference (L12-18) work.
 
 ## 2. EXPORT-04 & Persistence Location
