@@ -69,6 +69,14 @@ piped straight into an agent:
 margin --stdout spec.md | agent -p "address this review"
 ```
 
+Or pipe markdown straight in for an ephemeral review — `margin -` (or
+`--stdin`) reads the document from stdin, saves nothing to `.margin/threads`,
+and prints the review to stdout on quit (`--stdout` is implied):
+
+```
+agent -p "draft a plan" | margin - | agent -p "address this review"
+```
+
 The export leaves resolved threads out by default — it's a list of what still
 needs doing, not a transcript of everything ever said. Pass `--include-resolved`
 (with `Y` or `--stdout` alike) to get the full history back, including what
@@ -132,6 +140,8 @@ of the stripped one, for comparison.
       an agent with no tooling
 - [ ] Live reload — pick up a thread file an agent writes mid-session
 - [x] `--stdout` export, to pipe a review straight into an agent
+- [x] Ephemeral stdin reviews (`margin -`), pipe in, review, pipe out — nothing
+      saved
 - [ ] Link navigation between blocks, with a jumplist
 - [ ] Rendered diff between review rounds
 

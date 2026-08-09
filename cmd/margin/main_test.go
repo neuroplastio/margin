@@ -135,6 +135,70 @@ func TestHelpMentionsStdout(t *testing.T) {
 	}
 }
 
+// --- --stdin ------------------------------------------------------------------
+
+func TestStdinFlagReachesTheRunner(t *testing.T) {
+	var got review.RunOptions
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "--stdin"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !got.Stdin {
+		t.Error("--stdin did not set RunOptions.Stdin")
+	}
+	if !got.Stdout {
+		t.Error("--stdin did not imply RunOptions.Stdout")
+	}
+}
+
+func TestDashMeansStdin(t *testing.T) {
+	var gotPath string
+	var got review.RunOptions
+	if _, err := exec(t, func(p string, opts review.RunOptions) error { gotPath, got = p, opts; return nil }, "-"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if gotPath != "-" {
+		t.Errorf("runner got path %q, want -", gotPath)
+	}
+	if !got.Stdin || !got.Stdout {
+		t.Errorf(`"margin -" gave RunOptions{Stdin: %v, Stdout: %v}, want both set`, got.Stdin, got.Stdout)
+	}
+}
+
+func TestStdinRejectsAFileArgument(t *testing.T) {
+	called := false
+	out, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }, "--stdin", "spec.md")
+	if err == nil {
+		t.Error("--stdin with a file argument was accepted")
+	}
+	if called {
+		t.Error("--stdin with a file argument reached the runner")
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("misuse did not show usage:\n%s", out)
+	}
+}
+
+func TestWithoutStdinFlagDefaultsFalse(t *testing.T) {
+	var got review.RunOptions
+	got.Stdin = true // prove the zero value, not a leftover
+	if _, err := exec(t, func(_ string, opts review.RunOptions) error { got = opts; return nil }, "spec.md"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if got.Stdin {
+		t.Error("RunOptions.Stdin is set without --stdin or -")
+	}
+}
+
+func TestHelpMentionsStdin(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "--stdin") {
+		t.Errorf("help does not mention --stdin:\n%s", out)
+	}
+}
+
 // --- --include-resolved -------------------------------------------------------
 
 func TestIncludeResolvedFlagReachesTheRunner(t *testing.T) {

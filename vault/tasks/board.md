@@ -1,7 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (new-comment composer shows the thread above the
-editor)
+Last updated: 2026-08-09 (ephemeral stdin reviews: `margin -` / `--stdin`)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -83,6 +82,20 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback fix)** ephemeral stdin reviews: `margin -` (or `--stdin`)
+      reads the document from stdin and reviews it with no persistence — no
+      thread files are read or written (the store stays nil, so saves are
+      no-ops, and no watcher starts) and `--stdout` is implied, the review
+      printing to stdout on quit. stdin is a pipe, so the interface runs on
+      the controlling terminal for *both* streams: one O_RDWR `/dev/tty`
+      handle feeds `tea.WithInput` and `tea.WithOutput` alike (recorded as
+      F17). `margin -` with a terminal on stdin is rejected up front with a
+      "pipe something in" error rather than swallowing keystrokes until EOF.
+      The export's agent instructions gain an ephemeral variant — "nothing
+      was saved, there are no thread files to reply in" — since pointing an
+      agent at `.margin/threads/stdin/` would send it writing files nothing
+      will ever read; the file-backed wording is unchanged. `[mech]` — see
+      journal 2026-08-09.13 — done 2026-08-09
 - [x] **(feedback fix)** adding a comment to a thread shows the thread: the
       composer box for a *new* comment now renders the thread's visible
       comments (and the resolved badge, when set) above the emulator, with a

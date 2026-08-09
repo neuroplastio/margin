@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/neuroplastio/margin/internal/review"
@@ -25,6 +26,7 @@ func main() {
 func newRootCmd(run func(path string, opts review.RunOptions) error) *cobra.Command {
 	var stdout bool
 	var includeResolved bool
+	var stdin bool
 
 	root := &cobra.Command{
 		Use:     "margin FILE.md",
@@ -52,21 +54,47 @@ an agent:
 
   margin --stdout FILE.md | agent -p "address this review"
 
+Or pipe markdown straight in for an ephemeral review — margin - (or
+--stdin) reads the document from stdin, saves nothing to .margin/threads,
+and prints the review to stdout on quit (so --stdout is implied):
+
+  agent -p "draft a plan" | margin - | agent -p "address this review"
+
 The export leaves out resolved threads by default — it is a list of what
 still needs doing, not a transcript of everything ever said. --include-resolved
 adds them back, for an agent that wants to see what it already addressed.`,
-		Args: cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if stdin {
+				if len(args) > 0 {
+					return fmt.Errorf("--stdin reads the document from standard input; pass no file")
+				}
+				return nil
+			}
+			return cobra.ExactArgs(1)(cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Silenced here rather than on the command, so the two kinds of
 			// failure read differently: getting the invocation wrong still
 			// prints usage, while a file that does not exist is a runtime
 			// error and should not bury its message under the help text.
 			cmd.SilenceUsage = true
-			return run(args[0], review.RunOptions{Stdout: stdout, IncludeResolved: includeResolved})
+			path := ""
+			if len(args) > 0 {
+				path = args[0]
+			}
+			// "-" is the conventional spelling of --stdin; both mean the same
+			// ephemeral review, and ephemeral implies --stdout.
+			ephemeral := stdin || path == "-"
+			return run(path, review.RunOptions{
+				Stdout:          stdout || ephemeral,
+				IncludeResolved: includeResolved,
+				Stdin:           ephemeral,
+			})
 		},
 	}
 	root.Flags().BoolVar(&stdout, "stdout", false, "write the review to stdout on quit, instead of requiring Y")
 	root.Flags().BoolVar(&includeResolved, "include-resolved", false, "include resolved threads in the export, instead of leaving them out")
+	root.Flags().BoolVar(&stdin, "stdin", false, "read the document from stdin for an ephemeral review: nothing is saved, and the review is printed on quit (implies --stdout)")
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	return root
 }

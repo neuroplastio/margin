@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -712,13 +713,24 @@ func anchorFor(b block) string {
 
 // loadDoc reads and parses a markdown file.
 func loadDoc(path string) ([]block, error) {
-	src, err := os.ReadFile(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return loadDocFrom(f, path)
+}
+
+// loadDocFrom parses markdown read from r — a pipe, in --stdin mode — with
+// label standing in for a path in errors, since there is no file to name.
+func loadDocFrom(r io.Reader, label string) ([]block, error) {
+	src, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 	blocks := parseDoc(src)
 	if len(blocks) == 0 {
-		return nil, fmt.Errorf("%s has no reviewable content", path)
+		return nil, fmt.Errorf("%s has no reviewable content", label)
 	}
 	return blocks, nil
 }

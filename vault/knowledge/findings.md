@@ -374,3 +374,19 @@ terminal path ever produces that key. `TestCtrlEnterDecodesThroughRealReader`
 `handleKey`, and asserts the composer submits. The decode is now pinned — what
 remains untestable is the maintainer's terminal actually reporting the
 modifier, which is a property of the terminal, not of margin.
+
+## F17 — one O_RDWR `/dev/tty` handle serves bubbletea for input *and* output
+
+When a pipe owns a standard stream, margin runs the interface on the
+controlling terminal instead: `--stdout` points `tea.WithOutput` at
+`/dev/tty` (stdout carries the review), and `--stdin` additionally points
+`tea.WithInput` at it (stdin carries the document). The thing worth knowing
+is that a **single** `os.OpenFile("/dev/tty", os.O_RDWR, 0)` handle can be
+handed to both options at once — the terminal is duplex, and bubbletea reads
+and writes it independently. Two separate opens also work but buy nothing.
+
+The companion trap: `--stdin` run with a *terminal* on stdin (someone typed
+`margin -` with no pipe) must be rejected before reading, or margin swallows
+keystrokes until EOF and then opens a review of whatever was typed. The check
+is `os.Stdin.Stat()` + `os.ModeCharDevice` — no new dependency, and `/dev/null`
+is a char device too, so the guard is unit-testable without a pty.

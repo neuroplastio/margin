@@ -111,6 +111,12 @@ type model struct {
 	// the --include-resolved flag.
 	includeResolved bool
 
+	// ephemeral marks a --stdin review: the document came from a pipe and
+	// nothing is persisted, so the export swaps its "edit the thread file"
+	// agent instructions for wording that does not point at files that will
+	// never exist. False on every model a test builds; only Run sets it.
+	ephemeral bool
+
 	// store is where a posted comment is persisted, in addition to the
 	// in-memory threads map above. nil on every model a test or seedModel
 	// builds — only Run sets one, since only Run is opening a real path with
@@ -575,7 +581,7 @@ func (m *model) cycleMark() {
 
 // exportToClipboard renders the review and puts it on the clipboard.
 func (m *model) exportToClipboard() tea.Cmd {
-	out := exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved)
+	out := exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved, m.ephemeral)
 
 	via, err := copyToClipboard(out)
 	switch {
@@ -1932,18 +1938,52 @@ type RunOptions struct {
 	// lost feedback, and this flag is that undo for the one review that needs
 	// the full history.
 	IncludeResolved bool
+
+	// Stdin, when set, reads the document from stdin instead of path and
+	// reviews it ephemerally: no thread files are read or written (the store
+	// stays nil, so saves are no-ops, and no watcher starts) and Stdout is
+	// implied — the review is printed on quit, since the pipe is the whole
+	// point. The export names the document "stdin".
+	Stdin bool
 }
 
-// openTTY opens the controlling terminal for the TUI to draw on when stdout
-// is carrying the review instead. A var so a test can substitute one that
-// does not need a real terminal.
-var openTTY = func() (io.WriteCloser, error) {
+// openTTY opens the controlling terminal for the TUI when a pipe has taken
+// over one of the standard streams: output, when stdout is carrying the
+// review, and input as well in --stdin mode, where stdin is carrying the
+// document. A var so a test can substitute one that does not need a real
+// terminal.
+var openTTY = func() (io.ReadWriteCloser, error) {
 	return os.OpenFile("/dev/tty", os.O_RDWR, 0)
 }
 
+// stdinReader is where Run reads the document in --stdin mode. A var so a
+// test can substitute one without standing on the process's real stdin.
+var stdinReader io.Reader = os.Stdin
+
 // Run opens path for review and reports what the session produced.
 func Run(path string, opts RunOptions) error {
-	doc, err := loadDoc(path)
+	if opts.Stdin {
+		// --stdin implies --stdout: nothing is persisted, so the printed
+		// review on quit is the only way the session's work leaves it.
+		opts.Stdout = true
+	}
+
+	var doc []block
+	var err error
+	if opts.Stdin {
+		// A terminal on stdin means the reviewer typed `margin -` with no
+		// pipe — reading it would swallow keystrokes until EOF, then open a
+		// review of whatever they happened to type. Say so instead.
+		if f, ok := stdinReader.(*os.File); ok {
+			if info, serr := f.Stat(); serr == nil && info.Mode()&os.ModeCharDevice != 0 {
+				return fmt.Errorf("run: --stdin expects markdown piped in; pass a file or pipe one (e.g. agent -p ... | margin -)")
+			}
+		}
+		doc, err = loadDocFrom(stdinReader, "stdin")
+		path = "stdin"
+	} else {
+		doc, err = loadDoc(path)
+	}
 	if err != nil {
 		return err
 	}
@@ -1951,24 +1991,33 @@ func Run(path string, opts RunOptions) error {
 	// root is the review root and docPath is the document's path relative to
 	// it (D9) — today, since M1 has no tree yet, that is just the file's own
 	// directory and base name. reattach (inside newModelAt) is what matches
-	// these loaded threads back to the parsed blocks.
-	root, docPath := filepath.Dir(path), filepath.Base(path)
-	threads, err := loadThreadsForDoc(root, docPath)
-	if err != nil {
-		return fmt.Errorf("run: %w", err)
+	// these loaded threads back to the parsed blocks. An ephemeral stdin
+	// review skips all of it: there is nothing on disk to read threads from
+	// or write them back to.
+	var threads map[string]*thread
+	var root, docPath string
+	if !opts.Stdin {
+		root, docPath = filepath.Dir(path), filepath.Base(path)
+		threads, err = loadThreadsForDoc(root, docPath)
+		if err != nil {
+			return fmt.Errorf("run: %w", err)
+		}
 	}
 
 	m := newModelAt(path, doc, threads)
 	m.includeResolved = opts.IncludeResolved
-	m.store = &threadStore{root: root, docPath: docPath}
-	// Live reload is a nice-to-have on top of a working review, not a
-	// precondition for one — a read-only filesystem or an exhausted inotify
-	// watch budget should not stop the reviewer from opening the document,
-	// so a failure here is silently not fatal. watcher stays nil and
-	// m.watcher.wait() (nil-safe) simply never fires.
-	if watcher, err := newThreadWatcher(root, docPath); err == nil {
-		m.watcher = watcher
-		defer watcher.close()
+	m.ephemeral = opts.Stdin
+	if !opts.Stdin {
+		m.store = &threadStore{root: root, docPath: docPath}
+		// Live reload is a nice-to-have on top of a working review, not a
+		// precondition for one — a read-only filesystem or an exhausted inotify
+		// watch budget should not stop the reviewer from opening the document,
+		// so a failure here is silently not fatal. watcher stays nil and
+		// m.watcher.wait() (nil-safe) simply never fires.
+		if watcher, err := newThreadWatcher(root, docPath); err == nil {
+			m.watcher = watcher
+			defer watcher.close()
+		}
 	}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
@@ -1978,13 +2027,21 @@ func Run(path string, opts RunOptions) error {
 		// review — the pipe would fill with escape sequences and the interface
 		// would have nowhere usable to draw. Point it at the controlling
 		// terminal instead and leave stdout untouched until the review itself
-		// is printed below.
+		// is printed below. In --stdin mode the keys have to come from the
+		// terminal too, since stdin is the document; one /dev/tty handle,
+		// opened read/write, serves both.
 		tty, err := openTTY()
 		if err != nil {
+			if opts.Stdin {
+				return fmt.Errorf("run: --stdin needs a controlling terminal for the interface (stdin is the document): %w", err)
+			}
 			return fmt.Errorf("run: --stdout needs a controlling terminal to draw the interface on: %w", err)
 		}
 		defer tty.Close()
 		progOpts = append(progOpts, tea.WithOutput(tty))
+		if opts.Stdin {
+			progOpts = append(progOpts, tea.WithInput(tty))
+		}
 	}
 	if _, err := tea.NewProgram(m, progOpts...).Run(); err != nil {
 		return fmt.Errorf("run: %w", err)
@@ -1992,7 +2049,7 @@ func Run(path string, opts RunOptions) error {
 	reportLatency(m.samples)
 
 	if opts.Stdout {
-		fmt.Print(exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved))
+		fmt.Print(exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved, m.ephemeral))
 		return nil
 	}
 

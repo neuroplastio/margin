@@ -18,7 +18,7 @@ func exportFixture() (string, []block, map[string]*thread, map[string]reviewMark
 
 func TestExportNamesTheBlockAndQuotesIt(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 
 	if !strings.Contains(out, "# Review of spec.md") {
 		t.Errorf("export has no document header:\n%s", out)
@@ -35,7 +35,7 @@ func TestExportNamesTheBlockAndQuotesIt(t *testing.T) {
 
 func TestExportCarriesTheWholeExchangeInOrder(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 
 	toly := strings.Index(out, "Shouldn't be global")
 	agent := strings.Index(out, "Changed to per-endpoint")
@@ -54,7 +54,7 @@ func TestExportCarriesTheWholeExchangeInOrder(t *testing.T) {
 // attention" is the whole message.
 func TestExportIncludesFlaggedBlocksWithoutComments(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 	if !strings.Contains(out, "## ^c3") {
 		t.Errorf("flagged block ^c3 is missing from the export:\n%s", out)
 	}
@@ -66,7 +66,7 @@ func TestExportIncludesFlaggedBlocksWithoutComments(t *testing.T) {
 // A reviewed block with nothing to say should not add noise.
 func TestExportSkipsCleanBlocks(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 	if strings.Contains(out, "## ^a1") {
 		t.Errorf("reviewed-and-silent block ^a1 should not appear:\n%s", out)
 	}
@@ -82,7 +82,7 @@ func TestExportSkipsCleanBlocks(t *testing.T) {
 // than including it, so the count is reported.
 func TestExportExcludesDraftsButCountsThem(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 	if strings.Contains(out, "This contradicts the sharing claim") {
 		t.Errorf("an unsubmitted draft leaked into the export:\n%s", out)
 	}
@@ -93,7 +93,7 @@ func TestExportExcludesDraftsButCountsThem(t *testing.T) {
 
 func TestExportOfAnUntouchedDocumentSaysSo(t *testing.T) {
 	doc, _ := seedDoc()
-	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{}, false, false)
 	if !strings.Contains(out, "No comments and nothing flagged") {
 		t.Errorf("empty export is not self-explanatory:\n%s", out)
 	}
@@ -114,7 +114,7 @@ func TestExportQuotesRawBlocks(t *testing.T) {
 		anchor: code.anchor,
 		posted: []comment{{author: "toly", body: "needs error handling", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 	if !strings.Contains(out, "func main") {
 		t.Errorf("export did not quote the code block it refers to:\n%s", out)
 	}
@@ -153,7 +153,7 @@ func TestExportLocatesByFileAndLine(t *testing.T) {
 		anchor: target.anchor,
 		posted: []comment{{author: "toly", body: "check this", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 
 	want := fmt.Sprintf("## spec.md:%d", target.line)
 	if !strings.Contains(out, want) {
@@ -175,7 +175,7 @@ func TestExportNamesTheEnclosingSection(t *testing.T) {
 		anchor: target.anchor,
 		posted: []comment{{author: "toly", body: "x", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 	if !strings.Contains(out, "Section: Budgets") {
 		t.Errorf("export does not name the enclosing section:\n%s", out)
 	}
@@ -203,7 +203,7 @@ func TestExportPreservesListStructure(t *testing.T) {
 		anchor: item.anchor,
 		posted: []comment{{author: "toly", body: "testing this", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 
 	if !strings.Contains(out, "> - per-endpoint caps") {
 		t.Errorf("item was not quoted with its marker intact:\n%s", out)
@@ -232,7 +232,7 @@ func TestExportReconstructsBlockQuoteMarkup(t *testing.T) {
 		anchor: q.anchor,
 		posted: []comment{{author: "toly", body: "testing this", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 
 	if !strings.Contains(out, "> Breaker state is per-process.\n") {
 		t.Errorf("quote markup not reconstructed cleanly:\n%s", out)
@@ -254,7 +254,7 @@ func TestExportQuotesHeadingsAsMarkdown(t *testing.T) {
 		anchor: h.anchor,
 		posted: []comment{{author: "toly", body: "rename this", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 	if !strings.Contains(out, "> ## Budgets") {
 		t.Errorf("heading quote does not show its level:\n%s", out)
 	}
@@ -271,7 +271,7 @@ func TestExportTruncatesOnWordBoundaries(t *testing.T) {
 		anchor: doc[0].anchor,
 		posted: []comment{{author: "toly", body: "x", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 
 	for _, line := range strings.Split(out, "\n") {
 		if !strings.HasPrefix(line, "> alpha") {
@@ -299,7 +299,7 @@ func TestExportCapsLongRawBlocks(t *testing.T) {
 		anchor: doc[0].anchor,
 		posted: []comment{{author: "toly", body: "x", at: time.Now()}},
 	}}
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 
 	quoted := strings.Count(out, "\n> line ")
 	if quoted > maxQuoteLines {
@@ -316,7 +316,7 @@ func TestExportCapsLongRawBlocks(t *testing.T) {
 func TestExportExcludesFrontmatter(t *testing.T) {
 	doc := parseDoc([]byte(frontmatterDoc))
 
-	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{}, false, false)
 	if !strings.Contains(out, "0 of 1 blocks reviewed") {
 		t.Errorf("frontmatter counted toward the reviewable total:\n%s", out)
 	}
@@ -324,7 +324,7 @@ func TestExportExcludesFrontmatter(t *testing.T) {
 	// Flag the paragraph and confirm its Section: line names the real
 	// heading, not the frontmatter.
 	marks := map[string]reviewMark{doc[2].anchor: markFlag}
-	out = exportReview("spec.md", doc, map[string]*thread{}, marks, false)
+	out = exportReview("spec.md", doc, map[string]*thread{}, marks, false, false)
 	if !strings.Contains(out, "Section: Retry policy") {
 		t.Errorf("flagged block's section is not the real heading:\n%s", out)
 	}
@@ -343,7 +343,7 @@ func TestExportExcludesResolvedThreadsByDefault(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
 	threads["^b2"].resolved = true
 
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 	if strings.Contains(out, "^b2") {
 		t.Errorf("resolved thread ^b2 appeared in the default export:\n%s", out)
 	}
@@ -359,7 +359,7 @@ func TestExportIncludeResolvedBringsThemBack(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
 	threads["^b2"].resolved = true
 
-	out := exportReview(path, doc, threads, marks, true)
+	out := exportReview(path, doc, threads, marks, true, false)
 	if !strings.Contains(out, "## ^b2") {
 		t.Errorf("--include-resolved did not restore the resolved thread:\n%s", out)
 	}
@@ -385,7 +385,7 @@ func TestExportShowsAFlaggedBlockEvenWhenItsThreadIsResolved(t *testing.T) {
 	}}
 	marks := map[string]reviewMark{"^b2": markFlag}
 
-	out := exportReview("spec.md", doc, threads, marks, false)
+	out := exportReview("spec.md", doc, threads, marks, false, false)
 	if !strings.Contains(out, "## ^b2") {
 		t.Errorf("flagged-and-resolved block was dropped entirely:\n%s", out)
 	}
@@ -407,7 +407,7 @@ func TestExportOfAllResolvedThreadsSaysSoDistinctly(t *testing.T) {
 		resolved: true,
 	}}
 
-	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, threads, map[string]reviewMark{}, false, false)
 	if !strings.Contains(out, "Nothing outstanding") {
 		t.Errorf("all-resolved export does not distinguish itself from a blank review:\n%s", out)
 	}

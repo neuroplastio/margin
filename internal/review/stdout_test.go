@@ -27,7 +27,7 @@ var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]")
 
 func TestExportReviewContainsNoANSI(t *testing.T) {
 	path, doc, threads, marks := exportFixture()
-	out := exportReview(path, doc, threads, marks, false)
+	out := exportReview(path, doc, threads, marks, false, false)
 	if ansiEscape.MatchString(out) {
 		t.Errorf("exportReview output carries ANSI escapes, which --stdout pipes verbatim:\n%q", out)
 	}
@@ -35,7 +35,7 @@ func TestExportReviewContainsNoANSI(t *testing.T) {
 
 func TestExportReviewOfAnEmptyReviewContainsNoANSI(t *testing.T) {
 	doc, _ := seedDoc()
-	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{}, false)
+	out := exportReview("spec.md", doc, map[string]*thread{}, map[string]reviewMark{}, false, false)
 	if ansiEscape.MatchString(out) {
 		t.Errorf("empty exportReview output carries ANSI escapes:\n%q", out)
 	}
@@ -56,7 +56,7 @@ func TestStdoutRunSurfacesTTYOpenFailure(t *testing.T) {
 
 	wantErr := errors.New("no controlling terminal")
 	restore := openTTY
-	openTTY = func() (io.WriteCloser, error) { return nil, wantErr }
+	openTTY = func() (io.ReadWriteCloser, error) { return nil, wantErr }
 	defer func() { openTTY = restore }()
 
 	err := Run(path, RunOptions{Stdout: true})

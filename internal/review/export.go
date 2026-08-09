@@ -31,10 +31,18 @@ const maxQuoteLines = 6
 // "this thread is resolved" are independent signals, and the flag alone
 // justifies inclusion the same way it does for a block with no comments at
 // all.
-func exportReview(path string, doc []block, threads map[string]*thread, marks map[string]reviewMark, includeResolved bool) string {
+//
+// ephemeral marks a --stdin review: nothing was persisted, so the agent
+// instructions cannot point at thread files that will never exist — the agent
+// addresses the items against the source it already has instead.
+func exportReview(path string, doc []block, threads map[string]*thread, marks map[string]reviewMark, includeResolved, ephemeral bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Review of %s\n\n", path)
-	fmt.Fprintf(&b, "**Agent instructions:** to reply or resolve a thread, edit its markdown file in `.margin/threads/%s/<id>.md`. The anchor id is in parentheses in the block header. To resolve, add `resolved: true` to the frontmatter.\n\n", path)
+	if ephemeral {
+		fmt.Fprintf(&b, "**Agent instructions:** this review is of piped content — nothing was saved, and there are no thread files to reply in. Address each item against the source document and report back; the quote under each header identifies the block.\n\n")
+	} else {
+		fmt.Fprintf(&b, "**Agent instructions:** to reply or resolve a thread, edit its markdown file in `.margin/threads/%s/<id>.md`. The anchor id is in parentheses in the block header. To resolve, add `resolved: true` to the frontmatter.\n\n", path)
+	}
 
 	done, flagged, total, drafts, resolvedHidden := 0, 0, 0, 0, 0
 	for _, blk := range doc {
