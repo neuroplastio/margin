@@ -641,7 +641,7 @@ func TestLoadDoc(t *testing.T) {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	blocks, err := loadDoc(path)
+	blocks, _, err := loadDoc(path)
 	if err != nil {
 		t.Fatalf("loadDoc: %v", err)
 	}
@@ -649,7 +649,7 @@ func TestLoadDoc(t *testing.T) {
 		t.Fatal("loadDoc returned no blocks")
 	}
 
-	if _, err := loadDoc(filepath.Join(dir, "nope.md")); err == nil {
+	if _, _, err := loadDoc(filepath.Join(dir, "nope.md")); err == nil {
 		t.Error("loadDoc on a missing file returned no error")
 	}
 
@@ -657,7 +657,7 @@ func TestLoadDoc(t *testing.T) {
 	if err := os.WriteFile(empty, []byte("\n\n"), 0o644); err != nil {
 		t.Fatalf("write empty: %v", err)
 	}
-	if _, err := loadDoc(empty); err == nil {
+	if _, _, err := loadDoc(empty); err == nil {
 		t.Error("loadDoc on a document with no content returned no error")
 	}
 }

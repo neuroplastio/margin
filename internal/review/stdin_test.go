@@ -19,7 +19,7 @@ import (
 // no-op), not behavioural.
 
 func TestLoadDocFromParsesPipedMarkdown(t *testing.T) {
-	blocks, err := loadDocFrom(strings.NewReader(sampleDoc), "stdin")
+	blocks, _, err := loadDocFrom(strings.NewReader(sampleDoc), "stdin")
 	if err != nil {
 		t.Fatalf("loadDocFrom: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestLoadDocFromParsesPipedMarkdown(t *testing.T) {
 }
 
 func TestLoadDocFromNamesTheLabelInItsError(t *testing.T) {
-	_, err := loadDocFrom(strings.NewReader("\n\n"), "stdin")
+	_, _, err := loadDocFrom(strings.NewReader("\n\n"), "stdin")
 	if err == nil {
 		t.Fatal("loadDocFrom on empty input returned no error")
 	}

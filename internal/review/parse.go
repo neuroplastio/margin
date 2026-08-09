@@ -755,11 +755,13 @@ func anchorFor(b block) string {
 	return "^" + hex.EncodeToString(sum[:3])
 }
 
-// loadDoc reads and parses a markdown file.
-func loadDoc(path string) ([]block, error) {
+// loadDoc reads and parses a markdown file, returning the blocks and the
+// verbatim source they were parsed from — the raw view (the \ toggle) renders
+// the source, not the blocks, so the source has to be kept.
+func loadDoc(path string) ([]block, []byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer f.Close()
 	return loadDocFrom(f, path)
@@ -767,14 +769,14 @@ func loadDoc(path string) ([]block, error) {
 
 // loadDocFrom parses markdown read from r — a pipe, in --stdin mode — with
 // label standing in for a path in errors, since there is no file to name.
-func loadDocFrom(r io.Reader, label string) ([]block, error) {
+func loadDocFrom(r io.Reader, label string) ([]block, []byte, error) {
 	src, err := io.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	blocks := parseDoc(src)
 	if len(blocks) == 0 {
-		return nil, fmt.Errorf("%s has no reviewable content", label)
+		return nil, nil, fmt.Errorf("%s has no reviewable content", label)
 	}
-	return blocks, nil
+	return blocks, src, nil
 }

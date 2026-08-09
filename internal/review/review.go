@@ -114,9 +114,20 @@ type cursor struct {
 type model struct {
 	path    string
 	doc     []block
+	src     []byte
 	threads map[string]*thread
 	marks   map[string]reviewMark
 	entries []entry
+
+	// raw switches the view to the document's verbatim markdown source — the
+	// 2026-08-09 navigation-feature-requests "rich/raw mode toggle". Rendered
+	// view re-reads m.doc's blocks; raw view re-reads m.src, the exact bytes
+	// loadDoc/loadDocFrom produced (nil on a seed model, which has no source
+	// of its own — the toggle then reports "no raw source" rather than
+	// pretending). Focus and scroll survive the switch: the same entry stays
+	// focused and the viewport re-anchors to it, so toggling back and forth
+	// never loses the reader's place.
+	raw bool
 
 	// codeScroll stores horizontal scroll offsets (in visual columns) per code block anchor.
 	codeScroll map[string]int
@@ -296,7 +307,11 @@ func (m *model) rebuild() {
 		// RENDER-07 is where the "no interaction" guarantee lives — in
 		// commentable/markable, not in the entry list.
 		m.entries = append(m.entries, entry{b: b})
-		if t, ok := m.threads[b.anchor]; ok && b.anchor != "" {
+		// Raw view is the document's source, not the review of it: threads are
+		// conversation that lives in .margin files, so their rows are left out
+		// while raw is on — a thread row has no source lines for the focus bar
+		// to ride anyway.
+		if t, ok := m.threads[b.anchor]; ok && b.anchor != "" && !m.raw {
 			m.entries = append(m.entries, entry{
 				b:      block{kind: blockThread, anchor: b.anchor},
 				thread: t,
@@ -1643,11 +1658,123 @@ func (m *model) gutter(focused bool, hovered bool, selected bool, mark reviewMar
 	return bar + rule + " "
 }
 
+// renderRaw produces the raw source view: every line of m.src verbatim, one
+// rendered line per source line — no re-wrapping, no inline styling, no block
+// reconstruction. It is the "rich/raw mode toggle" of the 2026-08-09
+// navigation-feature-requests: the exact bytes loadDoc/loadDocFrom read, shown
+// as-is, so a reviewer can check the source of truth behind the render. The
+// gutter stays — the focus bar rides the focused block's source-line range and
+// the mark rule rides a marked block's — so focus, marks and selection all
+// keep their meaning in raw mode, and j/k still walk blocks. Threads are
+// conversation, not document, so rebuild() already leaves them out of entries
+// while raw is on. Search runs over these rendered lines like any others, so
+// "/" finds a string in the source too.
+func (m *model) renderRaw() []string {
+	m.spans = make([]span, len(m.entries))
+	m.subspans = map[cursor]span{}
+	m.paneLead = 0
+	for i := range m.spans {
+		m.spans[i] = span{start: -1, end: -1}
+	}
+
+	src := strings.TrimRight(string(m.src), "\n")
+	var srcLines []string
+	if src != "" {
+		srcLines = strings.Split(src, "\n")
+	}
+	lines := make([]string, len(srcLines))
+
+	// owner maps a source line to the entry whose block covers it, or -1 for
+	// a line no block claims (a blank separator, say). Each entry's span is
+	// its source-line range, so hit-testing and focus-following scroll work
+	// on the raw view exactly as they do on the rendered one.
+	owner := make([]int, len(srcLines))
+	for i := range owner {
+		owner[i] = -1
+	}
+	for i, e := range m.entries {
+		b := e.b
+		if b.line <= 0 || b.endLine < b.line {
+			continue
+		}
+		lo, hi := b.line-1, b.endLine-1
+		for n := lo; n <= hi && n < len(srcLines); n++ {
+			owner[n] = i
+		}
+		m.spans[i] = span{start: lo, end: hi}
+	}
+
+	selLo, selHi, sel := m.selectionRange()
+
+	for li, raw := range srcLines {
+		ei := owner[li]
+		focused := ei == m.at.entry
+		hovered := ei >= 0 && ei == m.hoveredEntry
+		selected := sel && ei >= selLo && ei <= selHi
+		var mark reviewMark
+		var partial bool
+		if ei >= 0 {
+			if m.entries[ei].b.kind == blockHeading {
+				mark, partial = rollUp(m.marksFor(m.sectionAnchors(ei)))
+			} else {
+				mark = m.marks[m.entries[ei].b.anchor]
+			}
+		}
+		text := raw
+		if selected {
+			text = selLine(text)
+		}
+		lines[li] = m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, partial) + text
+	}
+	return m.applySearch(lines)
+}
+
+// toggleRaw flips between the rendered document and its raw markdown source
+// (view.raw / `\`). Focus survives the switch by anchor, not index — rebuild
+// drops thread rows while raw is on, shifting entry indices, so the block
+// under focus is re-found by its anchor after the rebuild — and the viewport
+// re-anchors to it on the next render, so the reader stays where they were.
+// Any dive or visual selection is cancelled: raw mode has no line dive (the
+// lines are all visible already) and a selection measured in rendered entries
+// would shift under the rebuild.
+func (m *model) toggleRaw() {
+	if len(m.src) == 0 {
+		m.status = "no raw source for this document"
+		return
+	}
+	a := m.anchorAt()
+	m.raw = !m.raw
+	m.at.line = 0
+	m.at.comment = commentNone
+	m.visual = false
+	m.pendingKey = ""
+	m.rebuild()
+	if a != "" {
+		for i, e := range m.entries {
+			if e.b.anchor == a {
+				m.at = cursor{entry: i, comment: commentNone}
+				break
+			}
+		}
+	}
+	// Force clampScroll to re-anchor to the newly rebuilt focus on the next
+	// render rather than holding the old offset.
+	m.scrollAnchor = cursor{entry: -1, comment: commentNone}
+	if m.raw {
+		m.status = "raw source view — \\ toggles back"
+	} else {
+		m.status = "rendered view"
+	}
+}
+
 // render walks the block list once, producing the lines to draw plus the span
 // each entry and comment occupies. Doing it in one pass is what keeps
 // hit-testing, the cursor position and scrolling from drifting apart — deriving
 // any of them separately is how the cursor ended up a row off earlier.
 func (m *model) render() []string {
+	if m.raw {
+		return m.renderRaw()
+	}
 	w := m.contentWidth()
 	m.spans = make([]span, len(m.entries))
 	m.subspans = map[cursor]span{}
@@ -2068,7 +2195,11 @@ func (m *model) View() tea.View {
 		if flagged > 0 {
 			progress += fmt.Sprintf(" · %s", flagStyle.Render(fmt.Sprintf("%d flagged", flagged)))
 		}
-		b.WriteString(dimStyle.Render("j/k move · c comment · e edit · space mark · Y copy review · q quit   ") +
+		hint := "j/k move · c comment · e edit · space mark · Y copy review · q quit   "
+		if m.raw {
+			hint = "\\ rendered · j/k move · c comment · space mark · Y copy · q quit   "
+		}
+		b.WriteString(dimStyle.Render(hint) +
 			dimStyle.Render(progress))
 		if m.status != "" {
 			b.WriteString(dimStyle.Render("   " + m.status))
@@ -2783,6 +2914,7 @@ func Run(path string, opts RunOptions) error {
 
 	var doc []block
 	var err error
+	var src []byte
 	if opts.Stdin {
 		// A terminal on stdin means the reviewer typed `margin -` with no
 		// pipe — reading it would swallow keystrokes until EOF, then open a
@@ -2792,10 +2924,10 @@ func Run(path string, opts RunOptions) error {
 				return fmt.Errorf("run: --stdin expects markdown piped in; pass a file or pipe one (e.g. agent -p ... | margin -)")
 			}
 		}
-		doc, err = loadDocFrom(stdinReader, "stdin")
+		doc, src, err = loadDocFrom(stdinReader, "stdin")
 		path = "stdin"
 	} else {
-		doc, err = loadDoc(path)
+		doc, src, err = loadDoc(path)
 	}
 	if err != nil {
 		return err
@@ -2818,6 +2950,7 @@ func Run(path string, opts RunOptions) error {
 	}
 
 	m := newModelAt(path, doc, threads)
+	m.src = src
 	m.includeResolved = opts.IncludeResolved
 	m.ephemeral = opts.Stdin
 	if opts.WheelSpeed > 0 {

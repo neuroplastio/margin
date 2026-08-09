@@ -28,7 +28,7 @@ func AddComment(path, anchor, author, text string) (string, error) {
 	if strings.TrimSpace(text) == "" {
 		return "", fmt.Errorf("comment text is empty")
 	}
-	doc, err := loadDoc(path)
+	doc, _, err := loadDoc(path)
 	if err != nil {
 		return "", err
 	}
@@ -72,7 +72,7 @@ func AddComment(path, anchor, author, text string) (string, error) {
 // "flagged, needs attention": what the export carries is what is on disk, the
 // threads, which is exactly what an agent acts on.
 func Export(path string, includeResolved bool) (string, error) {
-	doc, err := loadDoc(path)
+	doc, _, err := loadDoc(path)
 	if err != nil {
 		return "", err
 	}

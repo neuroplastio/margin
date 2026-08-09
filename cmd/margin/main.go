@@ -41,7 +41,7 @@ attention, then copy the whole review out for whatever wrote the document.
 Keys:
   j/k     move                c  comment            space  cycle the mark
   g/G     top/bottom          e  edit               r/f    reviewed / flag
-  Y       copy the review     q  quit
+  \\      rendered/raw source Y  copy the review    q  quit
 
 On a heading, the mark keys apply to the whole section.
 

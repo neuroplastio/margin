@@ -26,7 +26,7 @@ func writeDocUnderRoot(t *testing.T, content string) (root, docPath string) {
 // anchor, mirroring how an agent would learn anchors from the export.
 func firstParagraphAnchor(t *testing.T, docPath string) string {
 	t.Helper()
-	doc, err := loadDoc(docPath)
+	doc, _, err := loadDoc(docPath)
 	if err != nil {
 		t.Fatalf("loadDoc: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestAddCommentWritesFileAnAgentCanRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadThreadsForDoc: %v", err)
 	}
-	doc, err := loadDoc(docPath)
+	doc, _, err := loadDoc(docPath)
 	if err != nil {
 		t.Fatalf("loadDoc: %v", err)
 	}

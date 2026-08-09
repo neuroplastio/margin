@@ -162,6 +162,9 @@ var commands = []command{
 			return t != nil && len(m.visibleComments(t)) > 0
 		},
 		Run: func(m *model, val string) tea.Cmd {
+			if m.raw {
+				return nil
+			}
 			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
 				m.scrollBlock(4)
 				return nil
@@ -180,6 +183,9 @@ var commands = []command{
 			return m.at.comment != commentNone || m.at.line != 0
 		},
 		Run: func(m *model, val string) tea.Cmd {
+			if m.raw {
+				return nil
+			}
 			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
 				m.scrollBlock(-4)
 				return nil
@@ -346,6 +352,20 @@ var commands = []command{
 		Description: "Copy the whole review to the clipboard",
 		Applicable:  func(m *model) bool { return true },
 		Run:         func(m *model, val string) tea.Cmd { return m.exportToClipboard() },
+	},
+	{
+		// view.raw toggles between the rendered document and the raw markdown
+		// source of the same file (2026-08-09 navigation-feature-requests,
+		// "rich/raw mode toggle"). `\` is the binding: unbound before this,
+		// on the keyboard's home row, and reading as "show me the raw" — the
+		// rejected candidates were `x` (vim's delete-char muscle memory) and
+		// `z` (vim's fold family). Focus and scroll survive the switch: the
+		// same entry stays focused and the viewport re-anchors to it, so the
+		// reader never loses their place toggling between the two views.
+		ID:          "view.raw",
+		Description: "Toggle between rendered and raw source view",
+		Applicable:  func(m *model) bool { return len(m.src) > 0 },
+		Run:         func(m *model, val string) tea.Cmd { m.toggleRaw(); return nil },
 	},
 	{
 		ID:          "app.quit",
@@ -530,5 +550,6 @@ var keymap = map[string]string{
 	"Y":  "review.export",
 	"m": "mark",
 	"s": "goto",
+	"\\": "view.raw",
 	"q": "app.quit", "ctrl+c": "app.quit",
 }

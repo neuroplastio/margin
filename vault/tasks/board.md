@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (<num>gg source-line navigation)
+Last updated: 2026-08-09 (rich/raw toggle)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -9,6 +9,9 @@ Last updated: 2026-08-09 (<num>gg source-line navigation)
   it and centring the viewport; `gg`/`G` alone stay first/last block. Digits
   echo as `line 42` in the status line and only the two jumps consume them —
   journal 2026-08-09.35
+- (feedback feature) rich/raw toggle: `\` switches between rendered and raw
+  source, focus preserved by anchor, scroll re-anchored, threads excluded,
+  l/h inert — journal 2026-08-09.36
 - (feedback fix) frontmatter reachable by keyboard: the frontmatter block is
   a focus stop now (g lands on it, j/k walk it, focus-follow scroll brings it
   back into view), and long fields scroll horizontally with h/l instead of an
@@ -90,11 +93,7 @@ Last updated: 2026-08-09 (<num>gg source-line navigation)
 
 ## In progress
 
-- [ ] **(feedback feature)** rich/raw mode toggle: `\` switches between the
-      rendered document and the raw markdown source of the same file (feature
-      2 of `vault/feedback/2026-08-09-navigation-feature-requests.md`); focus
-      stays on the same block, mapped to its source lines; scroll survives.
-      (agent-3, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -146,6 +145,21 @@ settled" section for what each still leaves open for a felt leg.
       `vault/feedback/2026-08-09-navigation-feature-requests.md`; the rich/raw
       toggle feature remains. `[felt]` — see journal 2026-08-09.35 — done
       2026-08-09
+- [x] **(feedback feature)** rich/raw mode toggle: `\` (`view.raw`) switches
+      between the rendered document and the raw markdown source of the same
+      file. Raw mode renders `m.src` verbatim — one rendered line per source
+      line, no re-wrapping, no inline styling — kept on the model because
+      `loadDoc`/`loadDocFrom` now return the source alongside the blocks. Each
+      block's span is its source-line range, so hit-testing, clicks, page keys
+      and focus-following scroll behave identically; the gutter (focus bar +
+      mark rule) rides the block's source lines. Focus survives the switch by
+      anchor — rebuild drops thread rows while raw is on, since threads are
+      conversation, not document — and the viewport re-anchors to it; visual
+      selection and dives are cancelled, `l`/`h` are inert. A seed model has no
+      source, so the toggle refuses with a status. Drains feature 3 of
+      `vault/feedback/2026-08-09-navigation-feature-requests.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-09.36 — done 2026-08-09
+
 - [x] **(feedback fix)** frontmatter keyboard reachability and horizontal
       scroll: the frontmatter block is a focus stop now — entry 0, so `g`/`j`
       land on it and focus-following scroll brings it back into view — and a
