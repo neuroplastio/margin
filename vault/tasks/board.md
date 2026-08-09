@@ -47,7 +47,13 @@ Last updated: 2026-08-09 (palette backspace cancels the palette)
 
 ## In progress
 
-*(none)*
+- **(feedback) sibling-section marking bug** `[mech]` — marking one header
+  section incorrectly marks all sibling headers: sections whose bodies are
+  byte-identical derive the same content anchor (`anchorFor` hashes kind +
+  text only), so a mark on one twin lands on all of them and every sibling
+  roll-up lights up. Drains the "Marking Bug (`ccd3fc`)" bullet of
+  `vault/feedback/2026-08-09-todo-review-feedback.md`. (claimed by toly,
+  2026-08-09)
 
 ## Backlog — M1
 
