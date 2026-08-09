@@ -76,7 +76,10 @@ Last updated: 2026-08-09 (composer background artifacts)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** CLI commands for agent automation: dedicated CLI
+      subcommands/flags so agents can programmatically extract comments and
+      add/append their own comments without driving the interactive TUI
+      (Anatoly Rugalev, 2026-08-09)
 
 ## Backlog — M1
 
