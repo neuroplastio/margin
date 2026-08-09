@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (CLI export for agent automation)
+Last updated: 2026-08-09 (<num>gg line-number navigation)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -86,6 +86,12 @@ Last updated: 2026-08-09 (CLI export for agent automation)
       truncation with code-block-style `h`/`l` horizontal scroll — drains
       `vault/feedback/2026-08-09-frontmatter-feedback.md`
       (agent, 2026-08-09)
+- [ ] **(feedback feature)** `<num>gg` / `<num>G` source-line navigation:
+      `42gg` and `42G` jump to the markdown source line 42 (vim's two
+      spellings of one motion), landing focus on the block that contains it;
+      `gg`/`G` alone stay first/last block. Digits buffer in the status line
+      and only `gg`/`G` consume them.
+      (agent-2, 2026-08-09)
 
 ## Backlog — M1
 
