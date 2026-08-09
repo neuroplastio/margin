@@ -47,7 +47,7 @@ On a heading, the mark keys apply to the whole section.
 
 The comment composer is a real nvim, so every key inside it belongs to nvim:
   ctrl+s / ctrl+enter / :wq   submit
-  esc esc / :q                close, keeping a draft
+  esc / :q                    close, keeping a draft
   :q!                         discard
 
 --stdout runs the review as usual, but writes it to stdout on quit instead of

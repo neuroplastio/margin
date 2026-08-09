@@ -99,7 +99,7 @@ func open(t *testing.T, m *model, anchor string, target int, expect string) {
 }
 
 // typeKeys sends keys with a gap short enough to stay inside nvim's timeoutlen,
-// so multi-key mappings like <Esc><Esc> and <leader>ck actually resolve.
+// so multi-key mappings like <leader>ck actually resolve.
 func typeKeys(c *composer, keys ...tea.Key) {
 	for _, k := range keys {
 		c.sendKey(k)
@@ -361,18 +361,70 @@ func TestColonQBangDiscards(t *testing.T) {
 	}
 }
 
+// TestDoubleEscapeKeepsDraft: a new comment opens in insert mode, so leaving it
+// takes two <Esc> — the first exits insert mode, the second is the exit itself
+// — and the unfinished text survives as a draft.
 func TestDoubleEscapeKeepsDraft(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
 	typeText(m.comp, "half a thought")
-	// The first <Esc> leaves insert mode; the next two trigger the mapping.
-	typeKeys(m.comp, keyEsc, keyEsc, keyEsc)
+	typeKeys(m.comp, keyEsc, keyEsc)
 
 	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeDraft {
 		t.Fatalf("outcome = %v, want draft", got)
 	}
 	if body := m.comp.body(); body != "half a thought" {
 		t.Fatalf("body = %q, want the unfinished text preserved", body)
+	}
+}
+
+// TestSingleEscapeDoesNotExitNewComment: one <Esc> from a new comment only
+// leaves insert mode. The composer must stay open — typing and reviewing is not
+// one keypress from closing — and a second <Esc> exits keeping the draft.
+func TestSingleEscapeDoesNotExitNewComment(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m.comp, "half a thought")
+
+	done := make(chan error, 1)
+	go func() { done <- m.comp.cmd.Wait() }()
+	typeKeys(m.comp, keyEsc)
+	select {
+	case err := <-done:
+		t.Fatalf("a single <Esc> exited the composer (%v); a new comment needs two", err)
+	case <-time.After(700 * time.Millisecond):
+	}
+	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
+		t.Fatalf("after one <Esc> the composer is in %s, want NORMAL", m.comp.mode())
+	}
+
+	typeKeys(m.comp, keyEsc)
+	select {
+	case err := <-done:
+		m.dismiss(err)
+	case <-time.After(10 * time.Second):
+		t.Fatalf("double <Esc> did not exit; screen:\n%s", plainScreen(m.comp.em))
+	}
+	if got := m.threads[freshAnchor].draft(newCommentSlot); got != "half a thought" {
+		t.Fatalf("draft = %q, want the unfinished text preserved", got)
+	}
+}
+
+// TestSingleEscapeExitsEdit: an edit opens in normal mode with the comment
+// already on screen, so there is nothing to finish — a single <Esc> exits,
+// keeping the change as a draft and leaving the posted comment untouched.
+func TestSingleEscapeExitsEdit(t *testing.T) {
+	m := newTestModel(t)
+	original := m.threads[convoAnchor].posted[0].body
+
+	open(t, m, convoAnchor, 0, "noisy neighbour")
+	typeKeys(m.comp, keyEsc)
+
+	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeDraft {
+		t.Fatalf("single <Esc> on an edit gave outcome %v, want draft", got)
+	}
+	if got := m.threads[convoAnchor].posted[0].body; got != original {
+		t.Fatalf("posted comment was mutated by an esc-exited edit: %q", got)
 	}
 }
 

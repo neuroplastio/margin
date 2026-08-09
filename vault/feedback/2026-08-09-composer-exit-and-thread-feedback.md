@@ -2,11 +2,6 @@
 
 From the maintainer, while reviewing the dive/comment flow (journal 2026-08-09.28):
 
-## Exit to normal mode should be `esc`, not vim's `:`-based exit
-- Exiting the embedded vim should be done by `esc` while in normal mode.
-- Creating a new comment: **double `esc`** exits the composer.
-- Editing an existing comment: **single `esc`** exits (no comment body to finish).
-
 ## Inserting after appending a line reference
 - When appending line numbers to the comment, start inserting immediately after
   the appended reference (no intermediate command-line step).

@@ -85,7 +85,7 @@ func TestHelpListsTheKeys(t *testing.T) {
 	}
 	// The help is the only place a new user learns the keys, so the ones that
 	// are not guessable have to be in it.
-	for _, key := range []string{"space", "Y", "esc esc", "ctrl+enter"} {
+	for _, key := range []string{"space", "Y", "esc", "ctrl+enter"} {
 		if !strings.Contains(out, key) {
 			t.Errorf("help does not mention %q:\n%s", key, out)
 		}

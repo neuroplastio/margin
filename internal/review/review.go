@@ -6,8 +6,8 @@
 // The load-bearing bet is that the editor is disposable. A composer is a live
 // child process; losing focus kills it, and the text survives as a draft keyed
 // by anchor and target. Regaining focus respawns nvim with the draft restored.
-// Blur and "esc esc" are therefore the same code path, so there is only ever one
-// persistence story.
+// Blur and pressing "esc" are therefore the same code path, so there is only
+// ever one persistence story.
 package review
 
 import (
@@ -1038,6 +1038,16 @@ func (m *model) reviewProgress() (done, flagged, total int) {
 }
 
 // --- composing --------------------------------------------------------------
+
+// escHint names the exit gesture in the composer footer. A new comment opens in
+// insert mode, so it takes double <Esc> — the first leaves insert mode, the
+// second exits; an edit opens in normal mode, so a single <Esc> exits.
+func escHint(target int) string {
+	if target == newCommentSlot {
+		return "esc esc keep"
+	}
+	return "esc keep"
+}
 
 // openComposer splices a live editor into a thread. target selects what is being
 // written: newCommentSlot for a reply, or the index of a posted comment to edit.
@@ -2170,7 +2180,7 @@ func (m *model) View() tea.View {
 			what = "editing comment"
 		}
 		b.WriteString(authorStyle.Render(m.comp.mode()) + dimStyle.Render(
-			"  "+what+"  ·  ctrl+s save · esc esc keep · SPC c k discard · click away to blur"))
+			"  "+what+"  ·  ctrl+s save · "+escHint(m.comp.target)+" · SPC c k discard · click away to blur"))
 	} else if m.paletteOpen {
 		b.WriteString(paletteBox)
 	} else if m.searchOpen {

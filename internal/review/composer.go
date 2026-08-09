@@ -106,8 +106,9 @@ vim.opt.spelllang = 'en_us'
 vim.opt.swapfile = false
 vim.opt.shadafile = 'NONE'
 
--- <Esc><Esc> is a pending-mapping prefix, so a lone <Esc> in normal mode waits
--- this long before resolving. Keep it short or leaving insert mode feels laggy.
+-- <leader> (space) prefixes the submit/draft/discard commands, so a lone
+-- <leader> in normal mode waits this long before resolving to nothing. Keep it
+-- short or a stray space feels laggy.
 vim.opt.timeoutlen = 250
 
 local function submit()
@@ -125,8 +126,8 @@ local function discard()
 end
 
 -- User commands give the host a deterministic way to dismiss the pane. Sending
--- <Esc><Esc> would work too, but only from normal mode; a command survives
--- whatever mode or pending state the editor happens to be in.
+-- <Esc> would work too, but only from normal mode; a command survives whatever
+-- mode or pending state the editor happens to be in.
 vim.api.nvim_create_user_command('MarginSubmit', function() submit() end, { bang = true })
 vim.api.nvim_create_user_command('MarginDiscard', function() discard() end, { bang = true })
 -- The bang variant exists so ':q!' abbreviates cleanly: the abbreviation fires
@@ -159,7 +160,12 @@ map({ 'n', 'i' }, '<C-s>', submit, { desc = 'submit comment' })
 map('i', '<C-BS>', '<C-W>', { desc = 'delete word before cursor' })
 map('i', '<M-BS>', '<C-W>', { desc = 'delete word before cursor' })
 map('n', 'ZZ', submit, { desc = 'submit comment' })
-map('n', '<Esc><Esc>', draft, { desc = 'close, keeping a draft' })
+-- <Esc> is the exit, and the double-esc rule falls out of where each composer
+-- opens. A new comment starts in insert mode, so the first <Esc> leaves insert
+-- mode and the second exits — "double <Esc>" — while an edit (which opens in
+-- normal mode, see the VimEnter callback below) exits on the first <Esc>.
+-- Either way the text is kept as a draft; discarding is still :q! or SPC c k.
+map('n', '<Esc>', draft, { desc = 'close, keeping a draft' })
 map('n', '<leader>cc', submit, { desc = 'submit comment' })
 map('n', '<leader>cd', draft, { desc = 'close, keeping a draft' })
 map('n', '<leader>ck', discard, { desc = 'discard comment' })
@@ -303,9 +309,11 @@ func (c *composer) mode() string {
 }
 
 // requestDraft asks the child to save and exit with the draft code. This is how
-// blur works: losing focus is the same outcome as pressing esc esc, so the host
+// blur works: losing focus is the same outcome as pressing esc, so the host
 // does not need a second persistence path. The leading <Esc> leaves insert or
-// visual mode first; the ex command then runs regardless of pending state.
+// visual mode first — and in normal mode it is itself the exit, since <Esc> is
+// mapped to draft. In the modes where it survives, the ex command then runs
+// regardless of pending state. Every path ends in the draft code.
 func (c *composer) requestDraft() {
 	c.em.SendText("\x1b:MarginDraft\r")
 }

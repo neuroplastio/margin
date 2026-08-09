@@ -38,7 +38,7 @@ no statusline, no line numbers, no `~` filler — so all ten rows are your words
 
 **The editor is disposable.** Losing focus kills the child process, and the text
 survives as a draft keyed to the block. Focus it again and nvim respawns exactly
-where you left off, mid-sentence. Blur and `esc esc` are the same code path, so
+where you left off, mid-sentence. Blur and `esc` are the same code path, so
 there is only ever one way for work to persist.
 
 **Comments anchor to blocks, not lines.** Line numbers do not survive an agent
@@ -118,7 +118,7 @@ Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 | Key | Does |
 | --- | --- |
 | `ctrl+s` / `ctrl+enter` / `ZZ` / `:wq` / `SPC c c` | Submit |
-| `esc esc` / `:q` / `SPC c d` | Close, keeping a draft |
+| `esc` (`esc esc` for a new comment) / `:q` / `SPC c d` | Close, keeping a draft |
 | `:q!` / `SPC c k` | Discard |
 
 `ctrl+\` and `ctrl+enter` are the only keys the host intercepts.

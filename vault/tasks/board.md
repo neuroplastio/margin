@@ -4,6 +4,11 @@ Last updated: 2026-08-09 (esc-based composer exit)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) esc-based composer exit: `<esc>` in normal mode closes the
+  composer keeping a draft — a new comment opens in insert mode so it takes
+  double `esc` (first leaves insert, second exits), an edit opens in normal
+  mode so a single `esc` exits; footer hints `esc esc keep` vs `esc keep` —
+  journal 2026-08-09.37
 - (feedback feature) `<num>gg` / `<num>G` source-line navigation: `42gg` and
   `42G` jump to markdown source line 42, landing on the block that contains
   it and centring the viewport; `gg`/`G` alone stay first/last block. Digits
@@ -93,14 +98,7 @@ Last updated: 2026-08-09 (esc-based composer exit)
 
 ## In progress
 
-- [ ] **(feedback fix)** esc-based composer exit: `<esc>` in normal mode
-      closes the composer keeping a draft. A new comment opens in insert mode,
-      so it takes double `<esc>` (the first leaves insert mode, the second
-      exits); an edit opens in normal mode, so a single `<esc>` exits. Replaces
-      `<Esc><Esc>` as the primary exit; `:q`/`:q!`/`SPC c d`/`SPC c k` stay as
-      the explicit gestures — drains the first item of
-      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`
-      (agent-4, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -136,6 +134,27 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** esc-based composer exit: `<esc>` in normal mode closes
+      the composer keeping a draft. One nvim mapping swap in `composerInit` —
+      `map('n', '<Esc><Esc>', draft)` becomes `map('n', '<Esc>', draft)` — and
+      the double-esc/single-esc split falls out of where each composer opens:
+      a new comment opens in insert mode, so the first `<esc>` leaves insert
+      mode and the second exits; an edit opens in normal mode, so a single
+      `<esc>` exits. The old `<Esc><Esc>` effectively needed three presses for
+      a new comment and made a lone normal-mode esc wait out `timeoutlen`; an
+      exact `<Esc>` mapping fires immediately. Draft stays the default outcome
+      (interaction.md's settled dismissal table); discard is still `:q!` /
+      `SPC c k`, and `:q` / `SPC c d` / `ZZ` / `<C-s>` / `<C-enter>` are
+      untouched. `blur` is unchanged and still one path (F7): its leading
+      `\x1b` is now itself the exit in normal mode, same `cquit 2`. The footer
+      hints split — `esc esc keep` under a new comment, `esc keep` under an
+      edit (`escHint`, review.go) — and the help/README text drops the
+      `<Esc><Esc>` spelling. Drains the first item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`; the
+      line-reference insertion, cursor-at-end, cancel-early-empty-thread,
+      unchanged-edit-draft and enter/esc dive items remain.
+      `[felt]` — see journal 2026-08-09.37 — done 2026-08-09
 
 - [x] **(feedback feature)** `<num>gg` / `<num>G` source-line navigation:
       `42gg` and `42G` jump to a 1-based markdown source line (vim's two
