@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-08-09 (frontmatter keyboard reachability)
+Last updated: 2026-08-09 (<num>gg source-line navigation)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) `<num>gg` / `<num>G` source-line navigation: `42gg` and
+  `42G` jump to markdown source line 42, landing on the block that contains
+  it and centring the viewport; `gg`/`G` alone stay first/last block. Digits
+  echo as `line 42` in the status line and only the two jumps consume them —
+  journal 2026-08-09.35
 - (feedback fix) frontmatter reachable by keyboard: the frontmatter block is
   a focus stop now (g lands on it, j/k walk it, focus-follow scroll brings it
   back into view), and long fields scroll horizontally with h/l instead of an
@@ -85,12 +90,7 @@ Last updated: 2026-08-09 (frontmatter keyboard reachability)
 
 ## In progress
 
-- [ ] **(feedback feature)** `<num>gg` / `<num>G` source-line navigation:
-      `42gg` and `42G` jump to the markdown source line 42 (vim's two
-      spellings of one motion), landing focus on the block that contains it;
-      `gg`/`G` alone stay first/last block. Digits buffer in the status line
-      and only `gg`/`G` consume them.
-      (agent-2, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -127,6 +127,21 @@ settled" section for what each still leaves open for a felt leg.
 
 ## Done
 
+- [x] **(feedback feature)** `<num>gg` / `<num>G` source-line navigation:
+      `42gg` and `42G` jump to a 1-based markdown source line (vim's two
+      spellings of one motion), landing focus on the first block whose source
+      range contains it — thread rows carry no line numbers, so a jump can
+      never land on one — and centring the block in the viewport with
+      `scrollAnchor` updated (the search jump's mechanics). Digits buffer in
+      the status line (`line 42`) and only `gg`/`G` consume them; any other
+      key clears the buffer and acts exactly as it would with no count typed
+      (`42j` is a plain `j`). Lines no block covers clamp to the nearest block
+      with a `no source line N — jumped to the nearest block` status; the
+      buffer caps at six digits. Counted `g` becomes a prefix waiting for its
+      second `g` instead of the eager first-block move. Drains feature 2 of
+      `vault/feedback/2026-08-09-navigation-feature-requests.md`; the rich/raw
+      toggle feature remains. `[felt]` — see journal 2026-08-09.35 — done
+      2026-08-09
 - [x] **(feedback fix)** frontmatter keyboard reachability and horizontal
       scroll: the frontmatter block is a focus stop now — entry 0, so `g`/`j`
       land on it and focus-following scroll brings it back into view — and a

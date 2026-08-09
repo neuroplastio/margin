@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,10 @@ const (
 	borderW    = 1
 	maxMeasure = 76 // the comfortable reading measure
 	footerRows = 2
+	// maxCountDigits caps the `<num>gg` digit buffer. Six digits reach line
+	// 999,999 — beyond any document margin will open — and stops a key-mash
+	// from growing an unbounded string.
+	maxCountDigits = 6
 )
 
 // damageMsg says the child wrote something, so the grid may have changed. It is
@@ -183,6 +188,14 @@ type model struct {
 	visual     bool
 	visualFrom int
 	pendingKey string
+
+	// count is the digit buffer for a `<num>gg` / `<num>G` source-line jump
+	// (the 2026-08-09 navigation-feature-requests feedback, feature 2):
+	// digits accumulate here and only the two line jumps consume it — vim's
+	// count is a modifier, it never acts alone, so any other key clears it and
+	// behaves exactly as it would with no count typed. "" means no count
+	// pending.
+	count string
 
 	paletteOpen     bool
 	paletteQuery    string
@@ -457,6 +470,69 @@ func (m *model) moveFocus(d int) {
 		j = len(m.entries) - 1
 	}
 	m.at = cursor{entry: j, comment: commentNone}
+}
+
+// gotoCount parses the `<num>gg` / `<num>G` digit buffer. The buffer is
+// always non-empty, digit-only and capped when called, so the error branch is
+// unreachable — it exists only because strconv.Atoi returns one.
+func gotoCount(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// jumpToLine moves focus to the first entry whose block contains source line
+// n (1-based), centring the block in the viewport like a search jump. "Line"
+// here is a line of the markdown source — the locator reviewers and agents
+// already use (L12-18 references, file:L<n> yanks) — not a rendered row,
+// which shifts with the terminal width. Thread rows carry no line numbers, so
+// a jump can never land on one. A line no block covers (a blank separator, or
+// one past the document) clamps to the nearest block, with a status line
+// saying so rather than silently landing somewhere unexpected.
+func (m *model) jumpToLine(n int) {
+	if len(m.entries) == 0 {
+		return
+	}
+	target, found := m.entryForSourceLine(n)
+	if found {
+		m.status = ""
+	} else {
+		m.status = fmt.Sprintf("no source line %d — jumped to the nearest block", n)
+	}
+	m.at = cursor{entry: target, comment: commentNone}
+	viewport := max(m.h-footerRows, 1)
+	if target >= 0 && target < len(m.spans) {
+		m.scroll = max(0, m.spans[target].start-viewport/2)
+	}
+	m.scrollAnchor = m.at
+}
+
+// entryForSourceLine returns the index of the first entry whose block spans
+// source line n, and whether one does. Line-less entries (thread rows) are
+// skipped — the jump targets document blocks only. When no block covers n — a
+// blank separator line, or a line before the first block (n < 1) — it returns
+// the first block strictly after n, or the last block when n is past the
+// document.
+func (m *model) entryForSourceLine(n int) (int, bool) {
+	after := -1
+	for i, e := range m.entries {
+		lo, hi := e.b.lineRange()
+		if lo <= 0 {
+			continue
+		}
+		if n >= lo && n <= hi {
+			return i, true
+		}
+		if after < 0 && lo > n {
+			after = i
+		}
+	}
+	if after >= 0 {
+		return after, false
+	}
+	return len(m.entries) - 1, false
 }
 
 // lineDiveRange returns the 1-based source-line range a line-dive would walk
@@ -1140,18 +1216,49 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	if m.visual && msg.String() == "esc" {
 		m.visual = false
 		m.pendingKey = ""
+		m.count = ""
 		return nil
+	}
+
+	// A digit starts or extends the pending `<num>gg` / `<num>G` count. It
+	// never runs a command by itself — vim's count is a modifier for the two
+	// line jumps and nothing else. The status line echoes the buffer so
+	// typing `42` is not dead: `line 42`.
+	if !m.visual {
+		if d := msg.String(); len(d) == 1 && d[0] >= '0' && d[0] <= '9' {
+			if len(m.count) < maxCountDigits {
+				m.count += d
+				m.status = "line " + m.count
+			}
+			// A digit is always consumed — one past the cap must not leak
+			// into the next key as an ordinary count-clearing press.
+			return nil
+		}
 	}
 
 	if m.pendingKey != "" {
 		pk := m.pendingKey
 		combo := pk + msg.String()
 		m.pendingKey = ""
+		// `42gg`: a count completes the g prefix into a source-line jump
+		// rather than the plain first-block move — the digit buffer was
+		// accumulating while the first g waited. A plain `gg` carries no
+		// count, so it falls through to the keymap lookup, where the bare
+		// first `g` has already run move.first.
+		if pk == "g" && msg.String() == "g" && m.count != "" {
+			m.jumpToLine(gotoCount(m.count))
+			m.count = ""
+			return nil
+		}
 		if id, ok := keymap[combo]; ok {
 			if cmd, ok := commandByID(id); ok {
+				m.count = ""
 				return cmd.Run(m, "")
 			}
 		}
+		// Any other key after g ends the pending count too — only gg/G
+		// consume it.
+		m.count = ""
 	}
 
 	// Every key margin recognises resolves to a command id via keymap and runs
@@ -1161,6 +1268,7 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	if msg.String() == ":" && m.comp == nil {
 		m.visual = false
 		m.pendingKey = ""
+		m.count = ""
 		m.paletteOpen = true
 		m.paletteQuery = ""
 		m.paletteSelected = 0
@@ -1169,6 +1277,7 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	if msg.String() == "/" && m.comp == nil {
 		m.visual = false
 		m.pendingKey = ""
+		m.count = ""
 		m.searchOpen = true
 		m.searchDraft = ""
 		m.searchCurrent = 0
@@ -1177,10 +1286,27 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 
 	id, ok := keymap[msg.String()]
 	if !ok {
+		// A count with no line jump after it clears — vim's count never acts
+		// alone, and the unbound key is still unbound.
+		m.count = ""
 		return nil
 	}
 	cmd, ok := commandByID(id)
 	if !ok {
+		return nil
+	}
+	// The count completes only on `gg` and `G` — `<num>gg` and `<num>G` are
+	// vim's two spellings of one motion, the source-line jump. A counted `g`
+	// becomes a prefix waiting for its second `g` instead of running the
+	// eager first-block move; a counted `G` jumps straight away.
+	if msg.String() == "g" && m.count != "" {
+		m.pendingKey = "g"
+		return nil
+	}
+	if msg.String() == "G" && m.count != "" {
+		m.jumpToLine(gotoCount(m.count))
+		m.count = ""
+		m.pendingKey = ""
 		return nil
 	}
 	if cmd.Values != nil {
@@ -1197,6 +1323,8 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	} else {
 		m.pendingKey = ""
 	}
+	// Only gg/G consume the count; any other command clears it.
+	m.count = ""
 	// Any command that is not movement or selection itself ends the
 	// selection — vim's rule — so there is no bookkeeping about which verbs
 	// keep a selection alive.

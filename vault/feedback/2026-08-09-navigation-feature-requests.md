@@ -5,7 +5,9 @@ All are felt legs. Order within this file is not priority — pick any unblocked
 one when draining, or split as the maintainer prefers.
 
 *(Feature 1, "`/` search with match highlighting", landed 2026-08-09 in the leg
-that built it — see journal 2026-08-09.32. What remains:)*
+that built it — see journal 2026-08-09.32. Feature 2, "`<num>gg` line-number
+navigation", landed 2026-08-09 in the leg that built it — see journal
+2026-08-09.35. What remains:)*
 
 ## 1. Line-number navigation with `<num>gg`
 
