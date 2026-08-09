@@ -156,7 +156,13 @@ make run
 ```
 
 Git identity: `Anatoly Rugalev <anatoly.rugalev@gmail.com>` (set repo-locally).
-End commit messages with the standard `Co-Authored-By` trailer.
+End every commit message with exactly `Co-Authored-By: Anatoly Rugalev
+<anatoly.rugalev@gmail.com>` and nothing else in the trailer block — never a
+tool's own platform identity. A `Co-Authored-By:` whose email belongs to
+anything other than the maintainer resolves on GitHub to whoever registered
+that email, and once falsely attributed a random user (shimoneator) as a
+co-author on four commits; see D8 and journal 2026-08-09. The trailer must be
+the maintainer's identity, verbatim.
 
 A stop hook in cloud sessions will flag this authorship and ask you to amend it.
 **Do not.** See D8 in `vault/knowledge/decisions.md`: the hook is a platform-side

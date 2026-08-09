@@ -113,7 +113,10 @@ rejected; that is what makes a correction cheap.
 
 ```bash
 git add -A
-git commit   # conventional prefix; end with the Co-Authored-By trailer
+git commit   # conventional prefix; end with exactly:
+             #   Co-Authored-By: Anatoly Rugalev <anatoly.rugalev@gmail.com>
+             # and nothing else in the trailer block — never a tool's own
+             # platform identity (see D8)
 git push
 ```
 

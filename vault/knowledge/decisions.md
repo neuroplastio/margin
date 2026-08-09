@@ -49,6 +49,12 @@ doubt about an edge case, keep.
 including those an unsupervised run produces. Agent involvement is disclosed with
 `Co-Authored-By:`, and an autonomous run additionally carries
 `Claude-Session: <url>` so any commit can be traced to the session that made it.
+The `Co-Authored-By:` trailer is **always** exactly
+`Co-Authored-By: Anatoly Rugalev <anatoly.rugalev@gmail.com>`, never a tool's
+own platform identity: GitHub resolves trailer emails to whoever registered
+them, and on 2026-08-09 a `Co-Authored-By: Antigravity
+<antigravity@google.com>` falsely attributed four commits to a random user
+(shimoneator). See journal 2026-08-09.11.
 
 Rationale: the author line names who is accountable for the change, which is the
 maintainer in every case — they set the goals, wrote the constraints, and review
