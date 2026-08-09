@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (composer background artifacts)
+Last updated: 2026-08-09 (CLI comment add for agent automation)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -76,10 +76,7 @@ Last updated: 2026-08-09 (composer background artifacts)
 
 ## In progress
 
-- [ ] **(feedback fix)** CLI commands for agent automation: dedicated CLI
-      subcommands/flags so agents can programmatically extract comments and
-      add/append their own comments without driving the interactive TUI
-      (Anatoly Rugalev, 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -115,6 +112,21 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** CLI comment add for agent automation: new `margin
+      comment add FILE.md --anchor ^abc --text "..." [--author agent]`
+      subcommand appends a comment to a thread without driving the TUI —
+      `review.AddComment` resolves the root, finds the block by anchor, and
+      writes through the same `writeThreadFile`/`marshalThread` the TUI uses,
+      so the thread file is byte-identical to one a reviewer typed. The anchor
+      must name a commentable block that exists (stale exports fail loudly,
+      not silently), accepts with or without the leading `^`, and `--author`
+      defaults to the OS user. Drains the add/append half of the "CLI Commands
+      for Agent Automation" bullet of
+      `vault/feedback/2026-08-09-additional-ux-and-cli-feedback.md`; the
+      extract half stays as a residual (already served by `--stdout` and the
+      plain-markdown thread files per D5). `[mech]` — see journal
+      2026-08-09.31 — done 2026-08-09
 
 - [x] **(feedback fix)** composer background artifacts: nvim's default
       colorscheme paints `Normal` with its own dark background

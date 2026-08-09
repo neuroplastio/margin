@@ -15,15 +15,16 @@ import (
 var version = "dev"
 
 func main() {
-	if err := newRootCmd(review.Run).Execute(); err != nil {
+	if err := newRootCmd(review.Run, review.AddComment, review.DefaultAuthor).Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-// newRootCmd builds the margin command tree. It takes the runner as an argument
-// and is a function rather than a package var so tests can construct an isolated
-// command with its own I/O, args, and a runner that does not open a terminal.
-func newRootCmd(run func(path string, opts review.RunOptions) error) *cobra.Command {
+// newRootCmd builds the margin command tree. It takes the runner and the
+// non-interactive command handlers as arguments and is a function rather than a
+// package var so tests can construct an isolated command with its own I/O,
+// args, and handlers that do not open a terminal or touch disk.
+func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), defaultAuthor func() string) *cobra.Command {
 	var stdout bool
 	var includeResolved bool
 	var stdin bool
@@ -102,5 +103,57 @@ a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).`,
 	root.Flags().BoolVar(&stdin, "stdin", false, "read the document from stdin for an ephemeral review: nothing is saved, and the review is printed on quit (implies --stdout)")
 	root.Flags().IntVar(&wheelSpeed, "wheel-speed", 0, "lines one mouse wheel tick scrolls (default 3)")
 	root.SetVersionTemplate("margin {{.Version}}\n")
+	root.AddCommand(newCommentCmd(addComment, defaultAuthor))
 	return root
+}
+
+// newCommentCmd builds the `margin comment` subcommand tree: the
+// non-interactive half of the review loop. An agent appends a reply here
+// without driving the TUI — the same thread file the interface would have
+// written — so the reviewer sees it on next open (or live, via the watcher).
+func newCommentCmd(addComment func(path, anchor, author, text string) (string, error), defaultAuthor func() string) *cobra.Command {
+	var anchor, author, text string
+
+	add := &cobra.Command{
+		Use:   "add FILE.md",
+		Short: "Append a comment to the thread on a block",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Silenced here rather than on the command: getting the invocation
+			// wrong still prints usage (cobra's MarkFlagRequired handles the
+			// missing --anchor/--text cases), while a missing block or a
+			// failing write is a runtime error that should not bury its
+			// message under the help text.
+			cmd.SilenceUsage = true
+			if author == "" {
+				if defaultAuthor != nil {
+					author = defaultAuthor()
+				} else {
+					author = "agent"
+				}
+			}
+			path, err := addComment(args[0], anchor, author, text)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "commented on %s\n", path)
+			return nil
+		},
+	}
+	add.Flags().StringVar(&anchor, "anchor", "", "block id to comment on (^abc)")
+	add.Flags().StringVar(&text, "text", "", "comment body")
+	add.Flags().StringVar(&author, "author", "", "who the comment is from (default: the current user)")
+	if err := add.MarkFlagRequired("anchor"); err != nil {
+		panic(err)
+	}
+	if err := add.MarkFlagRequired("text"); err != nil {
+		panic(err)
+	}
+
+	cmd := &cobra.Command{
+		Use:   "comment",
+		Short: "Read and write comments without opening the interface",
+	}
+	cmd.AddCommand(add)
+	return cmd
 }

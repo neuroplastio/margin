@@ -83,6 +83,19 @@ agent -p "draft a plan" | margin - | agent -p "address this review"
 The mouse wheel scrolls the document three lines per tick. `--wheel-speed N`
 sets a different step size (`--wheel-speed 1` for fine-grained scrolling).
 
+### Agent automation
+
+An agent can also write into a review without driving the interface — the same
+thread file the reviewer would have written:
+
+```
+margin comment add spec.md --anchor ^abc123 --text "fixed in rev 3" --author agent
+```
+
+The anchor is the `(^id)` shown in a block's export header. `--author` defaults
+to the current user. The reply appears on the reviewer's next open (or live, via
+the file watcher).
+
 The export leaves resolved threads out by default — it's a list of what still
 needs doing, not a transcript of everything ever said. Pass `--include-resolved`
 (with `Y` or `--stdout` alike) to get the full history back, including what

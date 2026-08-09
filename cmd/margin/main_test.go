@@ -9,14 +9,14 @@ import (
 	"github.com/neuroplastio/margin/internal/review"
 )
 
-// exec runs the root command with args and a stub runner, capturing its output.
+// exec runs the root command with args and stub handlers, capturing its output.
 func exec(t *testing.T, run func(string, review.RunOptions) error, args ...string) (string, error) {
 	t.Helper()
 	if run == nil {
 		run = func(string, review.RunOptions) error { return nil }
 	}
 	var out bytes.Buffer
-	root := newRootCmd(run)
+	root := newRootCmd(run, nil, nil)
 	root.SetOut(&out)
 	root.SetErr(&out)
 	root.SetArgs(args)
@@ -262,5 +262,119 @@ func TestHelpMentionsWheelSpeed(t *testing.T) {
 	}
 	if !strings.Contains(out, "--wheel-speed") {
 		t.Errorf("help does not mention --wheel-speed:\n%s", out)
+	}
+}
+
+// --- comment add -------------------------------------------------------------
+
+// execComment runs `comment add` with a stub AddComment handler, capturing the
+// arguments it received and the output.
+func execComment(t *testing.T, args []string) (path, anchor, author, text string, out string, err error) {
+	t.Helper()
+	var gotP, gotA, gotAuthor, gotT string
+	addComment := func(p, a, au, tx string) (string, error) {
+		gotP, gotA, gotAuthor, gotT = p, a, au, tx
+		return "/root/.margin/threads/doc.md/x.md", nil
+	}
+	var buf bytes.Buffer
+	root := newRootCmd(nil, addComment, nil)
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs(args)
+	err = root.Execute()
+	return gotP, gotA, gotAuthor, gotT, buf.String(), err
+}
+
+func TestCommentAddReachesTheHandler(t *testing.T) {
+	path, anchor, author, text, _, err := execComment(t,
+		[]string{"comment", "add", "spec.md", "--anchor", "^abc123", "--text", "reply text", "--author", "agent"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if path != "spec.md" || anchor != "^abc123" || author != "agent" || text != "reply text" {
+		t.Errorf("handler got (%q, %q, %q, %q), want (spec.md, ^abc123, agent, reply text)", path, anchor, author, text)
+	}
+}
+
+func TestCommentAddDefaultsAuthorToCurrentUser(t *testing.T) {
+	_, _, author, _, _, err := execComment(t,
+		[]string{"comment", "add", "spec.md", "--anchor", "^abc", "--text", "no author given"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if author == "" {
+		t.Error("author is empty without --author, want a default")
+	}
+}
+
+func TestCommentAddRequiresAnchor(t *testing.T) {
+	_, _, _, _, out, err := execComment(t, []string{"comment", "add", "spec.md", "--text", "no anchor"})
+	if err == nil {
+		t.Fatal("comment add without --anchor reported success")
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("misuse did not show usage:\n%s", out)
+	}
+}
+
+func TestCommentAddRequiresText(t *testing.T) {
+	_, _, _, _, out, err := execComment(t, []string{"comment", "add", "spec.md", "--anchor", "^abc"})
+	if err == nil {
+		t.Fatal("comment add without --text reported success")
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("misuse did not show usage:\n%s", out)
+	}
+}
+
+func TestCommentAddRequiresAFile(t *testing.T) {
+	_, _, _, _, out, err := execComment(t, []string{"comment", "add", "--anchor", "^abc", "--text", "hi"})
+	if err == nil {
+		t.Fatal("comment add without a file reported success")
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("misuse did not show usage:\n%s", out)
+	}
+}
+
+func TestCommentAddPrintsWhereItLanded(t *testing.T) {
+	_, _, _, _, out, err := execComment(t,
+		[]string{"comment", "add", "spec.md", "--anchor", "^abc", "--text", "hi"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, "/root/.margin/threads/doc.md/x.md") {
+		t.Errorf("output does not name the thread file:\n%s", out)
+	}
+}
+
+func TestCommentAddSurfacesRuntimeError(t *testing.T) {
+	addComment := func(string, string, string, string) (string, error) {
+		return "", errors.New("no commentable block with anchor ^abc in spec.md")
+	}
+	var buf bytes.Buffer
+	root := newRootCmd(nil, addComment, nil)
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"comment", "add", "spec.md", "--anchor", "^abc", "--text", "hi"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("a failing add reported success")
+	}
+	if !strings.Contains(buf.String(), "no commentable block") {
+		t.Errorf("the actual error is missing:\n%s", buf.String())
+	}
+	if strings.Contains(buf.String(), "Usage:") {
+		t.Errorf("runtime error printed the usage block:\n%s", buf.String())
+	}
+}
+
+func TestHelpMentionsCommentAdd(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "comment") {
+		t.Errorf("help does not mention the comment subcommand:\n%s", out)
 	}
 }
