@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (composer edit cursor-at-end)
+Last updated: 2026-08-09 (claim cancel-early-empty-thread)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -107,7 +107,12 @@ Last updated: 2026-08-09 (composer edit cursor-at-end)
 
 ## In progress
 
-*(none)*
+- [ ] **(feedback fix)** cancel-early empty thread: `c` on a thread-less block
+      opens the composer via `ensureThread`, which creates an empty thread;
+      cancelling before anything is committed leaves it showing "no comments
+      yet". Drains the cancel-early item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md` (two
+      items remain: unchanged-edit draft, enter/esc dive bindings).
 
 ## Backlog — M1
 
