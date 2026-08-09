@@ -63,7 +63,7 @@ Last updated: 2026-08-09 (focus retained on comment exit)
 
 ## In progress
 
-*(none)*
+- (feedback fix) palette visual separation & hover visibility (Antigravity 2026-08-09)
 
 ## Backlog — M1
 
