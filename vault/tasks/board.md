@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-09 (thread dive navigation)
+Last updated: 2026-08-09 (composer modified keys)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -57,7 +57,19 @@ Last updated: 2026-08-09 (thread dive navigation)
 
 ## In progress
 
-*(none)*
+- **(feedback) composer modified-key forwarding** `[mech]` — the composer
+  silently drops (or mangles into a bare ESC) every modified key vt's SendKey
+  has no explicit case for: ctrl+backspace, ctrl+shift+letter, shift+enter,
+  ctrl+delete, and any alt combo carrying a second modifier (the bare ESC is
+  what drops nvim into normal mode "unexpectedly"). Encode those ourselves —
+  xterm forms for navigation/function keys, CSI-u for everything else —
+  verified against a real nvim, and map `<C-BS>` to `<C-W>` in the composer
+  so the newly-delivered key does what hands expect. Drains the "vim mode
+  key combos" bullet of
+  `vault/feedback/2026-08-09-todo-review-feedback.md`; the file's other
+  bullets (multi-line block dive residue, .margin location, palette
+  separation, J/K scroll, wheel speed, hover visibility) stay for future
+  legs. (claimed by toly, 2026-08-09)
 
 ## Backlog — M1
 
