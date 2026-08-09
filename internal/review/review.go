@@ -143,6 +143,10 @@ type model struct {
 	quitting     bool
 	confirmDelete bool // true when the user must press the delete key again
 
+	paletteOpen     bool
+	paletteQuery    string
+	paletteSelected int
+
 	spans    []span
 	subspans map[cursor]span // comment-level spans of the expanded thread
 	paneTop  int             // line index of the first emulator row; -1 when idle
@@ -677,6 +681,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.handleClick(msg.Mouse())
 
 	case tea.KeyPressMsg:
+		if m.paletteOpen {
+			return m, m.handlePaletteKey(msg)
+		}
 		if m.confirmDelete {
 			id, ok := keymap[msg.String()]
 			if !ok || id != "thread.delete" {
@@ -712,6 +719,13 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	// through that command's Run — see command.go. handleKey itself carries no
 	// verb-specific behaviour, so a future palette invoking the same command
 	// id is guaranteed to do exactly what the key does.
+	if msg.String() == ":" && m.comp == nil {
+		m.paletteOpen = true
+		m.paletteQuery = ""
+		m.paletteSelected = 0
+		return nil
+	}
+
 	id, ok := keymap[msg.String()]
 	if !ok {
 		return nil
@@ -721,6 +735,54 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 	return cmd.Run(m)
+}
+
+func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.paletteOpen = false
+		m.paletteQuery = ""
+		return nil
+	case "enter":
+		cmds := matchCommands(commands, m.paletteQuery)
+		rows := paletteRows(m, cmds)
+		if len(rows) > 0 && m.paletteSelected >= 0 && m.paletteSelected < len(rows) {
+			cmd := rows[m.paletteSelected].Command
+			m.paletteOpen = false
+			m.paletteQuery = ""
+			return cmd.Run(m)
+		}
+		return nil
+	case "up", "ctrl+k":
+		m.paletteSelected--
+		if m.paletteSelected < 0 {
+			m.paletteSelected = 0
+		}
+		return nil
+	case "down", "ctrl+j", "tab":
+		cmds := matchCommands(commands, m.paletteQuery)
+		rows := paletteRows(m, cmds)
+		m.paletteSelected++
+		if m.paletteSelected >= len(rows) {
+			m.paletteSelected = len(rows) - 1
+			if m.paletteSelected < 0 {
+				m.paletteSelected = 0
+			}
+		}
+		return nil
+	case "backspace":
+		if len(m.paletteQuery) > 0 {
+			m.paletteQuery = m.paletteQuery[:len(m.paletteQuery)-1]
+			m.paletteSelected = 0
+		}
+		return nil
+	default:
+		if len(msg.String()) == 1 {
+			m.paletteQuery += msg.String()
+			m.paletteSelected = 0
+		}
+		return nil
+	}
 }
 
 // editFocused opens whatever the focus is sitting on for editing: a posted
@@ -1135,7 +1197,14 @@ func (m *model) View() tea.View {
 		m.paneW = m.contentWidth() - 2*borderW
 	}
 
-	viewport := max(m.h-footerRows, 1)
+	var paletteBox string
+	paletteHeight := 0
+	if m.paletteOpen {
+		paletteBox = m.renderPalette(m.w)
+		paletteHeight = strings.Count(paletteBox, "\n") + 1
+	}
+
+	viewport := max(m.h-footerRows-paletteHeight, 1)
 	m.scroll = m.clampScroll(len(lines), viewport)
 	visible := lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
 
@@ -1149,6 +1218,8 @@ func (m *model) View() tea.View {
 		}
 		b.WriteString(authorStyle.Render(m.comp.mode()) + dimStyle.Render(
 			"  "+what+"  ·  ctrl+s save · esc esc keep · SPC c k discard · click away to blur"))
+	} else if m.paletteOpen {
+		b.WriteString(paletteBox)
 	} else {
 		done, flagged, total := m.reviewProgress()
 		progress := fmt.Sprintf("%d/%d reviewed", done, total)
@@ -1743,4 +1814,43 @@ func Run(path string, opts RunOptions) error {
 		}
 	}
 	return nil
+}
+
+func (m *model) renderPalette(w int) string {
+	cmds := matchCommands(commands, m.paletteQuery)
+	rows := paletteRows(m, cmds)
+	
+	if m.paletteSelected >= len(rows) {
+		m.paletteSelected = max(0, len(rows)-1)
+	}
+	if m.paletteSelected < 0 {
+		m.paletteSelected = 0
+	}
+
+	var b strings.Builder
+	
+	showCount := 7
+	start := 0
+	if m.paletteSelected >= showCount {
+		start = m.paletteSelected - showCount + 1
+	}
+	end := start + showCount
+	if end > len(rows) {
+		end = len(rows)
+	}
+
+	for i := start; i < end; i++ {
+		row := rows[i]
+		cursor := "  "
+		style := dimStyle
+		if i == m.paletteSelected {
+			cursor = focusStyle.Render("▌ ")
+			style = textStyle
+		}
+		b.WriteString(cursor + style.Render(row.Command.ID) + dimStyle.Render(" — "+row.Title) + "\n")
+	}
+	
+	b.WriteString(focusStyle.Render(":") + m.paletteQuery + focusStyle.Render("█"))
+	
+	return lipgloss.NewStyle().Width(w).Render(b.String())
 }
