@@ -1,9 +1,10 @@
 # Board
 
-Last updated: 2026-08-09 (focus retained on comment exit)
+Last updated: 2026-08-09 (palette visual separation & hover visibility)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) palette visual separation & hover visibility: dim horizontal rule ─ above command palette, hover indicator color brightened to 248 for clear visibility — journal 2026-08-09.24
 - (feedback fix) focus retained on comment exit: exiting composer leaves focus on the comment so pressing e immediately re-edits it — journal 2026-08-09.23
 - (feedback fix) line/range prepending in comments & yank reference: commenting
   (`c`) with visual selection prepends `L12-18: ` / `L12: ` to comment draft; `gy` / `yr` /
@@ -63,7 +64,7 @@ Last updated: 2026-08-09 (focus retained on comment exit)
 
 ## In progress
 
-- (feedback fix) palette visual separation & hover visibility (Antigravity 2026-08-09)
+*(none)*
 
 ## Backlog — M1
 
@@ -99,6 +100,12 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** palette visual separation & hover visibility: prepends
+      dim horizontal rule `─` to command palette and brightens mouse hover indicator
+      color to 248 (`hoverStyle`). Drains the "Visual Separation" and "Mouse Hover
+      Visibility" bullets in `vault/feedback/2026-08-09-todo-review-feedback.md`.
+      `[felt]` — see journal 2026-08-09.24 — done 2026-08-09
 
 - [x] **(feedback fix)** focus retained on comment exit: exiting composer (`dismiss`)
       leaves focus (`m.at.comment`) on the newly posted or edited comment so

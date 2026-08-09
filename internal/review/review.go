@@ -1327,7 +1327,7 @@ var (
 	authorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	draftStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
 	focusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	hoverStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("239"))
+	hoverStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("248"))
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	flagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("209"))
 	reviewedTxt = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -2450,6 +2450,7 @@ func (m *model) renderPalette(w int) string {
 	}
 
 	var b strings.Builder
+	b.WriteString(dimStyle.Render(strings.Repeat("─", w)) + "\n")
 	
 	showCount := 7
 	start := 0

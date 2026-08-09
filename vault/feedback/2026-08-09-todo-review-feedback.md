@@ -16,6 +16,8 @@ legacy meta form instead of collapsing to a bare ESC), and the composer binds
 changing focus (`m.at`). The .margin directory location landed in journal
 2026-08-09.21 — `resolveReviewRoot` locates the project root via `.git`/`.margin`
 anchor so `.margin` lands in the project root with `docPath` relative to it.
+Palette visual separation and mouse hover indicator visibility landed in journal
+2026-08-09.24 — dim horizontal rule `─` above palette, hover indicator color brightened to 248.
 What remains:)*
 
 ## 1. THREAD-04 — Delete Thread & Thread UX
@@ -27,10 +29,8 @@ What remains:)*
 
 ## 3. CMD-03 & CMD-05 — Command Palette UI & Staged Commands
 - **Palette Position & Size:** Bottom position and 7-item limit are both approved.
-- **Visual Separation:** Main document rendering is fine, but extra visual separation between palette and document wouldn't hurt.
 - **Staged Commands UX (`m`/`s`):** Seeding via `m` and `s` keys is good enough for now.
 
 ## 4. SCROLL-02, SCROLL-03, SCROLL-04 — Scrolling & Mouse Interactions
 - **Focus & Viewport Separation:** Separating focus and scrolling is approved ("perfect").
 - **Mouse Wheel Speed:** Mouse wheel speed (3 lines per tick) should be tunable.
-- **Mouse Hover Visibility (`SCROLL-04`):** The dim hover indicator `▌` is not visible enough—feels like it's not working.

@@ -1,6 +1,7 @@
 package review
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -342,3 +343,15 @@ func TestPaletteBackspaceInValueStageDeletesThenCancels(t *testing.T) {
 		t.Error("backspace at the bare seed left the palette open, want it cancelled")
 	}
 }
+
+// TestRenderPaletteIncludesVisualSeparator pins the todo-review feedback:
+// palette rendering includes a dim horizontal rule at top for visual
+// separation from document prose.
+func TestRenderPaletteIncludesVisualSeparator(t *testing.T) {
+	m := newTestModel(t)
+	out := m.renderPalette(80)
+	if !strings.Contains(out, "─") {
+		t.Errorf("renderPalette output did not contain top separator rule '─', got:\n%s", out)
+	}
+}
+
