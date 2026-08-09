@@ -608,12 +608,12 @@ func TestParseUnterminatedFrontmatterIsNotSwallowed(t *testing.T) {
 }
 
 // TestParsedFrontmatterRendersDimmedAndDoesNotCrash is the render half of
-// RENDER-07: frontmatter now draws as a dimmed key/value block ahead of the
-// document (see renderFrontmatter), so its fields are expected in the
-// output — but it must still never reach m.entries (no focus stop, no
-// comments, no mark) and must not hit the default branch of the render
-// switch, which is built for a thread entry and would misbehave given a
-// bare block.
+// RENDER-07: frontmatter draws as a dimmed key/value block ahead of the
+// document (see renderFrontmatterFields). Since the 2026-08-09 frontmatter
+// feedback it is also a focus stop — entry 0, so g/j can land on it — while
+// staying uncommentable and unmarkable through commentable()/markable(). The
+// old guarantee (never in m.entries) has moved from the entry list to those
+// two methods.
 func TestParsedFrontmatterRendersDimmedAndDoesNotCrash(t *testing.T) {
 	m := newModel(parseDoc([]byte(frontmatterDoc)), nil)
 	m.w, m.h = 100, 60
@@ -626,10 +626,11 @@ func TestParsedFrontmatterRendersDimmedAndDoesNotCrash(t *testing.T) {
 	if !strings.Contains(joined, "Retry policy") {
 		t.Error("real heading did not render")
 	}
-	for _, e := range m.entries {
-		if e.b.kind == blockFrontmatter {
-			t.Error("a frontmatter block reached m.entries; it should be filtered in rebuild")
-		}
+	if len(m.entries) == 0 || m.entries[0].b.kind != blockFrontmatter {
+		t.Fatalf("frontmatter is not a focus stop: entry 0 kind = %v, want blockFrontmatter (the 2026-08-09 frontmatter feedback)", m.entries[0].b.kind)
+	}
+	if b := m.entries[0].b; b.commentable() || b.markable() {
+		t.Errorf("frontmatter became commentable/markable (commentable=%v markable=%v); it is metadata and must stay inert", b.commentable(), b.markable())
 	}
 }
 

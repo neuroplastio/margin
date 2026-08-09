@@ -13,10 +13,10 @@
 //
 // What is searched is deliberate: document blocks and the thread boxes under
 // them (a comment's words are part of the review surface). The frontmatter is
-// metadata about the document, excluded exactly as it is from comments, marks
-// and rebuild — the same call, so it cannot be jumped to, and it is not
-// searched. Each match carries the entry whose span owns its line, so Enter
-// lands focus on a real block.
+// metadata about the document — reachable by keyboard since the 2026-08-09
+// frontmatter feedback (g/j land on it), but still not a search target, the
+// same way it is not commentable or markable. Each match carries the entry
+// whose span owns its line, so Enter lands focus on a real block.
 package review
 
 import (
@@ -170,8 +170,9 @@ func (m *model) activeQuery() string {
 // applySearch recomputes m.searchMatches over the rendered lines and paints
 // the matched runs, running at the end of render so the list and the highlight
 // always describe the same screen. Lines outside any entry's span — the
-// frontmatter, inter-block blanks — take no part: not highlighted, not
-// navigable, the same exclusion rebuild applies to the frontmatter. searchCurrent
+// inter-block blanks — take no part, and lines owned by the frontmatter entry
+// are skipped by the same "metadata is not part of the document" call that
+// keeps it out of comments and marks: not highlighted, not navigable. searchCurrent
 // is clamped to whatever survived, so a narrower query cannot leave n/N
 // pointing past the list.
 func (m *model) applySearch(lines []string) []string {
@@ -183,6 +184,14 @@ func (m *model) applySearch(lines []string) []string {
 	for li, l := range lines {
 		entry, ok := m.entryForLine(li)
 		if !ok {
+			continue
+		}
+		if m.entries[entry].b.kind == blockFrontmatter {
+			// Frontmatter is metadata, not part of the document: it is a
+			// focus stop now (g/j can land on it, the 2026-08-09 frontmatter
+			// feedback), but it stays out of comments, marks and search the
+			// same way it always has — searching it would make "/" jump to
+			// YAML fields no query about the prose is looking for.
 			continue
 		}
 		styled, ranges := highlightSearch(l, q)
@@ -204,7 +213,8 @@ func (m *model) applySearch(lines []string) []string {
 }
 
 // entryForLine returns the entry whose rendered span owns line li, or ok=false
-// for a line no entry spans (frontmatter, the trailing blank).
+// for a line no entry spans (the trailing blank). The frontmatter is an entry
+// now and its lines resolve here; applySearch filters them out explicitly.
 func (m *model) entryForLine(li int) (int, bool) {
 	for i, s := range m.spans {
 		if li >= s.start && li <= s.end {

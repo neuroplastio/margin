@@ -826,31 +826,105 @@ func TestTableColumnWidthsLeavesRoomWhenItFits(t *testing.T) {
 	}
 }
 
-// TestRenderFrontmatterTruncatesLongFields confirms a field wider than the
-// measure is truncated with an ellipsis rather than wrapped or overflowing —
-// frontmatter is key: value pairs, not prose, so a wrapped continuation line
-// would misleadingly read as a second field.
-func TestRenderFrontmatterTruncatesLongFields(t *testing.T) {
-	b := block{kind: blockFrontmatter, text: "---\ndescription: " + strings.Repeat("x", 80) + "\n---"}
-	lines := renderFrontmatter(b, 20)
-	if len(lines) != 2 { // the one field, plus the trailing blank line
-		t.Fatalf("renderFrontmatter produced %d lines, want 2 (field + blank): %v", len(lines), lines)
+// TestRenderFrontmatterScrollsHorizontally confirms a field wider than the
+// measure is scrolled horizontally (the code-block treatment) rather than
+// wrapped or truncated with an ellipsis: at offset 0 the full natural width is
+// rendered (frontmatter is key: value pairs, not prose, so nothing gets cut
+// off the top of the value), and a scroll offset clips to the measure while
+// keeping the dim styling on the visible run.
+func TestRenderFrontmatterScrollsHorizontally(t *testing.T) {
+	longField := "description: " + strings.Repeat("x", 80)
+	b := block{kind: blockFrontmatter, text: "---\n" + longField + "\n---"}
+
+	// Offset 0: the first measure of the field, clipped without an ellipsis —
+	// a scroll window cannot be wider than the screen, and the "truncation" is
+	// now a viewport, not a cut: scrolling reveals the rest.
+	lines := renderFrontmatterFields(b, 20, 0)
+	if len(lines) != 1 {
+		t.Fatalf("renderFrontmatterFields produced %d lines, want 1 (the one field): %v", len(lines), lines)
 	}
 	stripped := ansiRe.ReplaceAllString(lines[0], "")
-	// gutterW spaces of indent, then the truncated field capped at the
-	// measure (20 runes, ellipsis included).
-	if got := len([]rune(strings.TrimPrefix(stripped, strings.Repeat(" ", gutterW)))); got != 20 {
-		t.Errorf("truncated field is %d runes wide, want 20: %q", got, stripped)
+	if stripped != longField[:20] {
+		t.Errorf("offset 0 field = %q, want the first measure %q", stripped, longField[:20])
 	}
-	if !strings.HasSuffix(stripped, "…") {
-		t.Errorf("truncated field = %q, want it to end with an ellipsis", stripped)
+	if strings.Contains(stripped, "…") {
+		t.Errorf("offset 0 field contains an ellipsis; frontmatter is scrolled, not truncated: %q", stripped)
+	}
+
+	// Offset 20: the next measure of the field, the rest off-screen.
+	scrolled := renderFrontmatterFields(b, 20, 20)
+	if len(scrolled) != 1 {
+		t.Fatalf("scrolled renderFrontmatterFields produced %d lines, want 1", len(scrolled))
+	}
+	got := ansiRe.ReplaceAllString(scrolled[0], "")
+	if got != longField[20:20+20] {
+		t.Errorf("offset 20 field = %q, want the next measure %q", got, longField[20:20+20])
+	}
+
+	// An offset past the end leaves nothing (scrollBlock clamps the offset, so
+	// this only guards the renderer itself against a bad caller).
+	if got := renderFrontmatterFields(b, 20, 500); len(got) != 1 || ansiRe.ReplaceAllString(got[0], "") != "" {
+		t.Errorf("offset past the end = %q, want an empty rendered line", got)
 	}
 }
 
 func TestRenderFrontmatterEmptyIsNil(t *testing.T) {
 	b := block{kind: blockFrontmatter, text: "---\n---"}
-	if got := renderFrontmatter(b, 40); got != nil {
-		t.Errorf("renderFrontmatter of an empty body = %v, want nil", got)
+	if got := renderFrontmatterFields(b, 40, 0); got != nil {
+		t.Errorf("renderFrontmatterFields of an empty body = %v, want nil", got)
+	}
+}
+
+// TestFrontmatterIsAKeyboardFocusStop: the 2026-08-09 frontmatter feedback
+// found the block unreachable — j/k never landed on it and focus-following
+// scroll could never bring it back into view once the reviewer had scrolled
+// down. It is entry 0 now, so g and a downward j land on it and movement
+// leaves it again.
+func TestFrontmatterIsAKeyboardFocusStop(t *testing.T) {
+	m := newModel(parseDoc([]byte(frontmatterDoc)), nil)
+	m.w, m.h = 100, 60
+
+	if m.at.entry != 0 || m.entries[0].b.kind != blockFrontmatter {
+		t.Fatalf("initial focus = entry %d kind %v, want 0/blockFrontmatter", m.at.entry, m.entries[0].b.kind)
+	}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'j', Text: "j"}))
+	if m.entries[m.at.entry].b.kind != blockHeading {
+		t.Fatalf("j from the frontmatter landed on kind %v, want the heading", m.entries[m.at.entry].b.kind)
+	}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'k', Text: "k"}))
+	if m.entries[m.at.entry].b.kind != blockFrontmatter {
+		t.Fatalf("k back up landed on kind %v, want the frontmatter again", m.entries[m.at.entry].b.kind)
+	}
+}
+
+// TestFrontmatterScrollsHorizontally: l/h on a focused frontmatter block scroll
+// a long field horizontally, the code-block treatment the frontmatter feedback
+// asked for in place of the ellipsis truncation.
+func TestFrontmatterScrollsHorizontally(t *testing.T) {
+	fm := block{
+		kind:   blockFrontmatter,
+		anchor: "^fm",
+		text:   "---\ndescription: " + strings.Repeat("x", 80) + "\n---",
+	}
+	rest := []block{{kind: blockHeading, text: "## Heading", anchor: "^h1", level: 2}}
+	m := newModel(append([]block{fm}, rest...), nil)
+	m.w, m.h = 40, 60
+	m.at = cursor{entry: 0, comment: commentNone}
+
+	if off := m.codeScroll["^fm"]; off != 0 {
+		t.Fatalf("initial frontmatter scroll offset = %d, want 0", off)
+	}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'l', Text: "l"}))
+	if off := m.codeScroll["^fm"]; off <= 0 {
+		t.Errorf("after 'l' frontmatter scroll offset = %d, want > 0", off)
+	}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'h', Text: "h"}))
+	if off := m.codeScroll["^fm"]; off != 0 {
+		t.Errorf("after 'h' frontmatter scroll offset = %d, want 0", off)
 	}
 }
 

@@ -149,7 +149,7 @@ var commands = []command{
 			if m.visual {
 				return false
 			}
-			if m.at.comment == commentNone && m.focusedKind() == blockCode {
+			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
 				return true
 			}
 			if m.at.comment != commentNone || m.at.line != 0 {
@@ -162,8 +162,8 @@ var commands = []command{
 			return t != nil && len(m.visibleComments(t)) > 0
 		},
 		Run: func(m *model, val string) tea.Cmd {
-			if m.at.comment == commentNone && m.focusedKind() == blockCode {
-				m.scrollCode(4)
+			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
+				m.scrollBlock(4)
 				return nil
 			}
 			m.dive()
@@ -174,14 +174,14 @@ var commands = []command{
 		ID:          "move.surface",
 		Description: "Surface back to block / thread / scroll code block left",
 		Applicable: func(m *model) bool {
-			if m.at.comment == commentNone && m.focusedKind() == blockCode && m.codeScroll[m.anchorAt()] > 0 {
+			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) && m.codeScroll[m.anchorAt()] > 0 {
 				return true
 			}
 			return m.at.comment != commentNone || m.at.line != 0
 		},
 		Run: func(m *model, val string) tea.Cmd {
-			if m.at.comment == commentNone && m.focusedKind() == blockCode {
-				m.scrollCode(-4)
+			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
+				m.scrollBlock(-4)
 				return nil
 			}
 			m.surface()

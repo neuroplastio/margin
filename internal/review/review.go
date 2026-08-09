@@ -273,15 +273,15 @@ func (m *model) orphanedThreads() []*thread {
 func (m *model) rebuild() {
 	m.entries = m.entries[:0]
 	for _, b := range m.doc {
-		if b.kind == blockFrontmatter {
-			// Metadata about the document, not part of it: no focus stop, no
-			// comments, no mark, no review-progress accounting — none of
-			// that changes here. It does get a visual treatment now
-			// (RENDER-07); render() draws it directly against m.doc,
-			// outside the entry list entirely, since nothing about it
-			// should behave like a real block.
-			continue
-		}
+		// Frontmatter is metadata, not prose — commentable() and markable()
+		// exclude it, so no comment, mark or progress accounting can ever
+		// land on it. But it is still something the reviewer reads, and the
+		// 2026-08-09 frontmatter feedback asked for it to be reachable by
+		// keyboard, so it IS a focus stop now: entry 0, landed on by g/j,
+		// kept on screen by focus-following scroll, and scrolled horizontally
+		// by h/l when a field overflows the measure. What changed from
+		// RENDER-07 is where the "no interaction" guarantee lives — in
+		// commentable/markable, not in the entry list.
 		m.entries = append(m.entries, entry{b: b})
 		if t, ok := m.threads[b.anchor]; ok && b.anchor != "" {
 			m.entries = append(m.entries, entry{
@@ -1526,13 +1526,6 @@ func (m *model) render() []string {
 	m.paneLead = 0
 	var lines []string
 
-	if len(m.doc) > 0 && m.doc[0].kind == blockFrontmatter {
-		// Always first when present (parseDoc emits it before anything
-		// else) — drawn ahead of the entry loop rather than folded into it,
-		// since it is not an entry at all (see rebuild).
-		lines = append(lines, renderFrontmatter(m.doc[0], w)...)
-	}
-
 	selLo, selHi, sel := m.selectionRange()
 
 	for i, e := range m.entries {
@@ -1552,7 +1545,7 @@ func (m *model) render() []string {
 				m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, partial)+
 					text, "")
 
-		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable:
+		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable, e.b.kind == blockFrontmatter:
 			mark := m.marks[e.b.anchor]
 			body := textStyle
 			if mark == markOK {
@@ -1608,6 +1601,12 @@ func (m *model) render() []string {
 					}
 					out = scrolled
 				}
+				preStyled = true
+			case blockFrontmatter:
+				// Dimmed key/value lines, never truncated — a field wider
+				// than the measure scrolls horizontally with h/l, the code
+				// block treatment (the 2026-08-09 frontmatter feedback).
+				out = renderFrontmatterFields(e.b, w, m.codeScroll[e.b.anchor])
 				preStyled = true
 			case blockTable:
 				// A table is data, not markup, so it dims on review the same
@@ -2228,13 +2227,23 @@ func (m *model) focusedKind() blockKind {
 	return m.entries[m.at.entry].b.kind
 }
 
-// scrollCode shifts the horizontal scroll offset of the focused code block by delta.
-func (m *model) scrollCode(delta int) {
+// scrollBlock shifts the horizontal scroll offset of the focused block by
+// delta, for the two kinds that do not wrap to the measure: code blocks and
+// the frontmatter block. l scrolls right, h scrolls left, 4 columns per press
+// (the same step size the code block horizontal scroll feedback settled for
+// blockCode and the frontmatter feedback asks to extend to blockFrontmatter).
+func (m *model) scrollBlock(delta int) {
 	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
 		return
 	}
 	e := m.entries[m.at.entry]
-	if e.b.kind != blockCode {
+	var lines []string
+	switch e.b.kind {
+	case blockCode:
+		lines = highlightCode(e.b.lines, e.b.lang)
+	case blockFrontmatter:
+		lines = frontmatterFields(e.b.text)
+	default:
 		return
 	}
 	anchor := e.b.anchor
@@ -2242,7 +2251,6 @@ func (m *model) scrollCode(delta int) {
 		return
 	}
 
-	lines := highlightCode(e.b.lines, e.b.lang)
 	maxLen := 0
 	for _, l := range lines {
 		if w := visualWidth(l); w > maxLen {
@@ -2270,15 +2278,15 @@ func (m *model) scrollCode(delta int) {
 	}
 
 	if curr == next && delta > 0 && maxScroll == 0 {
-		m.status = "code block fits within measure"
+		m.status = "block fits within measure"
 		return
 	}
 
 	m.codeScroll[anchor] = next
 	if next == 0 {
-		m.status = "code block scrolled to left edge"
+		m.status = "block scrolled to left edge"
 	} else {
-		m.status = fmt.Sprintf("code block scrolled to col %d", next)
+		m.status = fmt.Sprintf("block scrolled to col %d", next)
 	}
 }
 
@@ -2377,32 +2385,35 @@ func scrollCodeLine(line string, offset int, width int) string {
 	return result.String()
 }
 
-// renderFrontmatter draws a document's leading frontmatter (blockFrontmatter)
-// as a dimmed key/value block, indented to match the gutter width so it lines
-// up with the prose below rather than sitting flush against the left edge.
-// RENDER-07: the maintainer's feedback offered three candidates — hidden on
-// demand, a dimmed key/value block, or a collapsed line that expands — and
-// this picks the middle one. It needs no new key, no new focus state and no
-// interaction to see at all, unlike the other two; a reviewer scanning
-// name/status/tags before the prose is the common case a felt leg should
-// optimise for, not the rare one a hidden-by-default treatment assumes. A
-// field line longer than the measure is truncated with an ellipsis rather
-// than wrapped — frontmatter is short key: value pairs, not prose, so a
-// wrapped continuation line would read as a second field.
-func renderFrontmatter(b block, w int) []string {
+// renderFrontmatterFields draws a document's leading frontmatter
+// (blockFrontmatter) as dimmed key/value lines, one per field. RENDER-07 chose
+// the dimmed block over hidden-on-demand and a collapsed line that expands
+// because it needs no new key and no new focus state to see at all; the
+// 2026-08-09 frontmatter feedback then asked for the two changes this function
+// is the output of. A field line wider than the measure is scrolled
+// horizontally with h/l (the code-block treatment) rather than wrapped or
+// truncated with an ellipsis — frontmatter is short key: value pairs, not
+// prose, so a wrapped continuation line would read as a second field, and a
+// truncated one hides the value it was there to show. off is the horizontal
+// scroll offset in visual columns, clamped to the field width minus the
+// measure; scrollCodeLine does the clipping and keeps the dim styling on the
+// visible run.
+func renderFrontmatterFields(b block, w, off int) []string {
 	fields := frontmatterFields(b.text)
 	if len(fields) == 0 {
 		return nil
 	}
-	indent := strings.Repeat(" ", gutterW)
-	lines := make([]string, 0, len(fields)+1)
+	lines := make([]string, 0, len(fields))
 	for _, f := range fields {
-		if len([]rune(f)) > w {
-			f = truncate(f, w)
-		}
-		lines = append(lines, indent+dimStyle.Render(f))
+		lines = append(lines, dimStyle.Render(f))
 	}
-	lines = append(lines, "")
+	if off > 0 || hasOverflow(lines, w) {
+		scrolled := make([]string, len(lines))
+		for idx, l := range lines {
+			scrolled[idx] = scrollCodeLine(l, off, w)
+		}
+		lines = scrolled
+	}
 	return lines
 }
 

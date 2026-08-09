@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-08-09 (<num>gg line-number navigation)
+Last updated: 2026-08-09 (frontmatter keyboard reachability)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) frontmatter reachable by keyboard: the frontmatter block is
+  a focus stop now (g lands on it, j/k walk it, focus-follow scroll brings it
+  back into view), and long fields scroll horizontally with h/l instead of an
+  ellipsis truncation; it stays uncommentable/unmarkable and out of search —
+  journal 2026-08-09.34
 - (feedback feature) `/` search: `/` opens a bottom prompt, typing highlights
   every match live (background-only SGR 94 over rendered lines), enter commits
   and jumps to the next match after focus, `n`/`N` walk with wrap, esc cancels
@@ -80,12 +85,6 @@ Last updated: 2026-08-09 (<num>gg line-number navigation)
 
 ## In progress
 
-- [ ] **(feedback fix)** frontmatter keyboard reachability and horizontal
-      scroll: make the frontmatter block a focus stop (`g`/`j` land on it,
-      focus-follow scroll brings it back into view) and replace its ellipsis
-      truncation with code-block-style `h`/`l` horizontal scroll — drains
-      `vault/feedback/2026-08-09-frontmatter-feedback.md`
-      (agent, 2026-08-09)
 - [ ] **(feedback feature)** `<num>gg` / `<num>G` source-line navigation:
       `42gg` and `42G` jump to the markdown source line 42 (vim's two
       spellings of one motion), landing focus on the block that contains it;
@@ -127,6 +126,21 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** frontmatter keyboard reachability and horizontal
+      scroll: the frontmatter block is a focus stop now — entry 0, so `g`/`j`
+      land on it and focus-following scroll brings it back into view — and a
+      field wider than the measure scrolls horizontally with `h`/`l` (the
+      code-block treatment) instead of being truncated with an ellipsis.
+      `rebuild` keeps it in `m.entries`, `render` draws it through the shared
+      block loop (gutter focus bar included), and `scrollBlock` generalises
+      the code-block scroll to cover it; the "no interaction" guarantee moves
+      from the entry list to `commentable()`/`markable()`, which still exclude
+      it, so it cannot be commented, marked, or counted in review progress.
+      Search deliberately still excludes it (unchanged from 2026-08-09.32) —
+      metadata is reachable but not a target — flagged in the demo recipe.
+      Drains `vault/feedback/2026-08-09-frontmatter-feedback.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-09.34 — done 2026-08-09
 
 - [x] **(feedback fix)** CLI commands for agent automation — the extract half:
       a dedicated non-interactive `margin export FILE.md [--include-resolved]`
