@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (unchanged-edit no draft)
+Last updated: 2026-08-10 (enter/esc dive bindings)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -118,7 +118,11 @@ Last updated: 2026-08-10 (unchanged-edit no draft)
 
 ## In progress
 
-*(none)*
+- **(feedback fix)** dive/undive also binds to `enter`/`esc`: `enter` dives,
+      `esc` undives, in addition to the existing `l`/`h` bindings. Drains the
+      last item of
+      `vault/feedback/2026-08-09-composer-exit-and-thread-feedback.md`.
+      `[felt]` — claimed 2026-08-10
 
 ## Backlog — M1
 
