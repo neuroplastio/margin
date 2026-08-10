@@ -152,6 +152,30 @@ func parseEvent(line string) (event, error) {
 	}, nil
 }
 
+// readEventsAfter returns the events of root's log strictly after the event
+// whose id is cursor, in file order. The cursor is a position in the file, not
+// a string to compare against: two events sharing a millisecond are ordered by
+// where they were appended, so the filter matches the id and takes everything
+// after its line — exactly how D13 says a wait command must resolve
+// same-millisecond ties. An empty cursor means the whole log is new. A cursor
+// that matches no event is an error: a caller pointing at the wrong log, or
+// passing a stale id, should be told, not silently handed the whole file.
+func readEventsAfter(root, cursor string) ([]event, error) {
+	evs, err := readEvents(root)
+	if err != nil {
+		return nil, err
+	}
+	if cursor == "" {
+		return evs, nil
+	}
+	for i := range evs {
+		if evs[i].id == cursor {
+			return evs[i+1:], nil
+		}
+	}
+	return nil, fmt.Errorf("event log: no event with id %s", cursor)
+}
+
 // readEvents parses every completed line of the review root's event log, in
 // file order. A log that does not exist yet is not an error — it just means
 // nothing has happened — but a malformed *completed* line is: the log is a

@@ -51,7 +51,14 @@ func resolveReviewRoot(path string) (root, docPath string) {
 		absPath = path
 	}
 
+	// The marker walk starts at the path's own directory when it is a directory
+	// (a wait command's ".", a future tree review's DIR), or the path's
+	// containing directory when it is a file — the walk must not skip the very
+	// marker that names the review the caller is standing in.
 	startDir := filepath.Dir(absPath)
+	if st, err := os.Stat(absPath); err == nil && st.IsDir() {
+		startDir = absPath
+	}
 	dir := startDir
 	foundRoot := ""
 

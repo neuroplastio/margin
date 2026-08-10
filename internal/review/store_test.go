@@ -437,3 +437,23 @@ func TestResolveReviewRootFallbackToCwd(t *testing.T) {
 	}
 }
 
+// TestResolveReviewRootDirectoryUsesOwnMarker: a directory path (the wait
+// command's ".", a future tree review's DIR/) must find a marker in that
+// directory itself — the walk must not skip the cwd's own .git/.margin, or a
+// marker in an ancestor wins and the caller lands in the wrong review.
+func TestResolveReviewRootDirectoryUsesOwnMarker(t *testing.T) {
+	parent := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(parent, ".margin"), 0o755); err != nil {
+		t.Fatalf("MkdirAll parent marker: %v", err)
+	}
+	child := filepath.Join(parent, "child")
+	if err := os.MkdirAll(filepath.Join(child, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll child marker: %v", err)
+	}
+
+	gotRoot, _ := resolveReviewRoot(child)
+	if gotRoot != child {
+		t.Errorf("resolveReviewRoot(%q) = %q, want %q (its own .git, not the parent's .margin)", child, gotRoot, child)
+	}
+}
+

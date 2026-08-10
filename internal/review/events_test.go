@@ -354,3 +354,221 @@ func TestAddCommentWritesEvent(t *testing.T) {
 		t.Errorf("second event = %+v, want comment index 1", second)
 	}
 }
+
+// --- readEventsAfter ---------------------------------------------------------
+
+// writeEvents writes raw log lines into a fresh review root, returning the
+// root, so a test controls the exact bytes (ids, timestamps, ordering) the
+// cursor logic must resolve.
+func writeEvents(t *testing.T, lines ...string) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Dir(eventsLogPath(root)), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	var b strings.Builder
+	for _, l := range lines {
+		b.WriteString(l)
+		b.WriteString("\n")
+	}
+	if err := os.WriteFile(eventsLogPath(root), []byte(b.String()), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	return root
+}
+
+// eventLine builds a log line for a hand-controlled event, the shape the
+// reader tests need to pin cursor behaviour without the appendEvent machinery.
+func eventLine(id string, at time.Time, kind eventType, doc, anchor, author string, comment int) string {
+	return marshalEvent(event{
+		id:      id,
+		at:      at,
+		kind:    kind,
+		doc:     doc,
+		anchor:  anchor,
+		author:  author,
+		comment: comment,
+	})
+}
+
+// TestReadEventsAfterEmptyCursorReturnsEverything: with no cursor, every event
+// is new — the first call of a polling loop sees the whole history.
+func TestReadEventsAfterEmptyCursorReturnsEverything(t *testing.T) {
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	root := writeEvents(t,
+		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAW", at, eventCommentPosted, "doc.md", "^a", "agent", 1),
+	)
+	evs, err := readEventsAfter(root, "")
+	if err != nil {
+		t.Fatalf("readEventsAfter: %v", err)
+	}
+	if len(evs) != 2 {
+		t.Fatalf("readEventsAfter(\"\") returned %d events, want 2", len(evs))
+	}
+}
+
+// TestReadEventsAfterCursorExcludesIt: events strictly after the cursor come
+// back in file order, the cursor itself excluded.
+func TestReadEventsAfterCursorExcludesIt(t *testing.T) {
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	root := writeEvents(t,
+		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAW", at, eventThreadResolved, "doc.md", "^a", "agent", -1),
+		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAX", at, eventCommentPosted, "doc.md", "^b", "toly", 0),
+	)
+	evs, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAW")
+	if err != nil {
+		t.Fatalf("readEventsAfter: %v", err)
+	}
+	if len(evs) != 1 || evs[0].id != "01ARZ3NDEKTSV4RRFFQ69G5FAX" {
+		t.Errorf("readEventsAfter(id-0002) = %+v, want only id-0003", evs)
+	}
+}
+
+// TestReadEventsAfterLastCursorIsEmpty: a cursor naming the last event leaves
+// nothing after it — the "nothing new yet" state a poller starts in.
+func TestReadEventsAfterLastCursorIsEmpty(t *testing.T) {
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	root := writeEvents(t, eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0))
+	evs, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	if err != nil {
+		t.Fatalf("readEventsAfter: %v", err)
+	}
+	if len(evs) != 0 {
+		t.Errorf("readEventsAfter(last id) = %+v, want none", evs)
+	}
+}
+
+// TestReadEventsAfterUnknownCursorErrors: a cursor matching no event is an
+// error — a caller pointed at the wrong log (or carrying a stale id) must be
+// told, not silently handed the whole file.
+func TestReadEventsAfterUnknownCursorErrors(t *testing.T) {
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	root := writeEvents(t, eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0))
+	_, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAZ")
+	if err == nil {
+		t.Fatal("readEventsAfter with an unknown cursor reported success")
+	}
+	if !strings.Contains(err.Error(), "01ARZ3NDEKTSV4RRFFQ69G5FAZ") {
+		t.Errorf("error does not name the bad cursor: %v", err)
+	}
+}
+
+// TestReadEventsAfterResolvesTiesByFilePosition: two events sharing a
+// millisecond are ordered by where they sit in the file, not by comparing
+// ids — a cursor into an append-only log means the tie is file order (D13).
+// Here the second line's id sorts *before* the first's lexically, so a string
+// comparison would hand back the wrong event.
+func TestReadEventsAfterResolvesTiesByFilePosition(t *testing.T) {
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	root := writeEvents(t,
+		eventLine("ZZZZZZZZZZZZZZZZZZZZZZZZZW", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		eventLine("00000000000000000000000000", at, eventCommentPosted, "doc.md", "^a", "agent", 1),
+	)
+	evs, err := readEventsAfter(root, "ZZZZZZZZZZZZZZZZZZZZZZZZZW")
+	if err != nil {
+		t.Fatalf("readEventsAfter: %v", err)
+	}
+	if len(evs) != 1 || evs[0].id != "00000000000000000000000000" {
+		t.Errorf("readEventsAfter(ZZZZ…) = %+v, want the later line (file order, not id order)", evs)
+	}
+}
+
+// TestReadEventsAfterSurfacesMalformedLine: the cursor filter runs on the
+// same parsed log as everything else, so a malformed completed line is still
+// an error, not silently skipped.
+func TestReadEventsAfterSurfacesMalformedLine(t *testing.T) {
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	root := writeEvents(t,
+		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		"this is not an event line",
+	)
+	if _, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAV"); err == nil {
+		t.Fatal("readEventsAfter over a malformed log reported success")
+	}
+}
+
+// --- WaitEvents --------------------------------------------------------------
+
+// waitRoot creates a review root with a doc.md in it, so WaitEvents' path
+// argument can resolve to a root the test controls without depending on the
+// process working directory.
+func waitRoot(t *testing.T) (root, docPath string) {
+	t.Helper()
+	return writeDocUnderRoot(t, "# Title\n\nA commentable paragraph.\n")
+}
+
+// TestWaitEventsReturnsEventsImmediately: events already past the cursor come
+// back on the first poll, no waiting.
+func TestWaitEventsReturnsEventsImmediately(t *testing.T) {
+	root, docPath := waitRoot(t)
+	if err := appendEvent(root, event{kind: eventCommentPosted, doc: "doc.md", anchor: "^a", author: "toly", comment: 0}); err != nil {
+		t.Fatalf("appendEvent: %v", err)
+	}
+	lines, err := WaitEvents(docPath, "", time.Second)
+	if err != nil {
+		t.Fatalf("WaitEvents: %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("WaitEvents returned %d lines, want 1", len(lines))
+	}
+	if !strings.Contains(lines[0], "comment.posted") {
+		t.Errorf("line does not carry the event:\n%s", lines[0])
+	}
+}
+
+// TestWaitEventsTimesOut: with no events past the cursor and a small timeout,
+// the wait gives up with ErrWaitTimeout rather than waiting forever.
+func TestWaitEventsTimesOut(t *testing.T) {
+	_, docPath := waitRoot(t)
+	start := time.Now()
+	_, err := WaitEvents(docPath, "", 30*time.Millisecond)
+	if err != ErrWaitTimeout {
+		t.Fatalf("WaitEvents = %v, want ErrWaitTimeout", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("timeout took %v, want it to respect the small deadline", elapsed)
+	}
+}
+
+// TestWaitEventsBlocksUntilNewEvent: an empty log with no events yet blocks
+// until an event lands, then returns it — the "agent waits for the reviewer's
+// first comment" case.
+func TestWaitEventsBlocksUntilNewEvent(t *testing.T) {
+	root, docPath := waitRoot(t)
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = appendEvent(root, event{kind: eventThreadResolved, doc: "doc.md", anchor: "^a", author: "toly", comment: -1})
+	}()
+	lines, err := WaitEvents(docPath, "", 5*time.Second)
+	if err != nil {
+		t.Fatalf("WaitEvents: %v", err)
+	}
+	if len(lines) != 1 || !strings.Contains(lines[0], "thread.resolved") {
+		t.Errorf("WaitEvents after a background append = %v, want the thread.resolved line", lines)
+	}
+}
+
+// TestWaitEventsCursorIsFilePosition: the cursor filters by file position, so
+// two events in one millisecond come out in file order even when their ids
+// sort the other way — the D13 tie rule, observed through the wait itself.
+func TestWaitEventsCursorIsFilePosition(t *testing.T) {
+	root, docPath := waitRoot(t)
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	if err := os.MkdirAll(filepath.Dir(eventsLogPath(root)), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	data := eventLine("ZZZZZZZZZZZZZZZZZZZZZZZZZW", at, eventCommentPosted, "doc.md", "^a", "toly", 0) + "\n" +
+		eventLine("00000000000000000000000000", at, eventCommentPosted, "doc.md", "^a", "agent", 1) + "\n"
+	if err := os.WriteFile(eventsLogPath(root), []byte(data), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	lines, err := WaitEvents(docPath, "ZZZZZZZZZZZZZZZZZZZZZZZZZW", time.Second)
+	if err != nil {
+		t.Fatalf("WaitEvents: %v", err)
+	}
+	if len(lines) != 1 || !strings.Contains(lines[0], "00000000000000000000000000") {
+		t.Errorf("WaitEvents(ZZZZ…) = %v, want the later line (file order)", lines)
+	}
+}

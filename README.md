@@ -96,6 +96,7 @@ reviewer's `Y` produces:
 ```
 margin export spec.md            # print the review as it stands on disk
 margin comment add spec.md --anchor ^abc123 --text "fixed in rev 3" --author agent
+margin comments wait --since 06FYPBSTNNP6979809ESB2HQN4   # block for the next event
 ```
 
 `margin export FILE.md` is non-interactive: it parses the document, loads its
@@ -104,6 +105,20 @@ script or CI pipeline reads the current state of a review with no terminal.
 Marks are session-only, so the export carries threads but not which blocks a
 reviewer had marked; `--include-resolved` brings resolved threads back the same
 way it does for `Y` and `--stdout`.
+
+`margin comments wait` is the reverse direction — the agent's half of an
+interactive review. It reads `.margin/events.log` and blocks until a new event
+(a comment posted, edited, deleted or restored; a thread resolved or deleted)
+lands after the one `--since` names, then prints each new event's log line and
+exits 0. No `--since` means every event is new. `--timeout` bounds the wait (0
+= wait forever); a timeout exits 1 with nothing printed — the "nothing yet,
+poll again" signal — while a real error (a broken log, an unknown `--since`)
+exits 1 and writes the reason to stderr. The printed lines are the log's own
+lines, so an agent takes the last line's id as the next `--since`:
+
+```
+margin comments wait --since 06FYPBSTNNP6979809ESB2HQN4 --timeout 60s
+```
 
 The anchor is the `(^id)` shown in a block's export header. `--author` defaults
 to the current user. The reply appears on the reviewer's next open (or live, via

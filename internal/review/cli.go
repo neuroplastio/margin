@@ -5,11 +5,66 @@
 package review
 
 import (
+	"errors"
 	"fmt"
 	"os/user"
 	"strings"
 	"time"
 )
+
+// ErrWaitTimeout is returned by WaitEvents when its timeout elapses with no
+// new events. A caller (the `margin comments wait` command) uses it to tell
+// "nothing new yet" — a normal, expected outcome for a poller — from a
+// genuinely broken review root, so the agent loop can distinguish the two.
+var ErrWaitTimeout = errors.New("timed out waiting for new review events")
+
+// waitPollInterval is how often WaitEvents re-reads the event log while
+// waiting. The log is a single small file, so a modest poll beat is the
+// simplest robust way to notice a new line; a filesystem watcher would need
+// handling for the log not existing yet, which the poll does not.
+const waitPollInterval = 200 * time.Millisecond
+
+// WaitEvents is the poll half of the interactive review loop, and the CLI
+// surface D13 left to be judged in this leg: it returns the raw lines of
+// every event in the review root's event log strictly after the event whose
+// id is since — the whole log when since is empty — waiting (polling) until
+// at least one such event exists or timeout elapses. A timeout of 0 waits
+// forever. It is what lets an agent block for "the reviewer left a new
+// comment" instead of re-exporting the review on a timer.
+//
+// path resolves the review root the same way AddComment and Export do, so the
+// CLI can run the wait with no file argument by passing "." — the cwd, walked
+// up by resolveReviewRoot like any other path.
+//
+// Events are returned as their on-disk log lines, verbatim, in file order, so
+// the same seven tab-separated fields an agent sees in .margin/events.log —
+// id at type doc anchor author comment — are what it reads on stdout, and the
+// last line's id is the --since cursor for the next call. Same-millisecond
+// ties come out in file order (readEventsAfter), as D13 requires.
+func WaitEvents(path, since string, timeout time.Duration) ([]string, error) {
+	root, _ := resolveReviewRoot(path)
+	deadline := time.Time{}
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+	}
+	for {
+		evs, err := readEventsAfter(root, since)
+		if err != nil {
+			return nil, err
+		}
+		if len(evs) > 0 {
+			lines := make([]string, len(evs))
+			for i, ev := range evs {
+				lines[i] = marshalEvent(ev)
+			}
+			return lines, nil
+		}
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			return nil, ErrWaitTimeout
+		}
+		time.Sleep(waitPollInterval)
+	}
+}
 
 // AddComment appends a comment to the thread anchored at anchor on path,
 // creating the thread (with a quote from the block) if none exists yet. It is

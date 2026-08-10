@@ -4,8 +4,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/neuroplastio/margin/internal/review"
 	"github.com/spf13/cobra"
@@ -15,7 +17,7 @@ import (
 var version = "dev"
 
 func main() {
-	if err := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor).Execute(); err != nil {
+	if err := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor, review.WaitEvents).Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -24,7 +26,7 @@ func main() {
 // non-interactive command handlers as arguments and is a function rather than a
 // package var so tests can construct an isolated command with its own I/O,
 // args, and handlers that do not open a terminal or touch disk.
-func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), exportReview func(path string, includeResolved bool) (string, error), defaultAuthor func() string) *cobra.Command {
+func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), exportReview func(path string, includeResolved bool) (string, error), defaultAuthor func() string, waitEvents func(path, since string, timeout time.Duration) ([]string, error)) *cobra.Command {
 	var stdout bool
 	var includeResolved bool
 	var stdin bool
@@ -110,6 +112,7 @@ a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).`,
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	root.AddCommand(newCommentCmd(addComment, defaultAuthor))
 	root.AddCommand(newExportCmd(exportReview))
+	root.AddCommand(newCommentsCmd(waitEvents))
 	return root
 }
 
@@ -161,6 +164,71 @@ func newCommentCmd(addComment func(path, anchor, author, text string) (string, e
 		Short: "Read and write comments without opening the interface",
 	}
 	cmd.AddCommand(add)
+	return cmd
+}
+
+// newCommentsCmd builds the `margin comments` subcommand tree: the poll half
+// of the interactive review loop. An agent blocks here for the reviewer's next
+// comment, instead of re-exporting the review on a timer; see review.WaitEvents
+// for the event-log contract this reads.
+func newCommentsCmd(waitEvents func(path, since string, timeout time.Duration) ([]string, error)) *cobra.Command {
+	var since string
+	var timeout time.Duration
+
+	wait := &cobra.Command{
+		Use:   "wait",
+		Short: "Wait for new review events since an event id",
+		Long: `Wait until the review's event log (.margin/events.log) holds a new event —
+a comment posted, edited, deleted or restored, a thread resolved or deleted —
+after the one --since names, then print each new event's log line to stdout
+and exit 0. An agent polls this instead of re-exporting the review on a timer:
+the reviewer's comment lands in the log, this command notices it, and the
+agent reads the lines to find what to respond to.
+
+The printed lines are the log's own tab-separated lines (id, UTC timestamp,
+event type, document, anchor, author, comment index), in file order, so the
+last line's id is the --since cursor for the next call. A same-millisecond tie
+is resolved by file position, not id comparison.
+
+--since is optional: without it, every event in the log is new. --timeout
+bounds the wait (0 = wait forever); when it elapses with nothing new the
+command exits 1 and prints nothing, which a polling loop treats as "nothing
+yet, poll again". A real error — a broken log, an unknown --since id — also
+exits 1, but writes the reason to stderr, so the two are distinguishable by
+whether stderr is empty.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Same runtime-error discipline as the other subcommands: a broken
+			// log or a bad --since is a runtime error that should not bury its
+			// message under the help text. The timeout is not an error at all:
+			// nothing is wrong, so nothing is printed, and the exit code 1
+			// alone tells the poller to try again.
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			// "." resolves the review root from the cwd, the same walk a file
+			// argument gets — the wait command has no document of its own.
+			lines, err := waitEvents(".", since, timeout)
+			if err != nil {
+				if errors.Is(err, review.ErrWaitTimeout) {
+					return err
+				}
+				fmt.Fprintln(cmd.ErrOrStderr(), err)
+				return err
+			}
+			for _, l := range lines {
+				fmt.Fprintln(cmd.OutOrStdout(), l)
+			}
+			return nil
+		},
+	}
+	wait.Flags().StringVar(&since, "since", "", "last event id already seen (default: every event is new)")
+	wait.Flags().DurationVar(&timeout, "timeout", 0, "wait at most this long for a new event, then exit 1 (0 = wait forever)")
+
+	cmd := &cobra.Command{
+		Use:   "comments",
+		Short: "Read and wait on review events without opening the interface",
+	}
+	cmd.AddCommand(wait)
 	return cmd
 }
 

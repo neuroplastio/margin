@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/neuroplastio/margin/internal/review"
 )
@@ -16,7 +17,7 @@ func exec(t *testing.T, run func(string, review.RunOptions) error, args ...strin
 		run = func(string, review.RunOptions) error { return nil }
 	}
 	var out bytes.Buffer
-	root := newRootCmd(run, nil, nil, nil)
+	root := newRootCmd(run, nil, nil, nil, nil)
 	root.SetOut(&out)
 	root.SetErr(&out)
 	root.SetArgs(args)
@@ -277,7 +278,7 @@ func execComment(t *testing.T, args []string) (path, anchor, author, text string
 		return "/root/.margin/threads/doc.md/x.md", nil
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, addComment, nil, nil)
+	root := newRootCmd(nil, addComment, nil, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs(args)
@@ -353,7 +354,7 @@ func TestCommentAddSurfacesRuntimeError(t *testing.T) {
 		return "", errors.New("no commentable block with anchor ^abc in spec.md")
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, addComment, nil, nil)
+	root := newRootCmd(nil, addComment, nil, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs([]string{"comment", "add", "spec.md", "--anchor", "^abc", "--text", "hi"})
@@ -379,6 +380,111 @@ func TestHelpMentionsCommentAdd(t *testing.T) {
 	}
 }
 
+// --- comments wait ----------------------------------------------------------
+
+// execWait runs `comments wait` with a stub WaitEvents handler, capturing the
+// arguments it received and the output.
+func execWait(t *testing.T, args []string) (path, since string, timeout time.Duration, out string, err error) {
+	t.Helper()
+	var gotPath, gotSince string
+	var gotTimeout time.Duration
+	waitEvents := func(path, since string, timeout time.Duration) ([]string, error) {
+		gotPath, gotSince, gotTimeout = path, since, timeout
+		if since == "boom" {
+			return nil, errors.New("event log: no event with id boom")
+		}
+		if since == "timeout" {
+			return nil, review.ErrWaitTimeout
+		}
+		return []string{"line one", "line two"}, nil
+	}
+	var buf bytes.Buffer
+	root := newRootCmd(nil, nil, nil, nil, waitEvents)
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs(args)
+	err = root.Execute()
+	return gotPath, gotSince, gotTimeout, buf.String(), err
+}
+
+func TestCommentsWaitReachesTheHandler(t *testing.T) {
+	path, since, timeout, out, err := execWait(t, []string{"comments", "wait", "--since", "^abc", "--timeout", "30s"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if path != "." {
+		t.Errorf("handler got path %q, want . (cwd root resolution)", path)
+	}
+	if since != "^abc" {
+		t.Errorf("handler got since %q, want ^abc", since)
+	}
+	if timeout != 30*time.Second {
+		t.Errorf("handler got timeout %v, want 30s", timeout)
+	}
+	if !strings.Contains(out, "line one") || !strings.Contains(out, "line two") {
+		t.Errorf("output does not carry the event lines:\n%s", out)
+	}
+}
+
+func TestCommentsWaitDefaultsSinceAndTimeout(t *testing.T) {
+	_, since, timeout, _, err := execWait(t, []string{"comments", "wait"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if since != "" {
+		t.Errorf("since = %q without --since, want empty (every event is new)", since)
+	}
+	if timeout != 0 {
+		t.Errorf("timeout = %v without --timeout, want 0 (wait forever)", timeout)
+	}
+}
+
+func TestCommentsWaitTimeoutIsQuietExit(t *testing.T) {
+	_, _, _, out, err := execWait(t, []string{"comments", "wait", "--since", "timeout"})
+	if err == nil {
+		t.Fatal("a timeout reported success")
+	}
+	if out != "" {
+		t.Errorf("timeout printed output, want silence:\n%s", out)
+	}
+	if strings.Contains(out, "Usage:") {
+		t.Errorf("timeout printed usage:\n%s", out)
+	}
+}
+
+func TestCommentsWaitSurfacesRuntimeError(t *testing.T) {
+	_, _, _, out, err := execWait(t, []string{"comments", "wait", "--since", "boom"})
+	if err == nil {
+		t.Fatal("a failing wait reported success")
+	}
+	if !strings.Contains(out, "no event with id boom") {
+		t.Errorf("the actual error is missing:\n%s", out)
+	}
+	if strings.Contains(out, "Usage:") {
+		t.Errorf("runtime error printed the usage block:\n%s", out)
+	}
+}
+
+func TestCommentsWaitRejectsArgs(t *testing.T) {
+	_, _, _, out, err := execWait(t, []string{"comments", "wait", "spec.md"})
+	if err == nil {
+		t.Fatal("comments wait with a file argument was accepted")
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("misuse did not show usage:\n%s", out)
+	}
+}
+
+func TestHelpMentionsCommentsWait(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "comments") {
+		t.Errorf("help does not mention the comments subcommand:\n%s", out)
+	}
+}
+
 // --- export ------------------------------------------------------------------
 
 // execExport runs `export` with a stub Export handler, capturing the arguments
@@ -392,7 +498,7 @@ func execExport(t *testing.T, args []string) (path string, includeResolved bool,
 		return "# Review of " + p + "\n", nil
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, nil, exportReview, nil)
+	root := newRootCmd(nil, nil, exportReview, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs(args)
@@ -438,7 +544,7 @@ func TestExportSurfacesRuntimeError(t *testing.T) {
 		return "", errors.New("open nope.md: no such file or directory")
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, nil, exportReview, nil)
+	root := newRootCmd(nil, nil, exportReview, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs([]string{"export", "nope.md"})

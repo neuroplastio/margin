@@ -1,9 +1,16 @@
 # Board
 
-Last updated: 2026-08-10 (Q-0003 answered → D13; event log slice done, wait command remains)
+Last updated: 2026-08-10 (interactive agent review done: event log + wait command)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) `margin comments wait [--since ID] [--timeout DUR]`:
+  blocking poll over `.margin/events.log` that prints raw event lines after
+  the cursor (or all, with no `--since`) and exits 0; timeout exits 1 silently
+  (the "nothing yet" signal), a real error exits 1 with a stderr message;
+  same-millisecond ties resolve by file position, not id order (D13); the
+  review root resolves from the cwd since the command takes no file —
+  journal 2026-08-10.8
 - (feedback fix) raw mode horizontal scroll: `H`/`L` pan the whole raw source
   view sideways through a single viewport-wide offset (`m.rawH`), clipped by
   the same `scrollCodeLine` the rendered view uses on code blocks and tables
@@ -148,9 +155,7 @@ Last updated: 2026-08-10 (Q-0003 answered → D13; event log slice done, wait co
 
 ## In progress
 
-- **(feedback feature)** interactive agent review, slice 2: `margin comments
-      wait [--since <id>]` — the CLI half that reads the event log — claimed
-      by the 2026-08-10.8 leg
+*(none)*
 
 ## Backlog — M1
 
@@ -182,10 +187,11 @@ document, regardless of the order the tree-view work itself lands in.
 Q-0003 was answered 2026-08-10 and folded into `knowledge/decisions.md` as
 **D13** (the event log at `.margin/events.log`); the question file is deleted.
 The interactive-agent-review feature in
-`vault/feedback/2026-08-10-interactive-agent-review.md` is being built in
-slices: the event log itself (2026-08-10.7) is done, and `margin comments
-wait [--since <last_known_id>]` — the CLI half that reads the log — remains a
-leg. The feedback file stays until that lands.
+`vault/feedback/2026-08-10-interactive-agent-review.md` is complete: the event
+log (2026-08-10.7) and `margin comments wait [--since <last_known_id>]`, the
+CLI half that reads it (2026-08-10.8), have both landed and the feedback file
+is deleted. The wait command's exact surface — its exit codes, timeout shape,
+and output — is the felt part and is on `Needs a look:` above.
 
 Q-0001 and Q-0002 were answered 2026-08-07 and folded into
 `knowledge/decisions.md` as **D10** (tree review) and **D11** (thread
@@ -194,6 +200,22 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** interactive agent review, slice 2: `margin
+      comments wait [--since <last_known_id>]` — the CLI half that reads the
+      event log. `review.WaitEvents` polls `.margin/events.log` and returns
+      the raw log lines of every event after the cursor (the whole log when
+      `--since` is omitted), blocking until one arrives or a timeout elapses;
+      the cursor is a *file position*, so same-millisecond ties come out in
+      file order exactly as D13 prescribes, and an unknown id is an error, not
+      a silent reset. New `comments` subcommand tree: **exit 0** = new events
+      printed; **exit 1 silent** = timeout with nothing new (the poller's
+      "try again" signal); **exit 1 with a stderr message** = a real error —
+      told apart by stderr being empty, not by a distinct code. Also fixed
+      `resolveReviewRoot` skipping a directory's own marker (the cwd's
+      `.git`/`.margin` was never a candidate for a `"."` path). Drains
+      `vault/feedback/2026-08-10-interactive-agent-review.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.8 — done 2026-08-10
 
 - [x] **(feedback feature)** interactive agent review, slice 1: the event log
       at `.margin/events.log`. Records the maintainer's answer to Q-0003 as
