@@ -1,9 +1,18 @@
 # Board
 
-Last updated: 2026-08-10 (event log line shape corrected to JSONL + compact ids)
+Last updated: 2026-08-10 (margin skill command: the agent skill document)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) `margin skill`: prints the markdown document an agent
+  loads to learn how to use margin — the four CLI commands, the interactive
+  review loop spelled out end to end (launch in a new terminal, poll
+  `comments wait` with its exit contract, reply via `comment add --author
+  agent`, the human sees it live through the thread watcher), and the
+  contracts (event log JSONL, thread files, anchors). I chose subcommand over
+  the feedback title's `--skill` flag, markdown, the whole loop. Demo: run
+  `margin skill`, then run the loop from the document alone (journal
+  2026-08-10.10)
 - (feedback feature) `margin comments wait [--since ID] [--timeout DUR]`:
   blocking poll over `.margin/events.log` that prints raw JSONL event lines
   after the cursor (or all, with no `--since`) and exits 0; timeout exits 1
@@ -155,12 +164,7 @@ Last updated: 2026-08-10 (event log line shape corrected to JSONL + compact ids)
 
 ## In progress
 
-- (feedback feature) `margin --skill`: AI agent skill output — `margin skill`
-  prints the markdown document an agent loads to learn how to use margin,
-  including the interactive review loop (launch in a new terminal, poll
-  `comments wait`, reply via `comment add`, human sees it live through the
-  watcher). Drains `vault/feedback/2026-08-10-agent-skill-command.md`.
-  — in progress 2026-08-10
+*(none)*
 
 ## Backlog — M1
 
@@ -205,6 +209,29 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** `margin skill` — the document an agent loads to
+      learn how to use margin. A new subcommand prints `review.SkillDocument()`
+      (an embedded markdown file, ~100 lines) to stdout and nothing else. The
+      document teaches the **interactive review loop** end to end, built from
+      the pieces that already exist and nothing new: launch `margin FILE.md` in
+      a new terminal for the human (the agent never drives it); read the state
+      with `margin export FILE.md`; wait with `margin comments wait --since ID
+      --timeout DUR` including the three-outcome exit contract (0 = new event
+      lines, 1 silent = timeout "nothing yet", 1 + stderr = real error) and the
+      no-`--since` first call that seeds the cursor; reply with `margin comment
+      add FILE.md --anchor ID --text "..." --author agent`, the reply reaching
+      the human **live** through the thread watcher while the event log is what
+      the agent tails; then loop on the last line's id. A contracts section
+      pins the event log (JSONL, append-only, 13-char time-ordered ids,
+      file-position ties, torn tail), thread files (frontmatter
+      anchor/document/`resolved: true`; the CLI keeps thread + log in step),
+      and anchors (stable across rewrites; a stale anchor fails loudly).
+      Chosen: subcommand over the feedback title's `--skill` flag (every other
+      agent-facing command is a subcommand), markdown over plain text, the
+      whole loop spelled out over a summary, `go:embed` over a string literal.
+      Drains `vault/feedback/2026-08-10-agent-skill-command.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.10 — done 2026-08-10
 
 - [x] **(feedback fix)** event log on-disk shape: JSONL + compact ids + unix
       seconds. Each `.margin/events.log` line is now one JSON object

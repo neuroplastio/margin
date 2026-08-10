@@ -569,3 +569,38 @@ func TestHelpMentionsExport(t *testing.T) {
 		t.Errorf("help does not mention the export subcommand:\n%s", out)
 	}
 }
+
+// --- skill -------------------------------------------------------------------
+
+func TestSkillPrintsTheDocument(t *testing.T) {
+	out, err := exec(t, nil, "skill")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	// The output is the markdown skill document, whole, on stdout.
+	if !strings.HasPrefix(out, "# margin") {
+		t.Errorf("skill output is not the markdown document:\n%s", out)
+	}
+	for _, want := range []string{"comments wait", "comment add", "export", "--author agent", "event log"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("skill does not teach the agent about %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestSkillRejectsArgs(t *testing.T) {
+	_, err := exec(t, nil, "skill", "spec.md")
+	if err == nil {
+		t.Fatal("skill with a file argument was accepted")
+	}
+}
+
+func TestHelpMentionsSkill(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "skill") {
+		t.Errorf("help does not mention the skill subcommand:\n%s", out)
+	}
+}

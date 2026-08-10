@@ -74,7 +74,12 @@ still needs doing, not a transcript of everything ever said. --include-resolved
 adds them back, for an agent that wants to see what it already addressed.
 
 The mouse wheel scrolls the document three lines per tick; --wheel-speed sets
-a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).`,
+a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).
+
+margin skill prints the markdown document an agent loads to learn how to take
+part in an interactive review: launch margin in a terminal for the human, poll
+for their comments with margin comments wait, reply with margin comment add,
+and let the thread watcher carry each reply live to their open document.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if stdin {
 				if len(args) > 0 {
@@ -113,6 +118,7 @@ a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).`,
 	root.AddCommand(newCommentCmd(addComment, defaultAuthor))
 	root.AddCommand(newExportCmd(exportReview))
 	root.AddCommand(newCommentsCmd(waitEvents))
+	root.AddCommand(newSkillCmd())
 	return root
 }
 
@@ -261,4 +267,26 @@ func newExportCmd(exportReview func(path string, includeResolved bool) (string, 
 	}
 	cmd.Flags().BoolVar(&includeResolved, "include-resolved", false, "include resolved threads in the export, instead of leaving them out")
 	return cmd
+}
+
+// newSkillCmd builds the `margin skill` subcommand: the document an agent loads
+// to learn how to use margin. It is static content — review.SkillDocument
+// embeds the markdown — so there is nothing to wire in and no runtime failure
+// to handle; the command exists to print it.
+func newSkillCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "skill",
+		Short: "Print the skill document an agent loads to use margin",
+		Long: `Print the markdown document an agent loads to learn how to use margin:
+the four CLI commands, the interactive review loop that binds them — launch the
+review in a new terminal for the human, poll for their comments with comments
+wait, reply through comment add, and let the thread watcher carry the reply
+live to the open document — and the on-disk contracts the loop depends on: the
+event log, thread files, and anchors.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprint(cmd.OutOrStdout(), review.SkillDocument())
+			return nil
+		},
+	}
 }

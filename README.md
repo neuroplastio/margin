@@ -99,6 +99,13 @@ margin comment add spec.md --anchor ^abc123 --text "fixed in rev 3" --author age
 margin comments wait --since 1N7KB52S0NPCH   # block for the next event
 ```
 
+`margin skill` prints the full picture: the markdown document an agent loads to
+learn how to take part in an interactive review — the same four commands, the
+loop that binds them (launch the review in a new terminal for the human, poll
+for their comments, reply through the CLI, let the thread watcher carry the
+reply live), and the contracts behind it (the event log, thread files,
+anchors).
+
 `margin export FILE.md` is non-interactive: it parses the document, loads its
 threads from `.margin/threads/`, and prints the review straight to stdout, so a
 script or CI pipeline reads the current state of a review with no terminal.
