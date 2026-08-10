@@ -158,7 +158,14 @@ These have been raised but not judged. Each needs a felt leg and a review.
   column with every thread across the tree, newest first, `enter` jumping to
   the thread's document and block — whether that is the right surface, whether
   it should refresh live, what a row should carry, and whether clicks should
-  select rows are the leg's best guess. What review progress looks like rolled
-  up across a tree, and whether the export covers one document or all of them,
-  are still open.
+   rows select rows are the leg's best guess. Review progress across a tree —
+   built 2026-08-11 (journal 2026-08-11.4): marks are carried per-document
+   across switches, each pane row shows its file's `reviewed/total` (green when
+   the whole file is reviewed, orange `!` when flagged, blank for untouched
+   files), and the footer rolls the whole tree up (`tree N/M reviewed`, with
+   every file's blocks — opened or not — in the denominator). **Not settled:**
+   whether that is the right surface, whether untouched files should read `0/n`
+   instead of blank, and whether the footer should show the open document's
+   numbers alongside the tree's. Whether the export covers one document or all
+   of them is still open.
 - Whether marks and comments belong in the same gutter column.

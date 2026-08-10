@@ -1,11 +1,23 @@
 # Board
 
-Last updated: 2026-08-11 (the cross-document comment inbox landed: `i` in a
-directory review replaces the document column with every thread across the
-tree, newest first, `enter` jumping to the thread's document and block).
+Last updated: 2026-08-11 (tree review progress landed: marks carried
+per-document across switches, each pane row showing its file's `reviewed/total`,
+and the footer rolling the whole tree up).
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (tree review progress) each pane row carries a right-aligned `reviewed/total`
+  slot — green when the whole file is reviewed, orange with a trailing `!`
+  when any block is flagged, dim when partially reviewed, blank for files
+  nobody has touched; marks are carried per-document across switches (they
+  used to reset); and the footer reads `tree N/M reviewed · F flagged` across
+  every file's blocks, opened or not (the spec's blocks count while you sit in
+  the README) — whether per-file `n/m` in the pane is the right surface (vs a
+  pane summary, or `0/n` on untouched files), whether the colour rules read at
+  a glance, whether the footer should show the open document's numbers
+  alongside the tree's, and whether carrying marks per-document is the wanted
+  change (it replaces the reset-on-switch of the tree's first build) —
+  journal 2026-08-11.4
 - (comment inbox) `i` in a directory review replaces the document column with
   every thread across the tree, newest activity first — `enter`/`l` opens the
   thread's document (the pane-open path) and lands centred on its block,
@@ -303,12 +315,29 @@ tree, newest first, `enter` jumping to the thread's document and block).
 
 ## In progress
 
-- [ ] **Review progress across the whole tree** — claimed by the 2026-08-11
-      tree-progress leg: marks carried per-document across switches, per-file
-      progress in the pane, a tree-wide roll-up in the footer.
-      *In progress, 2026-08-11.*
+*(none)*
 
 ## Done
+
+- [x] **Review progress across the whole tree** — a directory review now has a
+      tree-wide progress readout. Marks are carried per-document across
+      switches (`markCache`, keyed by rel path; `openTreeFile` saves the
+      outgoing document's marks and restores the incoming document's), so
+      switching no longer throws the previous document's review away. The
+      denominator is the whole tree: `markTotals` holds every file's markable
+      block count, computed at tree open (and refreshed on `ctrl+r` reload),
+      so a file never opened still counts its blocks. Each pane row carries a
+      fixed right-aligned progress slot — `n/m` dim when partially reviewed,
+      green when the whole file is reviewed, orange `n/m!` when any block is
+      flagged, blank for untouched files and dirs — and the pane width grows
+      by the slot (still clamped at 36). The footer in a tree review reads
+      `tree N/M reviewed · F flagged` across every file's blocks instead of
+      the open document's readout (which now lives on its pane row);
+      single-document reviews are unchanged. Chosen: session-cache marks over
+      persisting them (persistence is a format decision nothing here needs),
+      blank over `0/n` for untouched files, `n/m!` over separate
+      reviewed/flagged columns, footer tree-roll-up over tree-plus-document.
+      `[felt]` — see journal 2026-08-11.4 — done 2026-08-11
 
 - [x] **A cross-document comment inbox** — `i` in a directory review (D10)
       replaces the document column with the comment inbox: `loadInbox` walks

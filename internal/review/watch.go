@@ -227,6 +227,12 @@ func (m *model) reloadDoc() {
 	m.doc = doc
 	m.src = src
 	m.rawH = 0
+	// The tree's per-document totals follow the reloaded blocks, so a
+	// document an agent rewrote re-counts its markable blocks (a reload is
+	// exactly the "prose moved under me" case a stale total would misreport).
+	if m.markTotals != nil {
+		m.markTotals[m.store.docPath] = markableTotal(doc)
+	}
 	reattach(m.doc, m.threads)
 	m.rebuild()
 	// Re-focus: by anchor when the focused block still exists (the common

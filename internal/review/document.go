@@ -185,6 +185,19 @@ func (b block) markable() bool {
 	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode || b.kind == blockTable
 }
 
+// markableTotal counts the blocks a review mark can land on — the denominator
+// of a document's progress. Headings are excluded (they roll up, they do not
+// hold marks), matching reviewProgress's per-block accounting.
+func markableTotal(blocks []block) int {
+	n := 0
+	for _, b := range blocks {
+		if b.markable() && b.anchor != "" {
+			n++
+		}
+	}
+	return n
+}
+
 // listItem is one item of a blockList, split out of the list's raw source so
 // it can wrap independently of its siblings. prefix is the marker exactly as
 // it reads on screen — indentation folded in, so a nested item gets a wider

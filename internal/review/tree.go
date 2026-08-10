@@ -96,8 +96,15 @@ func buildTree(files []string) []treeEntry {
 	return out
 }
 
-// treeWidth is the pane's column width, sized to its widest row and clamped so
-// a long path cannot swallow the document column.
+// progW is the width of the right-aligned progress slot every pane row
+// carries — a file's "reviewed/total", or blank where there is none. It is a
+// fixed slot rather than appended text so the document column stays aligned
+// whether or not a row has anything to show.
+const progW = 7
+
+// treeWidth is the pane's column width: the name portion sized to the widest
+// row and clamped, plus the fixed progress slot, the whole thing capped so a
+// long path cannot swallow the document column.
 func treeWidth(tree []treeEntry) int {
 	w := 0
 	for _, e := range tree {
@@ -105,7 +112,7 @@ func treeWidth(tree []treeEntry) int {
 			w = l
 		}
 	}
-	return min(max(w, 16), 36)
+	return min(max(w, 16), 36-progW) + progW
 }
 
 // newTreeModel builds the model for a tree review of dir: the pane rows from
@@ -154,6 +161,24 @@ func newTreeModel(dir string) (*model, error) {
 	m.treeAt = first
 	m.treeW = treeWidth(tree)
 	m.store = &threadStore{root: root, docPath: rel}
+	// The tree-progress session state: markCache holds each document's marks
+	// (session-local — nothing persists marks, D5), and markTotals holds every
+	// document's markable block count, computed up front so the pane's n/m and
+	// the footer's tree-wide roll-up have a whole-tree denominator rather than
+	// "the files opened so far". The open document's total comes from the doc
+	// already loaded; the rest parse once, defensively skipping any file that
+	// will not open (it contributes nothing to progress, which is honest).
+	m.markCache = map[string]map[string]reviewMark{}
+	m.markTotals = map[string]int{}
+	m.markTotals[rel] = markableTotal(doc)
+	for _, e := range tree {
+		if e.isDir || e.rel == rel {
+			continue
+		}
+		if blocks, _, err := loadDoc(filepath.Join(root, filepath.FromSlash(e.rel))); err == nil {
+			m.markTotals[e.rel] = markableTotal(blocks)
+		}
+	}
 	// The change-notification cursor starts at the newest event already on
 	// disk — the same seed the single-document path sets, so events from
 	// before the session are history, not news.
@@ -251,8 +276,17 @@ func (m *model) openTreeFile(i int) {
 	m.doc = doc
 	m.src = src
 	m.threads = threads
+	// Tree progress is session state keyed per document: the outgoing
+	// document's marks go into the cache and the incoming document's come back
+	// out — a switch is a move between reviews, not a discard of them.
+	if m.markCache != nil {
+		m.markCache[m.store.docPath] = m.marks
+		m.marks = m.markCache[e.rel]
+		if m.marks == nil {
+			m.marks = map[string]reviewMark{}
+		}
+	}
 	m.store.docPath = e.rel
-	m.marks = map[string]reviewMark{}
 	m.codeScroll = map[string]int{}
 	m.raw = false
 	m.rawH = 0
@@ -332,17 +366,53 @@ func (m *model) renderTree(viewport int) []string {
 		}
 		e := m.tree[idx]
 		indent := strings.Repeat("  ", e.depth)
+		var name string
 		switch {
 		case e.isDir:
-			rows[i] = dimStyle.Render(indent + e.name + "/")
+			name = dimStyle.Render(indent + e.name + "/")
 		case idx == m.treeAt && m.treeFocus:
-			rows[i] = focusStyle.Render("▌ ") + textStyle.Render(indent+e.name)
+			name = focusStyle.Render("▌ ") + textStyle.Render(indent+e.name)
 		case m.store != nil && e.rel == m.store.docPath:
-			rows[i] = dimStyle.Render("▸ ") + textStyle.Render(indent+e.name)
+			name = dimStyle.Render("▸ ") + textStyle.Render(indent+e.name)
 		default:
-			rows[i] = "  " + dimStyle.Render(indent+e.name)
+			name = "  " + dimStyle.Render(indent+e.name)
 		}
-		rows[i] = lipgloss.NewStyle().Width(m.treeW).Render(rows[i])
+		rows[i] = lipgloss.NewStyle().Width(m.treeW - progW).Render(name) + m.renderTreeProgress(e)
 	}
 	return rows
+}
+
+// renderTreeProgress returns a pane row's right-aligned progress slot: a file
+// with any marks this session shows its reviewed/total — green when the whole
+// file is reviewed, orange with a trailing `!` when any block is flagged, dim
+// otherwise — and a file nobody has touched (or a directory) shows a blank
+// place-holder, keeping every row the same width. `0/n` was rejected as a
+// slot for untouched files: a freshly opened tree would be wall-to-wall zeros,
+// which reads as "nothing", and the tree-wide footer roll-up already carries
+// the untouched denominator.
+func (m *model) renderTreeProgress(e treeEntry) string {
+	slot := ""
+	if !e.isDir {
+		if marks := m.marksForDoc(e.rel); len(marks) > 0 {
+			n, flagged := 0, false
+			for _, mk := range marks {
+				switch mk {
+				case markOK:
+					n++
+				case markFlag:
+					flagged = true
+				}
+			}
+			total := m.markTotals[e.rel]
+			switch {
+			case flagged:
+				slot = flagStyle.Render(fmt.Sprintf("%d/%d!", n, total))
+			case total > 0 && n == total:
+				slot = okStyle.Render(fmt.Sprintf("%d/%d", n, total))
+			case total > 0:
+				slot = dimStyle.Render(fmt.Sprintf("%d/%d", n, total))
+			}
+		}
+	}
+	return lipgloss.NewStyle().Width(progW).Align(lipgloss.Right).Render(slot)
 }

@@ -137,6 +137,18 @@ type model struct {
 	treeScroll int
 	treeW      int
 
+	// markCache and markTotals are the tree-progress session state. A tree
+	// review switches documents in place, and a document's marks are
+	// session-local (nothing persists marks; threads are the only on-disk
+	// review state, D5) — so a switch must carry them, not throw them away:
+	// markCache keeps each document's marks keyed by its rel path, and
+	// markTotals keeps each document's markable block count, computed for
+	// every file at tree open so the denominator is the whole tree, opened or
+	// not. Both are nil on a single-document review, which has no tree to
+	// aggregate.
+	markCache  map[string]map[string]reviewMark
+	markTotals map[string]int
+
 	// inbox is the cross-document comment inbox view (inbox.go): `i` in a tree
 	// review swaps the document column for the tree's threads, newest first.
 	// inboxAt is the focused row, inboxScroll the inbox's own scroll offset
@@ -1210,6 +1222,44 @@ func (m *model) reviewProgress() (done, flagged, total int) {
 			done++
 		case markFlag:
 			flagged++
+		}
+	}
+	return
+}
+
+// marksForDoc returns the session marks for the document at rel — the live
+// m.marks when rel is the document under review (marks mutate there before a
+// switch saves them into markCache), else the cache. The tree pane and the
+// tree-wide footer roll-up both read through here so neither can show a stale
+// snapshot of the document that is open right now.
+func (m *model) marksForDoc(rel string) map[string]reviewMark {
+	if m.store != nil && rel == m.store.docPath {
+		return m.marks
+	}
+	if m.markCache == nil {
+		return nil
+	}
+	return m.markCache[rel]
+}
+
+// treeProgress rolls every document's marks up into one tree-wide readout: the
+// reviewed and flagged counts across every markable block in the tree, opened
+// or not — markTotals is computed for every file at tree open, so a document
+// the reviewer never visited still contributes its blocks to the denominator,
+// which is what makes the number "progress across the whole tree" rather than
+// "progress across what I happened to open". Only documents with a known total
+// count: a file that failed to parse at open contributes nothing, since
+// "progress" over unreadable blocks is meaningless.
+func (m *model) treeProgress() (done, flagged, total int) {
+	for rel, t := range m.markTotals {
+		total += t
+		for _, mk := range m.marksForDoc(rel) {
+			switch mk {
+			case markOK:
+				done++
+			case markFlag:
+				flagged++
+			}
 		}
 	}
 	return
@@ -2625,6 +2675,16 @@ func (m *model) View() tea.View {
 		progress := fmt.Sprintf("%d/%d reviewed", done, total)
 		if flagged > 0 {
 			progress += fmt.Sprintf(" · %s", flagStyle.Render(fmt.Sprintf("%d flagged", flagged)))
+		}
+		// A tree review's footer rolls the whole tree up, not just the open
+		// document — the open document's own numbers sit on its pane row, so
+		// the footer is where the tree-wide answer lives.
+		if m.tree != nil {
+			td, tf, tt := m.treeProgress()
+			progress = fmt.Sprintf("tree %d/%d reviewed", td, tt)
+			if tf > 0 {
+				progress += fmt.Sprintf(" · %s", flagStyle.Render(fmt.Sprintf("%d flagged", tf)))
+			}
 		}
 		hint := "j/k move · c comment · e edit · space mark · Y copy review · q quit   "
 		if m.raw {

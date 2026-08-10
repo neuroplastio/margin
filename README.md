@@ -96,9 +96,13 @@ markdown files beneath the directory (hidden directories are tooling and are
 skipped, and a directory with no markdown anywhere beneath it does not
 appear). `tab` moves keyboard focus between the pane and the document; in the
 pane, `j`/`k` move through the files and `enter` (or `l`) opens the focused
-one — threads, marks and comments all switch to the new document. The pane
-carries a `▸` on the open file, and a `▌` on the focused row while the pane is
-active.
+one — the document, its threads and its comments switch to the new file, while
+each file's review marks are carried per-document across switches. The pane
+shows a file's `reviewed/total` beside it once it has any marks (green when the
+whole file is reviewed, orange with a `!` when something is flagged), and in a
+directory review the footer rolls the whole tree up — `tree N/M reviewed` — so
+untouched files count against the total. The pane carries a `▸` on the open
+file, and a `▌` on the focused row while the pane is active.
 
 Or pipe markdown straight in for an ephemeral review — `margin -` (or
 `--stdin`) reads the document from stdin, saves nothing to `.margin/threads`,

@@ -95,7 +95,10 @@ threads it considers resolved.
 - [x] Page and half-page keys (SCROLL-02)
 - [x] Mouse wheel (SCROLL-03)
 - [x] Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`)
-- [ ] Review progress across the whole tree
+- [x] Review progress across the whole tree *(marks carried per-document
+      across switches, per-file `n/m` in the pane, `tree N/M reviewed` in the
+      footer — journal 2026-08-11.4; per-document scroll and any judgement of
+      the progress surface remain open)*
 
 **Open question that gates the design:** is the unit of review a file or a tree?
 It changes the navigation model and is hard to retrofit. Raise it before building.
