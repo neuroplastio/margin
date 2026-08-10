@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (enter/esc dive bindings — done)
+Last updated: 2026-08-10 (viewport width and horizontal scroll — claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -124,7 +124,14 @@ Last updated: 2026-08-10 (enter/esc dive bindings — done)
 
 ## In progress
 
-*(none)*
+- **(feedback feature)** viewport width and horizontal scroll: `contentWidth()`
+      uses the terminal's width instead of capping prose at `maxMeasure` (76);
+      wide blocks (code blocks, and tables once they scroll) are allowed up to
+      the full terminal width; tables keep their natural column widths and
+      scroll horizontally like a code block instead of narrowing; horizontal
+      scroll moves from `l`/`h` to `H`/`L`, leaving `l`/`h` dive/surface
+      everywhere. Drains `vault/feedback/2026-08-10-viewport-width-and-horizontal-scroll.md`.
+      `[felt]` — claimed 2026-08-10
 
 ## Backlog — M1
 
