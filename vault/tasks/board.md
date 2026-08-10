@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (hover-without-lmb)
+Last updated: 2026-08-10 (mermaid sequence and state diagrams claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -219,7 +219,13 @@ Last updated: 2026-08-10 (hover-without-lmb)
 
 ## In progress
 
-*(none)*
+- (feedback feature) support mermaid `sequenceDiagram` and `stateDiagram-v2`
+  in the review — participants, message arrows, activations and notes for
+  sequences; states, transitions and `[*]` start/end for state diagrams, in
+  the same in-tree ASCII renderer, same constraints (never a half-parsed
+  diagram; on-disk format untouched); drains
+  `vault/feedback/2026-08-10-mermaid-sequence-and-state.md`. Claimed
+  2026-08-10 by the do-leg agent.
 
 ## Backlog — M1
 
