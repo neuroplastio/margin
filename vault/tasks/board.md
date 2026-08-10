@@ -251,7 +251,11 @@ so a long diagram/code block/table reads instead of leaping past)
 
 ## In progress
 
-*(none)*
+- **(feedback feature)** inline code (and bold/link) renders inside table
+      cells: `| `margin` runs in a TUI |` shows `margin` styled as code rather
+      than plain text, carrying RENDER-06's bold/code/link runs through the
+      column-width layout — claimed 2026-08-10 (drains
+      `vault/feedback/2026-08-10-inline-code-in-tables.md`)
 
 ## Done
 
