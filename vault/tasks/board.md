@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (Q-0003 raised — comment identity for the agent-polling wait command)
+Last updated: 2026-08-10 (Q-0003 answered — event log; claiming its first slice)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -148,7 +148,11 @@ Last updated: 2026-08-10 (Q-0003 raised — comment identity for the agent-polli
 
 ## In progress
 
-*(none)*
+- **(feedback feature)** interactive agent review, slice 1: the event log at
+  `.margin/events.log` — record every thread mutation (post, edit, delete,
+  restore, resolve) as one append-only line carrying a time-ordered ULID id,
+  and close Q-0003 (answer: the log is separate from thread files; the `--since`
+  cursor is an event id). Claimed 2026-08-10.
 
 ## Backlog — M1
 
@@ -175,12 +179,15 @@ document, regardless of the order the tree-view work itself lands in.
 
 ## Blocked
 
-- **Q-0003** (comment identity for `margin comments wait --since`) — raised
-  2026-08-10. Blocks the interactive-agent-review feature in
-  `vault/feedback/2026-08-10-interactive-agent-review.md`: whether `--since`
-  names the comment's timestamp or a new id field is a thread-file format
-  decision (on-disk format, the expensive-to-unwind class). The feedback file
-  stays until the question is answered and the feature lands.
+*(none)*
+
+Q-0003 was answered 2026-08-10 and folded into `knowledge/decisions.md` as
+**D13** (the event log at `.margin/events.log`); the question file is deleted.
+The interactive-agent-review feature in
+`vault/feedback/2026-08-10-interactive-agent-review.md` is being built in
+slices: the event log itself (2026-08-10.7) is this leg, and `margin comments
+wait [--since <last_known_id>]` — the CLI half that reads the log — remains a
+leg. The feedback file stays until that lands.
 
 Q-0001 and Q-0002 were answered 2026-08-07 and folded into
 `knowledge/decisions.md` as **D10** (tree review) and **D11** (thread
