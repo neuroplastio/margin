@@ -461,9 +461,14 @@ func collapse(s string) string {
 // characters are folded into one run so wrapInline (review.go) does not deal
 // with markup one byte at a time. Used for paragraphs, list items and quotes
 // alike — all three wrap through wrapInline.
+//
+// href is a link run's destination — what `[text](url)` carried in its
+// parentheses — kept so jump.follow (jump.go) can resolve an in-document
+// `#slug` link against the document's headings. Empty for every non-link run.
 type inlineRun struct {
 	text             string
 	bold, code, link bool
+	href             string
 }
 
 // parseInline recognises RENDER-06's three inline forms — **bold**,
@@ -506,7 +511,7 @@ func parseInline(s string) []inlineRun {
 			if close := strings.IndexByte(s[i:], ']'); close >= 0 && i+close+1 < len(s) && s[i+close+1] == '(' {
 				if paren := strings.IndexByte(s[i+close+2:], ')'); paren >= 0 {
 					flushPlain()
-					runs = append(runs, inlineRun{text: s[i+1 : i+close], link: true})
+					runs = append(runs, inlineRun{text: s[i+1 : i+close], link: true, href: s[i+close+2 : i+close+2+paren]})
 					i += close + 2 + paren + 1
 					continue
 				}

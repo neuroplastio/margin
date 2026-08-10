@@ -134,6 +134,42 @@ var commands = []command{
 		Run:         func(m *model, val string) tea.Cmd { m.searchStep(-1); return nil },
 	},
 	{
+		// jump.follow is the M3 navigation item "link navigation between
+		// blocks": it follows the first in-document link in the focused block
+		// — a `[text](#heading-slug)` — jumping focus to that heading and
+		// recording the landing in the jumplist (jump.go). `ctrl+]` is the
+		// binding, vim's "jump to the reference under the cursor" (tag-jump),
+		// which pairs with the jumplist's `ctrl+o`/`ctrl+i` exactly the way
+		// vim's tag navigation does. Applicable requires an actual link in the
+		// block so the palette does not offer a jump that will only report
+		// "no link here".
+		ID:          "jump.follow",
+		Description: "Follow the in-document link in the focused block",
+		Applicable:  func(m *model) bool { return len(m.focusedLinks()) > 0 },
+		Run: func(m *model, val string) tea.Cmd {
+			m.followLink()
+			return nil
+		},
+	},
+	{
+		ID:          "jump.back",
+		Description: "Jump back in the jumplist",
+		Applicable:  func(m *model) bool { return m.jumpIdx > 0 },
+		Run: func(m *model, val string) tea.Cmd {
+			m.jumpBack()
+			return nil
+		},
+	},
+	{
+		ID:          "jump.forward",
+		Description: "Jump forward in the jumplist",
+		Applicable:  func(m *model) bool { return m.jumpIdx < len(m.jumps)-1 },
+		Run: func(m *model, val string) tea.Cmd {
+			m.jumpForward()
+			return nil
+		},
+	},
+	{
 		// move.dive is the 2026-08-09 todo-review feedback's "dedicated dive
 		// navigation type": the only way focus reaches a comment from the
 		// keyboard. j/k at block level walk blocks and thread rows only, so
@@ -463,6 +499,7 @@ var commands = []command{
 		Run: func(m *model, val string) tea.Cmd {
 			for i, e := range m.entries {
 				if e.b.kind == blockHeading && string(e.b.text) == val {
+					m.pushJump(cursor{entry: i, comment: commentNone})
 					m.at = cursor{entry: i, comment: commentNone}
 					break
 				}
@@ -595,6 +632,9 @@ var keyBindings = []struct {
 	{"G", "move.last"}, {"end", "move.last"},
 	{"n", "search.next"},
 	{"N", "search.prev"},
+	{"ctrl+]", "jump.follow"},
+	{"ctrl+o", "jump.back"},
+	{"ctrl+i", "jump.forward"},
 	{"c", "comment.new"},
 	{"e", "comment.edit"},
 	{"r", "mark.reviewed"},

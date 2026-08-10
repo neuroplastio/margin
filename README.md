@@ -56,6 +56,8 @@ detectably orphaned rather than silently misplaced.
 | `H` / `L` | Scroll a wide block (code, table, frontmatter) horizontally — or the whole raw source view, in raw mode |
 | `/` | Search: type to highlight matches live, `enter` to jump, `esc` to cancel |
 | `n` / `N` | Jump to the next / previous search match |
+| `ctrl+]` | Follow the in-document link in the focused block (jumps to the heading it names) |
+| `ctrl+o` / `ctrl+i` | Walk the jumplist back / forward (older / newer jumps) |
 | `V` | Select blocks (visual mode): movement extends, `esc` cancels |
 | `y` | Yank the selected blocks' markdown to the clipboard |
 | `c` | New comment on the focused block (opens in insert mode) |

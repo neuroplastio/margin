@@ -1,11 +1,16 @@
 # Board
 
-Last updated: 2026-08-10 (M2 closed — every roadmap item and its exit criteria
-landed; M1's lazy-stamping wiring is recorded as a known gap in D12. Active
-milestone moves to M3, whose backlog is seeded below.)
+Last updated: 2026-08-10 (link navigation with a jumplist landed in the M3
+navigation backlog; the tree-view backlog is the only thing left open there).
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (link navigation) `ctrl+]` follows the first in-document link in the
+  focused block to its heading; `ctrl+o`/`ctrl+i` walk the jumplist (link,
+  search, line and section jumps; the walkers j/k, page, g/G are not
+  recorded) — whether `ctrl+]` is the follow key, whether search/line jumps
+  belong in the list, and whether first-link-wins is the right rule —
+  journal 2026-08-10.25
 - (feedback feature) table cells render their own inline markup: `` `code` ``,
   **bold** and [links] inside a cell now carry RENDER-06's styles the way a
   paragraph's runs do — `tableCellsFor` keeps each cell's markup (cellText
@@ -262,10 +267,25 @@ milestone moves to M3, whose backlog is seeded below.)
 
 ## In progress
 
-- Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`) —
-  in-document — claimed 2026-08-10
+*(none)*
 
 ## Done
+
+- [x] **Link navigation between blocks, with a jumplist** (`ctrl+o` / `ctrl+i`)
+      — `ctrl+]` follows the first in-document `[text](#heading-slug)` link in
+      the focused block to the heading it names (GitHub-style slugs, duplicate
+      headings disambiguated with `-1`/`-2` like GitHub), centring it like a
+      search jump; the jumplist records every *teleport* — link-follows, search
+      jumps, source-line jumps, `goto` section jumps — and `ctrl+o`/`ctrl+i`
+      walk older/newer entries with vim's truncate-forward-on-branching and
+      cap-at-100 semantics. Dead ends are reported, not silent: no link, all
+      links external (the tree-view milestone's job), and a fragment naming no
+      heading each get a status line. Chosen: `ctrl+]` over `gf`/`gx`
+      (`g` is an eager prefix that would fire move.first first) and
+      `enter`/`l` (dive); recording the teleports but not the walkers
+      (`j`/`k`, page keys, `g`/`G`) so the list does not flood; first-link-wins
+      in a block with several. `[felt]` — see journal 2026-08-10.25 — done
+      2026-08-10
 
 - [x] **(feedback feature)** inline code (and bold/link) renders inside table
       cells: a `| `margin` runs in a TUI |` cell now shows `margin` styled as
@@ -363,7 +383,7 @@ Independent of the tree view (D10): these are about moving around one
 document, regardless of the order the tree-view work itself lands in.
 
 - *(Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`) —
-  in-document — claimed, see In progress.)*
+  landed, see Done 2026-08-10.)*
 - *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
   earlier; see Done.)*
 

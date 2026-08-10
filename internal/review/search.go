@@ -259,13 +259,16 @@ func (m *model) searchStep(d int) {
 // owning entry and the scroll centres the match line in the viewport, so the
 // highlight that was just reached is the one under the reader's eye. scrollAnchor
 // is updated to match, so clampScroll does not immediately re-derive the
-// offset away from the centred line (SCROLL-01's decoupling).
+// offset away from the centred line (SCROLL-01's decoupling). A search jump is
+// a jump — it teleports focus — so the landing is recorded in the jumplist
+// before focus moves, and ctrl+o returns to wherever the search was started.
 func (m *model) gotoMatch(idx int) {
 	if idx < 0 || idx >= len(m.searchMatches) {
 		return
 	}
 	mt := m.searchMatches[idx]
 	m.searchCurrent = idx
+	m.pushJump(cursor{entry: mt.entry, comment: commentNone})
 	m.at = cursor{entry: mt.entry, comment: commentNone}
 	viewport := max(m.h-footerRows, 1)
 	m.scroll = max(0, mt.line-viewport/2)

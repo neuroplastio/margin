@@ -273,6 +273,20 @@ type model struct {
 	// pointing at the emulator's first row.
 	paneLead int
 
+	// jumps is the jumplist (jump.go): the positions each jump — following a
+	// link, a search match, a source line, a section — landed on, oldest
+	// first, with jumpIdx the index of the current position. `ctrl+o` walks
+	// to an older entry, `ctrl+i` to a newer one, vim's jumplist keys. Seeded
+	// with the opening position so the first jump has somewhere to return to.
+	jumps   []cursor
+	jumpIdx int
+
+	// headingSlugs maps a GitHub-style heading slug to the entry index of the
+	// heading it names, so `jump.follow` can resolve a `[text](#slug)` link
+	// against the document's headings. Rebuilt whenever the entries are
+	// (rebuild), like every other index of the block list.
+	headingSlugs map[string]int
+
 	// Latency instrumentation: keyAt is stamped when a keypress is forwarded
 	// and sampled on the first frame the child's response reaches, so samples
 	// measure the whole round trip — host key, pty, nvim, emulator, our frame.
@@ -312,6 +326,7 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 		wheelSpeed:   3,
 	}
 	m.rebuild()
+	m.jumps = []cursor{m.at}
 	return m
 }
 
@@ -357,6 +372,34 @@ func (m *model) rebuild() {
 	}
 	if m.at.entry >= len(m.entries) {
 		m.at = cursor{entry: len(m.entries) - 1, comment: commentNone}
+	}
+	m.rebuildSlugs()
+}
+
+// rebuildSlugs rebuilds headingSlugs from the current entries, the same
+// index-of-the-block-list pass everything else makes here: a heading's
+// GitHub-style slug names the entry jump.follow lands on. Duplicate headings
+// get GitHub's disambiguation — the first keeps the bare slug, later ones get
+// `-1`, `-2`, … — so a document with two "## Install" sections still has a
+// working `#install-1`.
+func (m *model) rebuildSlugs() {
+	m.headingSlugs = make(map[string]int, len(m.entries))
+	used := map[string]int{}
+	for i, e := range m.entries {
+		if e.b.kind != blockHeading {
+			continue
+		}
+		base := headingSlug(e.b.text)
+		if base == "" {
+			continue
+		}
+		n := used[base]
+		used[base]++
+		slug := base
+		if n > 0 {
+			slug = fmt.Sprintf("%s-%d", base, n)
+		}
+		m.headingSlugs[slug] = i
 	}
 }
 
@@ -599,6 +642,7 @@ func (m *model) jumpToLine(n int) {
 	} else {
 		m.status = fmt.Sprintf("no source line %d — jumped to the nearest block", n)
 	}
+	m.pushJump(cursor{entry: target, comment: commentNone})
 	m.at = cursor{entry: target, comment: commentNone}
 	viewport := max(m.h-footerRows, 1)
 	if target >= 0 && target < len(m.spans) {

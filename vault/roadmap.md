@@ -85,7 +85,7 @@ threads it considers resolved.
 - [x] A scroll offset the user owns, decoupled from focus-follow (SCROLL-01)
 - [x] Page and half-page keys (SCROLL-02)
 - [x] Mouse wheel (SCROLL-03)
-- [ ] Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`)
+- [x] Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`)
 - [ ] Review progress across the whole tree
 
 **Open question that gates the design:** is the unit of review a file or a tree?
