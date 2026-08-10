@@ -219,6 +219,44 @@ var commands = []command{
 		},
 	},
 	{
+		// tree.focus moves keyboard focus into the file-tree pane of a
+		// directory review (D10), and back out. `tab` is the binding — the
+		// pane's modal surface is otherwise reached only by a mouse click on
+		// one of its rows. While the pane holds focus, j/k/g/G/enter move and
+		// open files and everything else is inert until tab/esc/h returns to
+		// the document (handlePaneKey). Applicable only when a tree exists:
+		// a single-document review (`margin FILE.md`) has no pane to focus.
+		ID:          "tree.focus",
+		Description: "Toggle focus between the file tree and the document",
+		Applicable:  func(m *model) bool { return m.tree != nil },
+		Run: func(m *model, val string) tea.Cmd {
+			if m.tree == nil {
+				return nil
+			}
+			if m.treeFocus {
+				m.treeFocus = false
+				m.status = ""
+				return nil
+			}
+			// Entering the pane lands on the open document's row, so the
+			// reviewer always knows where the current file sits in the tree.
+			// Visual mode is a document selection — the pane is a different
+			// surface, so it cancels.
+			m.visual = false
+			m.pendingKey = ""
+			m.count = ""
+			for i, e := range m.tree {
+				if !e.isDir && m.store != nil && e.rel == m.store.docPath {
+					m.treeAt = i
+					break
+				}
+			}
+			m.treeFocus = true
+			m.status = ""
+			return nil
+		},
+	},
+	{
 		// move.hscrollLeft/Right are horizontal scroll, the 2026-08-10
 		// viewport-width feedback's re-binding: H/L scroll a wide block
 		// (code, table, frontmatter) sideways, and l/h keep their dive and
@@ -651,6 +689,7 @@ var keyBindings = []struct {
 	{"m", "mark"},
 	{"s", "goto"},
 	{"\\", "view.raw"},
+	{"tab", "tree.focus"},
 	{"ctrl+r", "doc.reload"},
 	{"q", "app.quit"}, {"ctrl+c", "app.quit"},
 }

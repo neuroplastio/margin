@@ -80,7 +80,11 @@ threads it considers resolved.
 
 *Felt-heavy. Expect this to be the slow milestone.*
 
-- [ ] Review a directory, not just a file
+- [x] Review a directory, not just a file — `margin DIR/` / bare `margin`
+      opens a tree of markdown files in a left pane (`tab` toggles focus,
+      `j`/`k` move, `enter`/`l` opens the focused file, switching threads and
+      marks to it); the pane's look/position/toggle/focus is felt, journal
+      2026-08-11.1
 - [ ] Navigation between documents, and a cross-document comment inbox
 - [x] A scroll offset the user owns, decoupled from focus-follow (SCROLL-01)
 - [x] Page and half-page keys (SCROLL-02)
@@ -92,8 +96,10 @@ threads it considers resolved.
 It changes the navigation model and is hard to retrofit. Raise it before building.
 *(Answered 2026-08-07: Q-0001 closed as **D10** — the unit of review is both a
 file and a tree, chosen by argv; `margin FILE.md` stays a single-document review.
-What remains felt and unsettled is the tree pane's appearance, position, toggle
-and focus — tracked in `interaction.md`'s "Not settled".)*
+The tree pane's first build is journal 2026-08-11.1 — the appearance, position,
+toggle and focus it chose are felt and need the maintainer's look (on the
+board's `Needs a look:` list); interaction.md's "Not settled" tracks what is
+still open.)*
 
 ---
 

@@ -1,10 +1,22 @@
 # Board
 
-Last updated: 2026-08-10 (link navigation with a jumplist landed in the M3
-navigation backlog; the tree-view backlog is the only thing left open there).
+Last updated: 2026-08-11 (directory review landed: `margin DIR/` / bare
+`margin` opens a left file-tree pane with tab focus-toggle, j/k and enter
+to open files — the first M3 tree-view item).
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (directory review) `margin DIR/` / bare `margin` opens a left file-tree pane
+  of the markdown files beneath the dir (dimmed dir headers for dirs with
+  markdown under them, files indented); `tab` toggles focus between pane and
+  document, `j`/`k`/`g`/`G` move through files, `enter`/`l` opens the focused
+  file (threads/store/watcher re-point, marks+scroll reset — a fresh review),
+  `esc`/`h`/`tab` returns to the doc, `q` quits; open file `▸`, focused row
+  `▌`, click selects; hidden dirs skipped; export still covers one document —
+  whether the pane belongs left, whether `tab` is the focus key, whether dir
+  headers should be focus stops/collapsible, whether open should land you in
+  the doc or stay in the pane, and whether switching should carry marks and
+   scroll per-document — journal 2026-08-11.1
 - (link navigation) `ctrl+]` follows the first in-document link in the
   focused block to its heading; `ctrl+o`/`ctrl+i` walk the jumplist (link,
   search, line and section jumps; the walkers j/k, page, g/G are not
@@ -267,12 +279,26 @@ navigation backlog; the tree-view backlog is the only thing left open there).
 
 ## In progress
 
-- [ ] **Review a directory, not just a file** — claimed by the 2026-08-11 tree-pane
-      leg: `margin` / `margin DIR/` opens a tree of markdown files in a left pane,
-      `tab` toggles focus between it and the document, `enter` opens the focused
-      file. *In progress, 2026-08-11.*
+*(none)*
 
 ## Done
+
+- [x] **Review a directory, not just a file** — `margin DIR/` and bare `margin`
+      (D10) walk the directory for markdown files and open the first one with a
+      left file-tree pane: directories that have markdown beneath them are
+      dimmed headers with their files indented, `tab` toggles focus between the
+      pane and the document, `j`/`k` (and `g`/`G`) move through the files
+      skipping headers, `enter`/`l` opens the focused file (threads, store and
+      watcher re-point, session state resets — a fresh review of a fresh
+      document, refusing while a composer is open), `esc`/`h`/`tab` return to
+      the document; the open file carries a `▸` and the focused row a `▌`;
+      clicks on a pane row select and focus it; `contentWidth`, the composer
+      box/cursor and mouse hit-testing offset by the pane width; hidden
+      directories are skipped so `.margin`'s thread files never appear; arg
+      validation moved to `cobra.MaximumNArgs(1)` per D10; the export still
+      covers the one document under review. Chosen: left pane, `tab`, dive keys
+      to open, dir headers as non-focusable rows, reset-on-switch. `[felt]` —
+      see journal 2026-08-11.1 — done 2026-08-11
 
 - [x] **Link navigation between blocks, with a jumplist** (`ctrl+o` / `ctrl+i`)
       — `ctrl+]` follows the first in-document `[text](#heading-slug)` link in
@@ -372,11 +398,11 @@ asked for. Split per the feedback's own suggested ordering — see
 ## Backlog — M3 (tree view)
 
 The unit-of-review question is settled (D10): `margin` / `margin DIR/` open a
-tree of markdown files, `margin FILE.md` stays a single-document review. What the
-pane looks like, where it sits, and how it is toggled and focused is still felt
-(interaction.md "Not settled").
+tree of markdown files, `margin FILE.md` stays a single-document review. The
+pane's first build landed 2026-08-11 (journal 2026-08-11.1); its appearance,
+position, toggle and focus are on `Needs a look:` until judged.
 
-- Review a directory, not just a file
+- *(Review a directory, not just a file — landed, see Done 2026-08-11.)*
 - Navigation between documents, and a cross-document comment inbox
 - Review progress across the whole tree
 

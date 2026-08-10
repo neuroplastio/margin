@@ -123,6 +123,20 @@ type model struct {
 	marks   map[string]reviewMark
 	entries []entry
 
+	// tree mode (D10): a directory review keeps the list of markdown files in
+	// a left pane (`margin` / `margin DIR/`). tree is nil for a
+	// single-document review (`margin FILE.md`), which renders exactly as it
+	// always has. treeAt is the focused file row, treeFocus whether keyboard
+	// focus sits in the pane (the document pane owns the keys otherwise),
+	// treeScroll the pane's own scroll offset (independent of the document's),
+	// and treeW the pane's width in columns. openTreeFile switches the
+	// document under review in place.
+	tree       []treeEntry
+	treeAt     int
+	treeFocus  bool
+	treeScroll int
+	treeW      int
+
 	// raw switches the view to the document's verbatim markdown source — the
 	// 2026-08-09 navigation-feature-requests "rich/raw mode toggle". Rendered
 	// view re-reads m.doc's blocks; raw view re-reads m.src, the exact bytes
@@ -435,7 +449,7 @@ func (m *model) waitForChild() tea.Cmd {
 // The floor keeps a very narrow terminal readable; there is deliberately no
 // upper cap, since the terminal's own width is the physical limit.
 func (m *model) contentWidth() int {
-	return max(m.w-2*gutterW, minPaneCol)
+	return max(m.w-2*gutterW-m.docX(), minPaneCol)
 }
 
 // --- focus ------------------------------------------------------------------
@@ -1459,6 +1473,14 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 
+	// While focus sits in the tree pane it owns the keyboard: j/k move
+	// through files, enter opens, tab/esc/h hand focus back to the document.
+	// It is a modal surface like the composer and the search prompt, so its
+	// keys route here before anything else.
+	if m.tree != nil && m.treeFocus {
+		return m.handlePaneKey(msg)
+	}
+
 	// esc cancels an active selection first — vim's rule, the composer's own
 	// esc (owned by the child while it is open) is untouched. Outside visual
 	// mode esc is move.surface: the undive key, a no-op where there is no
@@ -1704,8 +1726,19 @@ func (m *model) editFocused() tea.Cmd {
 func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
 
+	// A click in the tree pane's column selects the row under the pointer and
+	// moves keyboard focus into the pane — the mouse's one job is moving
+	// focus, and this is the tree's focus.
+	if m.tree != nil && mo.X < m.docX() && m.comp == nil {
+		if idx := mo.Y + m.treeScroll; idx >= 0 && idx < len(m.tree) && !m.tree[idx].isDir {
+			m.treeAt = idx
+			m.treeFocus = true
+		}
+		return nil
+	}
+
 	if m.comp != nil && m.paneTop >= 0 {
-		relY, relX := line-m.paneTop, mo.X-(gutterW+borderW)
+		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
 		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
 			m.comp.sendMouse(relX, relY, mo.Button, false)
 			return nil
@@ -1733,8 +1766,16 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
 
+	// The tree pane is not a document block — hovering it clears any
+	// document hover rather than misattributing it to whatever block sits at
+	// the same height in the other column.
+	if m.tree != nil && mo.X < m.docX() {
+		m.hoveredEntry = -1
+		return nil
+	}
+
 	if m.comp != nil && m.paneTop >= 0 {
-		relY, relX := line-m.paneTop, mo.X-(gutterW+borderW)
+		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
 		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
 			m.hoveredEntry = -1
 			return nil
@@ -1756,7 +1797,7 @@ func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
 
 	if m.comp != nil && m.paneTop >= 0 {
-		relY, relX := line-m.paneTop, mo.X-(gutterW+borderW)
+		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
 		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
 			m.comp.sendMouse(relX, relY, mo.Button, false)
 			return nil
@@ -2476,6 +2517,19 @@ func (m *model) View() tea.View {
 	m.scroll = m.clampScroll(len(lines), viewport)
 	visible := lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
 
+	// A directory review puts the file tree in a left column: each visible
+	// document line is prefixed with the pane's row at the same height, so
+	// both scroll independently and the document keeps its full width on the
+	// right of the pane. The separator is a dim rule, the same vertical
+	// language the blockquote and gutter already use.
+	if m.tree != nil {
+		pane := m.renderTree(viewport)
+		sep := dimStyle.Render("│")
+		for i, l := range visible {
+			visible[i] = pane[i] + sep + l
+		}
+	}
+
 	var b strings.Builder
 	b.WriteString(strings.Join(visible, "\n"))
 	b.WriteString("\n\n ")
@@ -2542,7 +2596,7 @@ func (m *model) View() tea.View {
 		if shape, blink, shown := m.comp.cur.get(); shown {
 			cp := m.comp.em.CursorPosition()
 			if y := m.paneTop + cp.Y - m.scroll; y >= 0 && y < viewport {
-				c := tea.NewCursor(gutterW+borderW+cp.X, y)
+				c := tea.NewCursor(m.docX()+gutterW+borderW+cp.X, y)
 				c.Shape, c.Blink = shape, blink
 				v.Cursor = c
 			}
@@ -3331,6 +3385,25 @@ func Run(path string, opts RunOptions) error {
 	var doc []block
 	var err error
 	var src []byte
+
+	// A directory — or no argument at all (D10: `margin` opens a tree of the
+	// working directory) — is a tree review, not a document: a left pane
+	// lists the markdown files beneath it and the first one opens. The
+	// no-argument case reaches here with path == "", which newTreeModel
+	// resolves as the current directory.
+	if !opts.Stdin {
+		if path == "" {
+			path = "."
+		}
+		if st, serr := os.Stat(path); serr == nil && st.IsDir() {
+			m, terr := newTreeModel(path)
+			if terr != nil {
+				return terr
+			}
+			return runModel(m, opts)
+		}
+	}
+
 	if opts.Stdin {
 		// A terminal on stdin means the reviewer typed `margin -` with no
 		// pipe — reading it would swallow keystrokes until EOF, then open a
@@ -3367,11 +3440,6 @@ func Run(path string, opts RunOptions) error {
 
 	m := newModelAt(path, doc, threads)
 	m.src = src
-	m.includeResolved = opts.IncludeResolved
-	m.ephemeral = opts.Stdin
-	if opts.WheelSpeed > 0 {
-		m.wheelSpeed = opts.WheelSpeed
-	}
 	if !opts.Stdin {
 		m.store = &threadStore{root: root, docPath: docPath}
 		// The change-notification cursor starts at the newest event already on
@@ -3387,8 +3455,21 @@ func Run(path string, opts RunOptions) error {
 		// m.watcher.wait() (nil-safe) simply never fires.
 		if watcher, err := newThreadWatcher(root, docPath); err == nil {
 			m.watcher = watcher
-			defer watcher.close()
 		}
+	}
+	return runModel(m, opts)
+}
+
+// runModel runs the Bubble Tea loop over an already-built model — the frame
+// quantum, the tty redirection for --stdout, the run itself, and the report
+// that follows it (the exported review on quit, or the on-screen marks and
+// threads when there is no --stdout). Shared by the single-document and tree
+// entry points, which differ only in how m was built.
+func runModel(m *model, opts RunOptions) error {
+	m.includeResolved = opts.IncludeResolved
+	m.ephemeral = opts.Stdin
+	if opts.WheelSpeed > 0 {
+		m.wheelSpeed = opts.WheelSpeed
 	}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
@@ -3413,6 +3494,12 @@ func Run(path string, opts RunOptions) error {
 		if opts.Stdin {
 			progOpts = append(progOpts, tea.WithInput(tty))
 		}
+	}
+	if m.watcher != nil {
+		// A closure, not `defer m.watcher.close()`: openTreeFile replaces
+		// m.watcher when the tree review switches documents, and the defer
+		// must close whatever is current at exit, not the original watch.
+		defer func() { m.watcher.close() }()
 	}
 	if _, err := tea.NewProgram(m, progOpts...).Run(); err != nil {
 		return fmt.Errorf("run: %w", err)

@@ -33,17 +33,23 @@ func newRootCmd(run func(path string, opts review.RunOptions) error, addComment 
 	var wheelSpeed int
 
 	root := &cobra.Command{
-		Use:     "margin FILE.md",
+		Use:     "margin [FILE.md|DIR/]",
 		Short:   "Review markdown in the terminal",
 		Version: version,
-		Long: `margin opens a markdown file for review: read the rendered prose, leave
+		Long: `margin opens markdown for review: read the rendered prose, leave
 comments anchored to blocks, mark what you have reviewed and what still needs
 attention, then copy the whole review out for whatever wrote the document.
+
+With no argument, or a directory argument, margin reviews a whole tree of
+markdown files: a file-tree pane lists them on the left, tab moves focus
+between the pane and the document, j/k move through the files, and enter opens
+the focused one. With a FILE.md argument it stays a single-document review.
 
 Keys:
   j/k     move            c  comment            space  cycle the mark
   g/G     top/bottom      e  edit               r/f    reviewed / flag
   \\      rendered/raw source Y  copy the review  q  quit
+  tab     tree pane / document (directory reviews)
   ctrl+r  reload the document after it changed on disk
 
 Gutter (the column beside each block):
@@ -94,7 +100,10 @@ the launch's completion as the signal that the review is done.`,
 				}
 				return nil
 			}
-			return cobra.ExactArgs(1)(cmd, args)
+			// D10: no argument opens a tree of the working directory, a
+			// directory argument opens a tree of that directory, one file
+			// stays a single-document review. Two files are still a misuse.
+			return cobra.MaximumNArgs(1)(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Silenced here rather than on the command, so the two kinds of

@@ -25,6 +25,8 @@ func exec(t *testing.T, run func(string, review.RunOptions) error, args ...strin
 	return out.String(), err
 }
 
+// TestRunsWithOneFile: a single path is a single-document review, unchanged
+// since before D10.
 func TestRunsWithOneFile(t *testing.T) {
 	var got string
 	if _, err := exec(t, func(p string, _ review.RunOptions) error { got = p; return nil }, "spec.md"); err != nil {
@@ -35,19 +37,30 @@ func TestRunsWithOneFile(t *testing.T) {
 	}
 }
 
+// TestRunsWithNoArguments: since D10, `margin` with no path opens a tree of
+// the working directory — the runner receives the empty path and Run resolves
+// it to the current directory.
+func TestRunsWithNoArguments(t *testing.T) {
+	called := false
+	if _, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !called {
+		t.Error("no-argument margin did not reach the runner")
+	}
+}
+
+// TestRejectsWrongNumberOfArguments: margin takes at most one path. Since D10
+// (2026-08-07), a directory review is the zero-argument default — `margin`
+// and `margin DIR/` open a tree of markdown files — so an empty argv is no
+// longer a misuse. Two paths still are.
 func TestRejectsWrongNumberOfArguments(t *testing.T) {
-	for _, args := range [][]string{{}, {"a.md", "b.md"}} {
-		called := false
-		out, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }, args...)
-		if err == nil {
-			t.Errorf("%v was accepted; margin takes exactly one file", args)
-		}
-		if called {
-			t.Errorf("%v reached the runner", args)
-		}
-		if !strings.Contains(out, "Usage:") {
-			t.Errorf("%v did not show usage:\n%s", args, out)
-		}
+	called := false
+	if _, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }, "a.md", "b.md"); err == nil {
+		t.Error("two files was accepted; margin takes at most one path")
+	}
+	if called {
+		t.Error("two files reached the runner")
 	}
 }
 

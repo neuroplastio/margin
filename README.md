@@ -12,7 +12,8 @@ wrote it.
 > `.margin/threads/`, and block ids are stamped into the source so a thread
 > survives its block being reworded. An agent writing a reply to a thread file
 > while margin is already open is not picked up until you reopen the document.
-> See [Roadmap](#roadmap).
+> `margin DIR/` (or `margin` with no argument) reviews a whole tree of markdown
+> files, with a file-tree pane. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -67,6 +68,7 @@ detectably orphaned rather than silently misplaced.
 | `R` | Resolve / unresolve the focused thread |
 | `ctrl+r` | Reload the document after it changed on disk (a `● file changed` notice appears in the footer) |
 | `Y` | Copy the whole review to the clipboard |
+| `tab` | Toggle focus between the document and the file-tree pane (directory reviews) |
 | `q` | Quit |
 
 On a heading, the mark keys apply to the whole section.
@@ -84,6 +86,18 @@ piped straight into an agent:
 ```
 margin --stdout spec.md | agent -p "address this review"
 ```
+
+### Directory reviews
+
+`margin DIR/` — or bare `margin`, which opens the working directory — reviews
+a whole tree of markdown files. A file-tree pane sits on the left, listing the
+markdown files beneath the directory (hidden directories are tooling and are
+skipped, and a directory with no markdown anywhere beneath it does not
+appear). `tab` moves keyboard focus between the pane and the document; in the
+pane, `j`/`k` move through the files and `enter` (or `l`) opens the focused
+one — threads, marks and comments all switch to the new document. The pane
+carries a `▸` on the open file, and a `▌` on the focused row while the pane is
+active.
 
 Or pipe markdown straight in for an ephemeral review — `margin -` (or
 `--stdin`) reads the document from stdin, saves nothing to `.margin/threads`,
@@ -177,6 +191,8 @@ go install github.com/neuroplastio/margin/cmd/margin@latest
 
 ```
 margin FILE.md
+margin DIR/           # review every markdown file beneath the directory
+margin                # same, for the working directory
 margin --help
 margin --version
 ```
@@ -218,7 +234,9 @@ of the stripped one, for comparison.
 - [x] `--stdout` export, to pipe a review straight into an agent
 - [x] Ephemeral stdin reviews (`margin -`), pipe in, review, pipe out — nothing
       saved
-- [ ] Link navigation between blocks, with a jumplist
+- [x] Link navigation between blocks, with a jumplist
+- [x] Directory reviews (`margin DIR/`): a file-tree pane, tab to switch focus,
+      enter to open the focused document
 - [ ] Rendered diff between review rounds
 
 ## License
