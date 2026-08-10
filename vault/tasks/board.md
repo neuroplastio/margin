@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (gutter glyphs made distinct and documented)
+Last updated: 2026-08-10 (review-change notification claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -184,7 +184,10 @@ Last updated: 2026-08-10 (gutter glyphs made distinct and documented)
 
 ## In progress
 
-*(none)*
+- (feedback feature) visually notify the reviewer when the document changes on
+  disk or a new comment lands — drains
+  `vault/feedback/2026-08-10-review-change-notification.md`. Claimed
+  2026-08-10 by the do-leg agent.
 
 ## Backlog — M1
 
