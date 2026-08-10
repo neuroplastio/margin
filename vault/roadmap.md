@@ -23,18 +23,25 @@ The interaction model, working end to end against a document seeded in code.
 
 ---
 
-## M1 — Real documents
+## M1 — Real documents ✅
+
+*Status: done, 2026-08-08.*
 
 *Mostly mechanical. This is where to build momentum.*
 
 Replace the seeded document with a parsed one.
 
-- [ ] Parse markdown with `goldmark`, keeping byte offsets per block
-- [ ] Render headings, paragraphs, lists, code blocks, block quotes, tables
-- [ ] Load a file from `argv`; render it at a comfortable measure
-- [ ] Stamp stable block ids into the source, lazily — only blocks that acquire a
+- [x] Parse markdown with `goldmark`, keeping byte offsets per block
+- [x] Render headings, paragraphs, lists, code blocks, block quotes, tables
+- [x] Load a file from `argv`; render it at a comfortable measure
+- [x] Stamp stable block ids into the source, lazily — only blocks that acquire a
       thread get one
-- [ ] Re-open a stamped file and re-attach threads by id
+- [x] Re-open a stamped file and re-attach threads by id
+
+The lazy-stamping item's *wiring* is recorded as a known gap in D12: `stampAll`
+exists and is tested (ID-01/02) but nothing in the running app calls it yet, so
+a block's anchor is content-derived and survives a reword only while its text is
+unchanged. Board record: closed when RENDER-07 emptied `Backlog — M1`.
 
 **Exit:** `margin some-real-doc.md` renders it, and a comment left today is still
 attached tomorrow after the file has been edited around it.
@@ -44,22 +51,24 @@ do not do all six and then ask.
 
 ---
 
-## M2 — Persistence and the loop
+## M2 — Persistence and the loop ✅
+
+*Status: done, 2026-08-10.*
 
 *Mechanical.*
 
 Threads become files an agent can read and write with no tooling.
 
-- [ ] Threads as markdown under `.margin/threads/`, one file per thread
-- [ ] Frontmatter carries anchor, quote fallback, status; replies append
-- [ ] Load threads on open; watch for external changes and reload
-- [ ] `--stdout` export: the whole review as a prompt an agent acts on
-- [ ] Orphan detection — a thread whose block id has vanished is surfaced, not
+- [x] Threads as markdown under `.margin/threads/`, one file per thread
+- [x] Frontmatter carries anchor, quote fallback, status; replies append
+- [x] Load threads on open; watch for external changes and reload
+- [x] `--stdout` export: the whole review as a prompt an agent acts on
+- [x] Orphan detection — a thread whose block id has vanished is surfaced, not
       silently dropped
-- [ ] Resolvable threads, resolvable by the reviewer *or* the agent — the loop
+- [x] Resolvable threads, resolvable by the reviewer *or* the agent — the loop
       does not close without this, since round two otherwise re-litigates
       everything from round one
-- [ ] Deleting a comment, and deleting a thread
+- [x] Deleting a comment, and deleting a thread
 
 **Exit:** review a document, pipe the export into an agent, have it revise the
 file and reply in the thread files, reopen and see the replies — and see which
@@ -73,14 +82,18 @@ threads it considers resolved.
 
 - [ ] Review a directory, not just a file
 - [ ] Navigation between documents, and a cross-document comment inbox
-- [ ] A scroll offset the user owns, decoupled from focus-follow (SCROLL-01)
-- [ ] Page and half-page keys (SCROLL-02)
-- [ ] Mouse wheel (SCROLL-03)
+- [x] A scroll offset the user owns, decoupled from focus-follow (SCROLL-01)
+- [x] Page and half-page keys (SCROLL-02)
+- [x] Mouse wheel (SCROLL-03)
 - [ ] Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`)
 - [ ] Review progress across the whole tree
 
 **Open question that gates the design:** is the unit of review a file or a tree?
 It changes the navigation model and is hard to retrofit. Raise it before building.
+*(Answered 2026-08-07: Q-0001 closed as **D10** — the unit of review is both a
+file and a tree, chosen by argv; `margin FILE.md` stays a single-document review.
+What remains felt and unsettled is the tree pane's appearance, position, toggle
+and focus — tracked in `interaction.md`'s "Not settled".)*
 
 ---
 

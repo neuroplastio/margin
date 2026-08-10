@@ -1,10 +1,10 @@
 # Board
 
-Last updated: 2026-08-10 (inline markup renders inside table cells — a
-`| `margin` runs in a TUI |` cell now shows `margin` styled as code, bold and
-links carried through the column layout)
+Last updated: 2026-08-10 (M2 closed — every roadmap item and its exit criteria
+landed; M1's lazy-stamping wiring is recorded as a known gap in D12. Active
+milestone moves to M3, whose backlog is seeded below.)
 
-**Active milestone:** M2 — Persistence and the loop
+**Active milestone:** M3 — Reading at scale
 **Needs a look:**
 - (feedback feature) table cells render their own inline markup: `` `code` ``,
   **bold** and [links] inside a cell now carry RENDER-06's styles the way a
@@ -345,12 +345,25 @@ asked for. Split per the feedback's own suggested ordering — see
 
 - *(none)*
 
+## Backlog — M3 (tree view)
+
+The unit-of-review question is settled (D10): `margin` / `margin DIR/` open a
+tree of markdown files, `margin FILE.md` stays a single-document review. What the
+pane looks like, where it sits, and how it is toggled and focused is still felt
+(interaction.md "Not settled").
+
+- Review a directory, not just a file
+- Navigation between documents, and a cross-document comment inbox
+- Review progress across the whole tree
+
 ## Backlog — M3 (navigation)
 
 Independent of the tree view (D10): these are about moving around one
 document, regardless of the order the tree-view work itself lands in.
 
-*(none)*
+- Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`) — in-document
+- *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
+  earlier; see Done.)*
 
 ## Blocked
 
