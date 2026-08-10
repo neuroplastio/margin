@@ -6,7 +6,7 @@ import (
 )
 
 // mermaid_test.go exercises the vendored mermaid renderer's dispatch
-// (internal/review/mermaid.go → third_party/mermaid-ascii): flowchart/graph,
+// (internal/review/mermaid.go → internal/mermaid-ascii): flowchart/graph,
 // sequence and ER diagrams render through the vendored packages, and anything
 // the vendored parser does not understand falls back to the block's plain
 // source lines.

@@ -3,20 +3,21 @@ package review
 import (
 	"strings"
 
-	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/diagram"
-	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/er"
-	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/graph"
-	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/sequence"
-	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/state"
+	"github.com/neuroplastio/margin/internal/mermaid-ascii/pkg/diagram"
+	"github.com/neuroplastio/margin/internal/mermaid-ascii/pkg/er"
+	"github.com/neuroplastio/margin/internal/mermaid-ascii/pkg/graph"
+	"github.com/neuroplastio/margin/internal/mermaid-ascii/pkg/sequence"
+	"github.com/neuroplastio/margin/internal/mermaid-ascii/pkg/state"
 )
 
 // mermaid.go renders fenced blocks whose info string is `mermaid` as ASCII
 // diagrams. The renderer is the vendored
-// github.com/AlexanderGrooff/mermaid-ascii source (third_party/mermaid-ascii,
-// MIT, folded into this module's tree — no replace directive, so `go install
-// module@version` works), which handles graph/flowchart, sequence, ER and —
-// through the in-tree extension delta D7 — state diagrams; the local deltas
-// against upstream live in that copy's CHANGELOG.md. This file is a thin
+// github.com/AlexanderGrooff/mermaid-ascii source
+// (internal/mermaid-ascii, MIT, folded into this module's tree — no replace
+// directive, so `go install module@version` works), which handles
+// graph/flowchart, sequence, ER and — through the in-tree extension delta D7 —
+// state diagrams; the local deltas against upstream live in that copy's
+// CHANGELOG.md. This file is a thin
 // dispatcher: pick a vendored package, render, and on any failure fall back to
 // the block's plain source lines — never chroma's meaningless colours on
 // mermaid source, and never a half-parsed diagram.

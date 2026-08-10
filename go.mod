@@ -9,10 +9,8 @@ require (
 	github.com/charmbracelet/ultraviolet v0.0.0-20260803092147-8b693049ce2a
 	github.com/charmbracelet/x/vt v0.0.0-20260803091719-3755ebad01b1
 	github.com/creack/pty v1.1.24
-	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/mattn/go-runewidth v0.0.23
-	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.10.2
 	github.com/yuin/goldmark v1.8.5
 )
