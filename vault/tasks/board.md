@@ -1,15 +1,15 @@
 # Board
 
-Last updated: 2026-08-10 (interactive agent review done: event log + wait command)
+Last updated: 2026-08-10 (event log line shape corrected to JSONL + compact ids)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
 - (feedback feature) `margin comments wait [--since ID] [--timeout DUR]`:
-  blocking poll over `.margin/events.log` that prints raw event lines after
-  the cursor (or all, with no `--since`) and exits 0; timeout exits 1 silently
-  (the "nothing yet" signal), a real error exits 1 with a stderr message;
-  same-millisecond ties resolve by file position, not id order (D13); the
-  review root resolves from the cwd since the command takes no file —
+  blocking poll over `.margin/events.log` that prints raw JSONL event lines
+  after the cursor (or all, with no `--since`) and exits 0; timeout exits 1
+  silently (the "nothing yet" signal), a real error exits 1 with a stderr
+  message; same-second ties resolve by file position, not id order (D13/D14);
+  the review root resolves from the cwd since the command takes no file —
   journal 2026-08-10.8
 - (feedback fix) raw mode horizontal scroll: `H`/`L` pan the whole raw source
   view sideways through a single viewport-wide offset (`m.rawH`), clipped by
@@ -200,6 +200,22 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** event log on-disk shape: JSONL + compact ids + unix
+      seconds. Each `.margin/events.log` line is now one JSON object
+      (`{"id":..,"at":..,"type":..,"doc":..,"anchor":..,"author":..,"comment":..}`)
+      instead of seven tab-separated fields, so the fields are self-describing
+      and the free-form-field sanitizer is gone (JSON escapes tabs/quotes/
+      newlines for free). Ids are 13-char Crockford base32 — 7 chars of unix
+      seconds (35 bits, fixed-width so lexicographic order stays chronological)
+      + 6 chars of randomness (30 bits) — down from the 26-char ULID. `at` is
+      a unix timestamp at second precision, an integer, not RFC3339Nano. The
+      wait command's contract, the file-position tie rule (same-millisecond →
+      same-second; `readEventsAfter` matches the id and takes everything after
+      its line, so the mechanism is granularity-independent) and the torn-tail
+      skip all survive unchanged; recorded as **D14**. Drains
+      `vault/feedback/2026-08-10-event-log-jsonl-and-compact-ids.md`; the file
+      is deleted. `[mech]` — see journal 2026-08-10.9 — done 2026-08-10
 
 - [x] **(feedback feature)** interactive agent review, slice 2: `margin
       comments wait [--since <last_known_id>]` — the CLI half that reads the

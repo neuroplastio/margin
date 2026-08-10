@@ -202,3 +202,41 @@ migration.
 Still felt and unsettled, to be judged in a later leg: `margin comments wait
 [--since <id>]`'s exact surface — what it prints, its exit code, its
 timeout/loop shape, and how it reports events that share a millisecond.
+
+**D14 — The event log's line shape is JSONL, with 13-character ids and unix
+timestamps at second precision.** Corrects D13's line shape, per the
+maintainer's 2026-08-10 feedback on a test run of the log, before the format
+has shipped to any agent; there is no history to migrate. Everything else in
+D13 — the single `.margin/events.log` location, append-only with one
+`O_APPEND` write per line, best-effort writes after the thread write, and the
+`--since` cursor as a position in the file — stands unchanged. D14 replaces
+D13's `Line shape`, `Reader contract` timestamp wording, and the tie rule's
+granularity; nothing else.
+
+- **Line shape** — one JSON object per line, no tab-separated fields:
+  ```json
+  {"id":"1N7KB52S0NPCH","at":1786363200,"type":"comment.posted","doc":"docs/spec.md","anchor":"^a1b2c3","author":"agent","comment":2}
+  ```
+  - `id`: a 13-character Crockford base32 id (the same alphabet D13 used,
+    minus I/L/O/U): seven characters of unix seconds (35 bits, fixed-width, so
+    lexicographic string order is chronological) followed by six characters of
+    randomness (30 bits). Half the length of the old ULID; time-ordered;
+    unique enough within a second that a `--since` cursor can never skip a
+    same-second sibling.
+  - `at`: the event's time as a unix timestamp in seconds — a plain integer,
+    not an RFC3339Nano string.
+  - `type`, `doc`, `anchor`, `author`: as in D13.
+  - `comment`: the 0-based comment index, or `-1` for a thread-level event
+    (the JSON spelling of D13's `-`).
+  - Free-form fields need no sanitising: JSON escapes tabs, quotes and
+    newlines, so a line is one physical line whatever an author is called —
+    the `sanitizeLogField` pass is gone.
+- **Tie rule, unchanged in mechanism:** the timestamp is second-precision, so
+  events sharing a second resolve by file position exactly as D13 resolved
+  same-millisecond ties — the cursor matches an id and takes everything after
+  its line, and id order never decides. The rule is granularity-independent:
+  whatever the id carries, `readEventsAfter` filters by file position.
+- **Reader contract, unchanged:** a completed line that is not valid JSON (or
+  whose id is not a well-formed 13-character id) is an error — "surface, don't
+  drop"; a final unterminated line is a torn append and is skipped. Writes
+  still end in `\n`.

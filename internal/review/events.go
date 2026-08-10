@@ -5,17 +5,18 @@
 // re-parsing or diffing thread files. Answers Q-0003: the identity the wait
 // command's --since cursor names is an *event* id, not a comment id, and the
 // log is stored separately from thread files (D13), which are unchanged and
-// gain no id field.
+// gain no id field. The line shape — JSONL, compact 13-character ids, unix
+// timestamps at second precision — is D14.
 package review
 
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -39,13 +40,26 @@ const (
 // event is one entry of the event log. id and at are filled in by appendEvent;
 // the call sites only describe what happened.
 type event struct {
-	id      string    // 26-char ULID; the --since cursor
-	at      time.Time // when the event happened, UTC
+	id      string    // 13-char time-ordered id; the --since cursor
+	at      time.Time // when the event happened, UTC, whole seconds
 	kind    eventType
 	doc     string // document path relative to the review root
 	anchor  string // the thread's anchor, ^-prefixed as in thread files
 	author  string // who performed the action
 	comment int    // 0-based index into the thread's posted comments; -1 for a thread-level event
+}
+
+// eventLine is one log line's JSON shape (D14). Kept separate from event so
+// the on-disk form — id, unix seconds, a `type` key that would fight the Go
+// keyword — does not leak into the in-memory struct.
+type eventLine struct {
+	ID      string    `json:"id"`
+	At      int64     `json:"at"`
+	Type    eventType `json:"type"`
+	Doc     string    `json:"doc"`
+	Anchor  string    `json:"anchor"`
+	Author  string    `json:"author"`
+	Comment int       `json:"comment"`
 }
 
 // eventsLogPath is the append-only event log for a review root: one file for
@@ -74,6 +88,7 @@ func appendEvent(root string, ev event) error {
 	if ev.at.IsZero() {
 		ev.at = time.Now()
 	}
+	ev.at = time.Unix(ev.at.Unix(), 0) // the log's timestamps are whole seconds (D14)
 	path := eventsLogPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("event log: %w", err)
@@ -89,77 +104,68 @@ func appendEvent(root string, ev event) error {
 	return nil
 }
 
-// marshalEvent renders one event as a log line: seven fields, tab-separated —
-// id, UTC timestamp, type, document path, anchor, author, and the comment
-// index (`-` when the event is about the thread as a whole). The separator is
-// a tab because a document path or anchor never contains one; the author is
-// free-form, so it is sanitized rather than allowed to corrupt the line.
+// marshalEvent renders one event as a JSONL line: a single JSON object with
+// the id, the unix-second timestamp, the type, the document path, the anchor,
+// the author and the comment index (-1 for a thread-level event). JSON is what
+// keeps a free-form author safe: encoding/json escapes tabs, quotes and
+// newlines, so a line is one physical line whatever the author is called, and
+// the field-sanitizer the tab-separated format needed is gone (D14).
 func marshalEvent(ev event) string {
-	comment := "-"
-	if ev.comment >= 0 {
-		comment = strconv.Itoa(ev.comment)
+	// Marshal cannot fail: eventLine holds only strings, an int64 and an
+	// eventType, all JSON-native. A failure here would be a bug, not a
+	// recoverable error, so it panics rather than producing a half line.
+	b, err := json.Marshal(eventLine{
+		ID:      ev.id,
+		At:      ev.at.Unix(),
+		Type:    ev.kind,
+		Doc:     ev.doc,
+		Anchor:  ev.anchor,
+		Author:  ev.author,
+		Comment: ev.comment,
+	})
+	if err != nil {
+		panic("event log: marshal event: " + err.Error())
 	}
-	return strings.Join([]string{
-		ev.id,
-		ev.at.UTC().Format(time.RFC3339Nano),
-		string(ev.kind),
-		sanitizeLogField(ev.doc),
-		sanitizeLogField(ev.anchor),
-		sanitizeLogField(ev.author),
-		comment,
-	}, "\t")
-}
-
-// sanitizeLogField strips the characters that would corrupt a tab-separated
-// line out of free-form fields (the author's name, in practice). Not applied
-// to id, type, timestamp or comment index, whose shapes are fixed.
-func sanitizeLogField(s string) string {
-	return strings.NewReplacer("\t", " ", "\r", " ", "\n", " ").Replace(s)
+	return string(b)
 }
 
 // parseEvent is marshalEvent's inverse. A malformed line is an error: a
 // listener or a future version must be able to trust the log, and a silent
 // skip would drop an event the same way a silent thread-file failure would
-// drop a comment.
+// drop a comment. The cursor depends on the id, so a well-formed id is
+// required; the comment index is range-checked. Absent optional fields fall
+// back to zero values, exactly as JSON semantics say.
 func parseEvent(line string) (event, error) {
-	fields := strings.Split(line, "\t")
-	if len(fields) != 7 {
+	var el eventLine
+	if err := json.Unmarshal([]byte(line), &el); err != nil {
 		return event{}, fmt.Errorf("event log: malformed line %q", line)
 	}
-	if !validULID(fields[0]) {
-		return event{}, fmt.Errorf("event log: bad event id %q in line %q", fields[0], line)
+	if !validEventID(el.ID) {
+		return event{}, fmt.Errorf("event log: bad event id %q in line %q", el.ID, line)
 	}
-	at, err := time.Parse(time.RFC3339Nano, fields[1])
-	if err != nil {
-		return event{}, fmt.Errorf("event log: bad timestamp %q: %w", fields[1], err)
-	}
-	comment := -1
-	if fields[6] != "-" {
-		n, err := strconv.Atoi(fields[6])
-		if err != nil || n < 0 {
-			return event{}, fmt.Errorf("event log: bad comment index %q in line %q", fields[6], line)
-		}
-		comment = n
+	if el.Comment < -1 {
+		return event{}, fmt.Errorf("event log: bad comment index %d in line %q", el.Comment, line)
 	}
 	return event{
-		id:      fields[0],
-		at:      at,
-		kind:    eventType(fields[2]),
-		doc:     fields[3],
-		anchor:  fields[4],
-		author:  fields[5],
-		comment: comment,
+		id:      el.ID,
+		at:      time.Unix(el.At, 0),
+		kind:    el.Type,
+		doc:     el.Doc,
+		anchor:  el.Anchor,
+		author:  el.Author,
+		comment: el.Comment,
 	}, nil
 }
 
 // readEventsAfter returns the events of root's log strictly after the event
 // whose id is cursor, in file order. The cursor is a position in the file, not
-// a string to compare against: two events sharing a millisecond are ordered by
-// where they were appended, so the filter matches the id and takes everything
-// after its line — exactly how D13 says a wait command must resolve
-// same-millisecond ties. An empty cursor means the whole log is new. A cursor
-// that matches no event is an error: a caller pointing at the wrong log, or
-// passing a stale id, should be told, not silently handed the whole file.
+// a string to compare against: two events sharing a second (the log's
+// timestamp granularity, D14) are ordered by where they were appended, so the
+// filter matches the id and takes everything after its line — exactly how D13
+// says a wait command must resolve ties, at whatever granularity the id
+// carries. An empty cursor means the whole log is new. A cursor that matches
+// no event is an error: a caller pointing at the wrong log, or passing a stale
+// id, should be told, not silently handed the whole file.
 func readEventsAfter(root, cursor string) ([]event, error) {
 	evs, err := readEvents(root)
 	if err != nil {
@@ -211,66 +217,72 @@ func readEvents(root string) ([]event, error) {
 
 // --- event ids -------------------------------------------------------------
 
-// newEventID returns a 26-character time-ordered id (a ULID): the first 10
-// characters encode the current time to the millisecond, the last 16 are
-// random. Lexicographic order of the string is creation order at millisecond
-// granularity — which lets a --since cursor be a plain string comparison while
-// the append-only file position resolves the same-millisecond ties.
+// newEventID returns a 13-character time-ordered id: seven characters of
+// Crockford base32 encoding the current unix time in seconds, then six of
+// randomness. Lexicographic order of the id is creation order at second
+// granularity — the fixed-width prefix makes string order chronological — so
+// a --since cursor is a plain string while the append-only file position
+// resolves the same-second ties (D13). D14: chosen over the 26-char ULID
+// because the id mostly needs to be an id — time-ordered, unique enough,
+// short enough to copy and compare — and 13 characters is half the length.
 func newEventID() string {
-	var b [16]byte
-	binary.BigEndian.PutUint64(b[:8], uint64(time.Now().UnixMilli())<<16)
-	if _, err := rand.Read(b[6:]); err != nil {
+	sec := uint64(time.Now().Unix())
+	var rnd [4]byte
+	if _, err := rand.Read(rnd[:]); err != nil {
 		// crypto/rand failing is practically unrecoverable; fall back to a
 		// time-seeded value so a valid-shaped id is still produced.
-		binary.BigEndian.PutUint64(b[8:], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint32(rnd[:], uint32(time.Now().UnixNano()))
 	}
-	return encodeULID(b)
+	return encodeTimePrefix(sec) + encodeRandom(rnd)
 }
 
-// ulidEnc is ULID's Crockford base32 alphabet: digits first, then the letters
-// minus I, L, O and U, which are excluded to avoid confusion with 1, l, 0 and
-// "u" in hex-ish text.
-const ulidEnc = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+// idEnc is Crockford base32: digits first, then the letters minus I, L, O and
+// U, which are excluded to avoid confusion with 1, l, 0 and "u" in hex-ish
+// text. The alphabet's ASCII order is its value order, which is what makes a
+// fixed-width encoded time sort chronologically.
+const idEnc = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-// encodeULID renders a 128-bit value — 48 bits of millisecond timestamp in the
-// most significant bits, 80 bits of entropy — as its 26-character Crockford
-// base32 spelling, most significant group first.
-func encodeULID(b [16]byte) string {
-	var out [26]byte
-	bit := 0
+// encodeTimePrefix renders a unix second count as its fixed-width 7-character
+// Crockford base32 spelling, most significant group first. Fixed width is the
+// whole point: a 1-second count encodes as 0000001, not as the one-char 1, so
+// every id of a later second still sorts after every id of an earlier one.
+// 35 bits of seconds covers until the year 3058.
+func encodeTimePrefix(sec uint64) string {
+	var out [7]byte
 	for i := range out {
-		var v byte
-		for j := 0; j < 5; j++ {
-			v <<= 1
-			if bit < 128 {
-				v |= (b[bit>>3] >> (7 - (bit & 7))) & 1
-			}
-			bit++
-		}
-		out[i] = ulidEnc[v]
+		out[i] = idEnc[(sec>>(5*uint(6-i)))&0x1f]
 	}
 	return string(out[:])
 }
 
-// validULID reports whether s is a well-formed 26-character ULID. The final
-// character carries only three real bits, but any alphabet character is
-// acceptable there, so a length plus alphabet check is all that is needed.
-func validULID(s string) bool {
-	if len(s) != 26 {
+// encodeRandom renders 30 bits of entropy as six Crockford characters, the
+// id's uniqueness within a second.
+func encodeRandom(rnd [4]byte) string {
+	v := binary.BigEndian.Uint32(rnd[:]) >> 2
+	var out [6]byte
+	for i := 0; i < 6; i++ {
+		out[i] = idEnc[(v>>(5*uint(5-i)))&0x1f]
+	}
+	return string(out[:])
+}
+
+// validEventID reports whether s is a well-formed 13-character event id.
+func validEventID(s string) bool {
+	if len(s) != 13 {
 		return false
 	}
 	for i := 0; i < len(s); i++ {
-		if ulidDec(s[i]) < 0 {
+		if idDec(s[i]) < 0 {
 			return false
 		}
 	}
 	return true
 }
 
-// ulidDec maps a Crockford base32 character to its value, or -1 if invalid.
+// idDec maps a Crockford base32 character to its value, or -1 if invalid.
 // Lowercase letters are accepted for a hand-written log line; the writer
 // always emits uppercase.
-func ulidDec(c byte) int {
+func idDec(c byte) int {
 	if c >= 'a' && c <= 'z' {
 		c -= 'a' - 'A'
 	}

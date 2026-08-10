@@ -1,7 +1,6 @@
 package review
 
 import (
-	"encoding/binary"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,83 +9,64 @@ import (
 	"time"
 )
 
-// decodeULID extracts the millisecond timestamp a ULID embeds, the inverse of
-// encodeULID's timestamp half. Test-only: the product compares ids as strings
-// and never needs to decode one.
-func decodeULID(s string) (ms uint64, ok bool) {
-	if !validULID(s) {
+// decodeTimePrefix extracts the unix second count a 13-char event id embeds,
+// the inverse of encodeTimePrefix's first seven characters. Test-only: the
+// product compares ids as strings and never needs to decode one.
+func decodeTimePrefix(s string) (sec uint64, ok bool) {
+	if !validEventID(s) {
 		return 0, false
 	}
-	var b [16]byte
-	bit := 0
-	for i := 0; i < 26; i++ {
-		v := ulidDec(s[i])
-		bits := 5
-		if i == 25 {
-			bits = 3 // the final character carries only the last three bits
+	var v uint64
+	for i := 0; i < 7; i++ {
+		c := idDec(s[i])
+		if c < 0 {
+			return 0, false
 		}
-		for j := bits - 1; j >= 0; j-- {
-			if bit < 128 {
-				b[bit>>3] |= byte((v>>j)&1) << (7 - (bit & 7))
-			}
-			bit++
-		}
+		v = v<<5 | uint64(c)
 	}
-	return binary.BigEndian.Uint64(b[:8]) >> 16, true
+	return v, true
 }
 
-// TestEncodeULIDKnownValues pins the encoder and decoder against values
+// TestEncodeTimePrefixKnownValues pins the id's time prefix against values
 // worked out by hand, independently of the implementation: all-zero bits; a
-// 1ms timestamp with no entropy (the timestamp's value 1 lives in the last
-// five-bit group of the timestamp field, which encodes as 4 — 0b00100 — in
-// character 9); and all-ones bits, whose letter-heavy spelling exercises the
-// Crockford letter values the all-digit cases never touch.
-func TestEncodeULIDKnownValues(t *testing.T) {
-	var zero [16]byte
-	if got := encodeULID(zero); got != "00000000000000000000000000" {
-		t.Errorf("encodeULID(0) = %q, want all-zeroes", got)
+// 1-second count — which must come out 0000001, not a one-char 1, because the
+// fixed width is what keeps lexicographic order chronological; and all-ones,
+// whose letter-heavy spelling exercises the Crockford letter values the
+// all-digit cases never touch.
+func TestEncodeTimePrefixKnownValues(t *testing.T) {
+	if got := encodeTimePrefix(0); got != "0000000" {
+		t.Errorf("encodeTimePrefix(0) = %q, want all-zeroes", got)
 	}
-	one := [16]byte{0, 0, 0, 0, 0, 1}
-	if got := encodeULID(one); got != "00000000040000000000000000" {
-		t.Errorf("encodeULID(1ms) = %q, want the hand-derived spelling", got)
+	if got := encodeTimePrefix(1); got != "0000001" {
+		t.Errorf("encodeTimePrefix(1s) = %q, want the hand-derived spelling", got)
 	}
-	maxMS := uint64(1<<48 - 1)
-	var all [16]byte
-	for i := range all {
-		all[i] = 0xFF
+	maxSec := uint64(1<<35 - 1)
+	if got := encodeTimePrefix(maxSec); got != "ZZZZZZZ" {
+		t.Errorf("encodeTimePrefix(all-ones) = %q, want 7 Zs", got)
 	}
-	// The final character carries only three real bits; the encoder pads the
-	// remaining two with zeros at the low end, so all-ones reads 0b11100 = W.
-	if got := encodeULID(all); got != "ZZZZZZZZZZZZZZZZZZZZZZZZZW" {
-		t.Errorf("encodeULID(all-ones) = %q, want 25 Zs + W", got)
+	if sec, ok := decodeTimePrefix("0000000ZZZZZZ"); !ok || sec != 0 {
+		t.Errorf("decodeTimePrefix(0) = %d, %v; want 0, true", sec, ok)
 	}
-	if ms, ok := decodeULID("00000000000000000000000000"); !ok || ms != 0 {
-		t.Errorf("decodeULID(0) = %d, %v; want 0, true", ms, ok)
+	if sec, ok := decodeTimePrefix("0000001ZZZZZZ"); !ok || sec != 1 {
+		t.Errorf("decodeTimePrefix(1s) = %d, %v; want 1, true", sec, ok)
 	}
-	if ms, ok := decodeULID("00000000040000000000000000"); !ok || ms != 1 {
-		t.Errorf("decodeULID(1ms) = %d, %v; want 1, true", ms, ok)
-	}
-	if ms, ok := decodeULID("ZZZZZZZZZZZZZZZZZZZZZZZZZW"); !ok || ms != maxMS {
-		t.Errorf("decodeULID(all-ones) = %d, %v; want %d, true", ms, ok, maxMS)
-	}
-	if ms, ok := decodeULID("zzzzzzzzzzzzzzzzzzzzzzzzzw"); !ok || ms != maxMS {
-		t.Errorf("decodeULID(lowercase) = %d, %v; want %d, true", ms, ok, maxMS)
+	if sec, ok := decodeTimePrefix("zzzzzzzzzzzzz"); !ok || sec != maxSec {
+		t.Errorf("decodeTimePrefix(lowercase) = %d, %v; want %d, true", sec, ok, maxSec)
 	}
 }
 
-// TestNewEventIDIsATimeOrderedULID: ids are 26 chars of the Crockford
-// alphabet, embed a current timestamp, differ from each other, and sort
-// lexicographically in non-decreasing time order even across the random
-// suffixes.
-func TestNewEventIDIsATimeOrderedULID(t *testing.T) {
-	before := time.Now().UnixMilli()
+// TestNewEventIDIsTimeOrdered: ids are 13 chars of the Crockford alphabet,
+// embed a current second, differ from each other, and sort lexicographically
+// in non-decreasing time order even across the random suffixes.
+func TestNewEventIDIsTimeOrdered(t *testing.T) {
+	before := time.Now().Unix()
 	a := newEventID()
-	after := time.Now().UnixMilli()
-	if !validULID(a) {
-		t.Fatalf("newEventID() = %q, not a valid ULID", a)
+	after := time.Now().Unix()
+	if !validEventID(a) {
+		t.Fatalf("newEventID() = %q, not a valid event id", a)
 	}
-	if ms, ok := decodeULID(a); !ok || ms < uint64(before) || ms > uint64(after) {
-		t.Errorf("newEventID() embeds timestamp %d, want within [%d,%d]", ms, before, after)
+	if sec, ok := decodeTimePrefix(a); !ok || sec < uint64(before) || sec > uint64(after) {
+		t.Errorf("newEventID() embeds timestamp %d, want within [%d,%d]", sec, before, after)
 	}
 	if b := newEventID(); b == a {
 		t.Errorf("two newEventID() calls both returned %q", a)
@@ -99,30 +79,30 @@ func TestNewEventIDIsATimeOrderedULID(t *testing.T) {
 	sort.Strings(ids)
 	var prev uint64
 	for _, id := range ids {
-		ms, ok := decodeULID(id)
+		sec, ok := decodeTimePrefix(id)
 		if !ok {
 			t.Fatalf("sorted id %q does not decode", id)
 		}
-		if ms < prev {
-			t.Fatalf("sorted ids out of chronological order: %d then %d", prev, ms)
+		if sec < prev {
+			t.Fatalf("sorted ids out of chronological order: %d then %d", prev, sec)
 		}
-		prev = ms
+		prev = sec
 	}
 }
 
-// TestEventLineShape pins the exact on-disk line D13 specifies, and that it
-// round-trips through parseEvent.
+// TestEventLineShape pins the exact on-disk JSONL line D14 specifies, and
+// that it round-trips through parseEvent.
 func TestEventLineShape(t *testing.T) {
 	ev := event{
-		id:      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-		at:      time.Date(2026, 8, 10, 12, 0, 0, 123000000, time.UTC),
+		id:      "1N7KFA0P7KFA0",
+		at:      time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
 		kind:    eventCommentPosted,
 		doc:     "docs/spec.md",
 		anchor:  "^a1b2c3",
 		author:  "agent",
 		comment: 2,
 	}
-	want := "01ARZ3NDEKTSV4RRFFQ69G5FAV\t2026-08-10T12:00:00.123Z\tcomment.posted\tdocs/spec.md\t^a1b2c3\tagent\t2"
+	want := `{"id":"1N7KFA0P7KFA0","at":1786363200,"type":"comment.posted","doc":"docs/spec.md","anchor":"^a1b2c3","author":"agent","comment":2}`
 	if got := marshalEvent(ev); got != want {
 		t.Errorf("marshalEvent() = %q, want %q", got, want)
 	}
@@ -140,11 +120,11 @@ func TestEventLineShape(t *testing.T) {
 	}
 }
 
-// TestEventLineThreadLevel: a thread-level event writes `-` for the comment
-// index and reads back as -1.
+// TestEventLineThreadLevel: a thread-level event writes comment -1 and reads
+// back as -1.
 func TestEventLineThreadLevel(t *testing.T) {
 	ev := event{
-		id:      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		id:      "1N7KFA0R8KFA1",
 		at:      time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
 		kind:    eventThreadResolved,
 		doc:     "doc.md",
@@ -152,7 +132,7 @@ func TestEventLineThreadLevel(t *testing.T) {
 		author:  "toly",
 		comment: -1,
 	}
-	want := "01ARZ3NDEKTSV4RRFFQ69G5FAV\t2026-08-10T12:00:00Z\tthread.resolved\tdoc.md\t^b2\ttoly\t-"
+	want := `{"id":"1N7KFA0R8KFA1","at":1786363200,"type":"thread.resolved","doc":"doc.md","anchor":"^b2","author":"toly","comment":-1}`
 	if got := marshalEvent(ev); got != want {
 		t.Errorf("marshalEvent() = %q, want %q", got, want)
 	}
@@ -165,28 +145,29 @@ func TestEventLineThreadLevel(t *testing.T) {
 	}
 }
 
-// TestMarshalEventSanitizesFreeFormFields: an author carrying a tab or newline
-// must not split the line into more fields or a second line.
-func TestMarshalEventSanitizesFreeFormFields(t *testing.T) {
+// TestMarshalEventEscapesFreeFormFields: an author carrying a tab, newline or
+// quote must not split the JSON — encoding/json escapes them, so the event
+// still parses back with the author whole and the line is one physical line.
+func TestMarshalEventEscapesFreeFormFields(t *testing.T) {
 	ev := event{
-		id:      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		id:      "1N7KFA0P7KFA0",
 		at:      time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
 		kind:    eventCommentPosted,
 		doc:     "doc.md",
 		anchor:  "^a",
-		author:  "tab\there\nnewline",
+		author:  "ta\tb\nc\"quote",
 		comment: 0,
 	}
 	line := marshalEvent(ev)
-	fields := strings.Split(line, "\t")
-	if len(fields) != 7 {
-		t.Fatalf("marshalEvent() = %q, split into %d fields", line, len(fields))
+	if strings.ContainsAny(line, "\t\n") {
+		t.Fatalf("marshalEvent() = %q, contains a raw tab or newline", line)
 	}
-	if fields[5] != "tab here newline" {
-		t.Errorf("author field = %q, want tabs/newlines replaced", fields[5])
+	round, err := parseEvent(line)
+	if err != nil {
+		t.Fatalf("parseEvent on escaped line: %v", err)
 	}
-	if _, err := parseEvent(line); err != nil {
-		t.Fatalf("parseEvent on sanitized line: %v", err)
+	if round.author != ev.author {
+		t.Errorf("author = %q, want %q (escaped and restored whole)", round.author, ev.author)
 	}
 }
 
@@ -220,8 +201,8 @@ func TestAppendEventAndReadEventsRoundTrip(t *testing.T) {
 	if first.id == "" || second.id == "" || first.id == second.id {
 		t.Errorf("ids not filled in: %q, %q", first.id, second.id)
 	}
-	if !validULID(first.id) || !validULID(second.id) {
-		t.Errorf("ids not ULIDs: %q, %q", first.id, second.id)
+	if !validEventID(first.id) || !validEventID(second.id) {
+		t.Errorf("ids not event ids: %q, %q", first.id, second.id)
 	}
 	if first.at.IsZero() || second.at.IsZero() {
 		t.Errorf("timestamps not filled in: %v, %v", first.at, second.at)
@@ -234,7 +215,7 @@ func TestAppendEventAndReadEventsRoundTrip(t *testing.T) {
 func TestReadEventsSkipsTornTail(t *testing.T) {
 	root := t.TempDir()
 	complete := marshalEvent(event{
-		id:      "00000000000000000000000000",
+		id:      "0000000000000",
 		at:      time.Unix(0, 0).UTC(),
 		kind:    eventCommentPosted,
 		doc:     "doc.md",
@@ -245,7 +226,7 @@ func TestReadEventsSkipsTornTail(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(eventsLogPath(root)), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(eventsLogPath(root), []byte(complete+"\n01ARZ3NDEKTS"), 0o644); err != nil {
+	if err := os.WriteFile(eventsLogPath(root), []byte(complete+"\n{\"id\":\"1N7KFA0"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -273,15 +254,13 @@ func TestReadEventsMissingLogIsEmpty(t *testing.T) {
 // TestParseEventMalformed: a completed line that does not fit the format is an
 // error — the log is a contract and a listener must not silently drop events.
 func TestParseEventMalformed(t *testing.T) {
-	id := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	cases := []string{
 		"",
-		id,
-		id + "\t2026-08-10T12:00:00Z\tcomment.posted\tdoc.md\t^a",
-		"not-a-ulid\t2026-08-10T12:00:00Z\tcomment.posted\tdoc.md\t^a\tx\t0",
-		id + "\tbadtimestamp\tcomment.posted\tdoc.md\t^a\tx\t0",
-		id + "\t2026-08-10T12:00:00Z\tcomment.posted\tdoc.md\t^a\tx\tzz",
-		id + "\t2026-08-10T12:00:00Z\tcomment.posted\tdoc.md\t^a\tx\t-1",
+		"this is not a JSON line",
+		`{"id":"short"}`, // id not 13 chars
+		`{"id":"1N7KFA0P7KFAI"}`, // I is not in the Crockford alphabet
+		`{"id":"1N7KFA0P7KFA0","at":1786363200,"type":"comment.posted","doc":"doc.md","anchor":"^a","author":"x","comment":-2}`,
+		`{"id":`,
 	}
 	for _, line := range cases {
 		if _, err := parseEvent(line); err == nil {
@@ -377,9 +356,9 @@ func writeEvents(t *testing.T, lines ...string) string {
 	return root
 }
 
-// eventLine builds a log line for a hand-controlled event, the shape the
+// logLine builds a log line for a hand-controlled event, the shape the
 // reader tests need to pin cursor behaviour without the appendEvent machinery.
-func eventLine(id string, at time.Time, kind eventType, doc, anchor, author string, comment int) string {
+func logLine(id string, at time.Time, kind eventType, doc, anchor, author string, comment int) string {
 	return marshalEvent(event{
 		id:      id,
 		at:      at,
@@ -396,8 +375,8 @@ func eventLine(id string, at time.Time, kind eventType, doc, anchor, author stri
 func TestReadEventsAfterEmptyCursorReturnsEverything(t *testing.T) {
 	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
 	root := writeEvents(t,
-		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
-		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAW", at, eventCommentPosted, "doc.md", "^a", "agent", 1),
+		logLine("1N7KFA0P7KFA0", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		logLine("1N7KFA0R8KFA1", at, eventCommentPosted, "doc.md", "^a", "agent", 1),
 	)
 	evs, err := readEventsAfter(root, "")
 	if err != nil {
@@ -413,15 +392,15 @@ func TestReadEventsAfterEmptyCursorReturnsEverything(t *testing.T) {
 func TestReadEventsAfterCursorExcludesIt(t *testing.T) {
 	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
 	root := writeEvents(t,
-		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
-		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAW", at, eventThreadResolved, "doc.md", "^a", "agent", -1),
-		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAX", at, eventCommentPosted, "doc.md", "^b", "toly", 0),
+		logLine("1N7KFA0P7KFA0", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		logLine("1N7KFA0R8KFA1", at, eventThreadResolved, "doc.md", "^a", "agent", -1),
+		logLine("1N7KFA0S9KFA2", at, eventCommentPosted, "doc.md", "^b", "toly", 0),
 	)
-	evs, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAW")
+	evs, err := readEventsAfter(root, "1N7KFA0R8KFA1")
 	if err != nil {
 		t.Fatalf("readEventsAfter: %v", err)
 	}
-	if len(evs) != 1 || evs[0].id != "01ARZ3NDEKTSV4RRFFQ69G5FAX" {
+	if len(evs) != 1 || evs[0].id != "1N7KFA0S9KFA2" {
 		t.Errorf("readEventsAfter(id-0002) = %+v, want only id-0003", evs)
 	}
 }
@@ -430,8 +409,8 @@ func TestReadEventsAfterCursorExcludesIt(t *testing.T) {
 // nothing after it — the "nothing new yet" state a poller starts in.
 func TestReadEventsAfterLastCursorIsEmpty(t *testing.T) {
 	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
-	root := writeEvents(t, eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0))
-	evs, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	root := writeEvents(t, logLine("1N7KFA0P7KFA0", at, eventCommentPosted, "doc.md", "^a", "toly", 0))
+	evs, err := readEventsAfter(root, "1N7KFA0P7KFA0")
 	if err != nil {
 		t.Fatalf("readEventsAfter: %v", err)
 	}
@@ -445,32 +424,32 @@ func TestReadEventsAfterLastCursorIsEmpty(t *testing.T) {
 // told, not silently handed the whole file.
 func TestReadEventsAfterUnknownCursorErrors(t *testing.T) {
 	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
-	root := writeEvents(t, eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0))
-	_, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAZ")
+	root := writeEvents(t, logLine("1N7KFA0P7KFA0", at, eventCommentPosted, "doc.md", "^a", "toly", 0))
+	_, err := readEventsAfter(root, "1N7KFA0T0KFA3")
 	if err == nil {
 		t.Fatal("readEventsAfter with an unknown cursor reported success")
 	}
-	if !strings.Contains(err.Error(), "01ARZ3NDEKTSV4RRFFQ69G5FAZ") {
+	if !strings.Contains(err.Error(), "1N7KFA0T0KFA3") {
 		t.Errorf("error does not name the bad cursor: %v", err)
 	}
 }
 
-// TestReadEventsAfterResolvesTiesByFilePosition: two events sharing a
-// millisecond are ordered by where they sit in the file, not by comparing
-// ids — a cursor into an append-only log means the tie is file order (D13).
+// TestReadEventsAfterResolvesTiesByFilePosition: two events sharing a second
+// are ordered by where they sit in the file, not by comparing ids — a cursor
+// into an append-only log means the tie is file order (D13).
 // Here the second line's id sorts *before* the first's lexically, so a string
 // comparison would hand back the wrong event.
 func TestReadEventsAfterResolvesTiesByFilePosition(t *testing.T) {
 	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
 	root := writeEvents(t,
-		eventLine("ZZZZZZZZZZZZZZZZZZZZZZZZZW", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
-		eventLine("00000000000000000000000000", at, eventCommentPosted, "doc.md", "^a", "agent", 1),
+		logLine("ZZZZZZZZZZZZZ", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		logLine("0000000000000", at, eventCommentPosted, "doc.md", "^a", "agent", 1),
 	)
-	evs, err := readEventsAfter(root, "ZZZZZZZZZZZZZZZZZZZZZZZZZW")
+	evs, err := readEventsAfter(root, "ZZZZZZZZZZZZZ")
 	if err != nil {
 		t.Fatalf("readEventsAfter: %v", err)
 	}
-	if len(evs) != 1 || evs[0].id != "00000000000000000000000000" {
+	if len(evs) != 1 || evs[0].id != "0000000000000" {
 		t.Errorf("readEventsAfter(ZZZZ…) = %+v, want the later line (file order, not id order)", evs)
 	}
 }
@@ -481,10 +460,10 @@ func TestReadEventsAfterResolvesTiesByFilePosition(t *testing.T) {
 func TestReadEventsAfterSurfacesMalformedLine(t *testing.T) {
 	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
 	root := writeEvents(t,
-		eventLine("01ARZ3NDEKTSV4RRFFQ69G5FAV", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
+		logLine("1N7KFA0P7KFA0", at, eventCommentPosted, "doc.md", "^a", "toly", 0),
 		"this is not an event line",
 	)
-	if _, err := readEventsAfter(root, "01ARZ3NDEKTSV4RRFFQ69G5FAV"); err == nil {
+	if _, err := readEventsAfter(root, "1N7KFA0P7KFA0"); err == nil {
 		t.Fatal("readEventsAfter over a malformed log reported success")
 	}
 }
@@ -551,7 +530,7 @@ func TestWaitEventsBlocksUntilNewEvent(t *testing.T) {
 }
 
 // TestWaitEventsCursorIsFilePosition: the cursor filters by file position, so
-// two events in one millisecond come out in file order even when their ids
+// two events in one second come out in file order even when their ids
 // sort the other way — the D13 tie rule, observed through the wait itself.
 func TestWaitEventsCursorIsFilePosition(t *testing.T) {
 	root, docPath := waitRoot(t)
@@ -559,16 +538,16 @@ func TestWaitEventsCursorIsFilePosition(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(eventsLogPath(root)), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	data := eventLine("ZZZZZZZZZZZZZZZZZZZZZZZZZW", at, eventCommentPosted, "doc.md", "^a", "toly", 0) + "\n" +
-		eventLine("00000000000000000000000000", at, eventCommentPosted, "doc.md", "^a", "agent", 1) + "\n"
+	data := logLine("ZZZZZZZZZZZZZ", at, eventCommentPosted, "doc.md", "^a", "toly", 0) + "\n" +
+		logLine("0000000000000", at, eventCommentPosted, "doc.md", "^a", "agent", 1) + "\n"
 	if err := os.WriteFile(eventsLogPath(root), []byte(data), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	lines, err := WaitEvents(docPath, "ZZZZZZZZZZZZZZZZZZZZZZZZZW", time.Second)
+	lines, err := WaitEvents(docPath, "ZZZZZZZZZZZZZ", time.Second)
 	if err != nil {
 		t.Fatalf("WaitEvents: %v", err)
 	}
-	if len(lines) != 1 || !strings.Contains(lines[0], "00000000000000000000000000") {
+	if len(lines) != 1 || !strings.Contains(lines[0], "0000000000000") {
 		t.Errorf("WaitEvents(ZZZZ…) = %v, want the later line (file order)", lines)
 	}
 }

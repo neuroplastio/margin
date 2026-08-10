@@ -37,10 +37,11 @@ const waitPollInterval = 200 * time.Millisecond
 // up by resolveReviewRoot like any other path.
 //
 // Events are returned as their on-disk log lines, verbatim, in file order, so
-// the same seven tab-separated fields an agent sees in .margin/events.log —
-// id at type doc anchor author comment — are what it reads on stdout, and the
-// last line's id is the --since cursor for the next call. Same-millisecond
-// ties come out in file order (readEventsAfter), as D13 requires.
+// the same JSONL an agent sees in .margin/events.log — one JSON object per
+// line carrying the id, unix-second timestamp, type, doc, anchor, author and
+// comment index — is what it reads on stdout, and the last line's id is the
+// --since cursor for the next call. Same-second ties come out in file order
+// (readEventsAfter), as D13 requires.
 func WaitEvents(path, since string, timeout time.Duration) ([]string, error) {
 	root, _ := resolveReviewRoot(path)
 	deadline := time.Time{}

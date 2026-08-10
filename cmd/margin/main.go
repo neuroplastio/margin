@@ -185,10 +185,11 @@ and exit 0. An agent polls this instead of re-exporting the review on a timer:
 the reviewer's comment lands in the log, this command notices it, and the
 agent reads the lines to find what to respond to.
 
-The printed lines are the log's own tab-separated lines (id, UTC timestamp,
-event type, document, anchor, author, comment index), in file order, so the
-last line's id is the --since cursor for the next call. A same-millisecond tie
-is resolved by file position, not id comparison.
+The printed lines are the log's own JSONL lines — one JSON object per event,
+carrying the id, unix-second timestamp, event type, document, anchor, author
+and comment index — in file order, so the last line's id is the --since cursor
+for the next call. Two events in the same second are ordered by file position,
+not id comparison.
 
 --since is optional: without it, every event in the log is new. --timeout
 bounds the wait (0 = wait forever); when it elapses with nothing new the

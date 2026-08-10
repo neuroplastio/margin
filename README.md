@@ -96,7 +96,7 @@ reviewer's `Y` produces:
 ```
 margin export spec.md            # print the review as it stands on disk
 margin comment add spec.md --anchor ^abc123 --text "fixed in rev 3" --author agent
-margin comments wait --since 06FYPBSTNNP6979809ESB2HQN4   # block for the next event
+margin comments wait --since 1N7KB52S0NPCH   # block for the next event
 ```
 
 `margin export FILE.md` is non-interactive: it parses the document, loads its
@@ -117,7 +117,7 @@ exits 1 and writes the reason to stderr. The printed lines are the log's own
 lines, so an agent takes the last line's id as the next `--since`:
 
 ```
-margin comments wait --since 06FYPBSTNNP6979809ESB2HQN4 --timeout 60s
+margin comments wait --since 1N7KB52S0NPCH --timeout 60s
 ```
 
 The anchor is the `(^id)` shown in a block's export header. `--author` defaults
@@ -125,11 +125,12 @@ to the current user. The reply appears on the reviewer's next open (or live, via
 the file watcher).
 
 Every thread change — a comment posted, edited, deleted or restored, a thread
-resolved or deleted — is also appended to `.margin/events.log` as one line with
-a time-ordered id (`id`, UTC timestamp, event type, document, anchor, author,
-comment index, tab-separated). A listener can tail or watch that single file to
-answer "what happened since the last thing I saw", instead of parsing thread
-files.
+resolved or deleted — is also appended to `.margin/events.log` as one JSONL
+line: a JSON object carrying a time-ordered 13-character id, a unix-second
+timestamp, and the event type, document, anchor, author and comment index.
+JSONL makes the fields self-describing, and a listener can tail or watch that
+single file to answer "what happened since the last thing I saw", instead of
+parsing thread files.
 
 The export leaves resolved threads out by default — it's a list of what still
 needs doing, not a transcript of everything ever said. Pass `--include-resolved`
