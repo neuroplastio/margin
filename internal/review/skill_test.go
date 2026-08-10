@@ -59,6 +59,29 @@ func TestSkillTeachesTheWaitExitContract(t *testing.T) {
 	}
 }
 
+// The feedback's essential requirement: an agent participating live (replying
+// as comments land) also has a definitive "the review is done" signal. The
+// taught recipe is to run the launch and the poll as two parallel jobs — launch
+// with --stdout chained to a sentinel, take the launch's completion as the
+// done-signal, poll with comments wait in parallel — and stop when it fires.
+func TestSkillTeachesTheDoneSignal(t *testing.T) {
+	doc := SkillDocument()
+	if !strings.Contains(doc, "When the review is done") {
+		t.Errorf("skill has no done-signal section:\n%s", doc)
+	}
+	for _, want := range []string{
+		"--stdout",
+		"sentinel",
+		"backgrounded",
+		"in parallel",
+		"done-signal",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("skill does not teach the %q done-signal element:\n%s", want, doc)
+		}
+	}
+}
+
 func TestSkillTeachesTheLiveUpdateHalf(t *testing.T) {
 	doc := SkillDocument()
 	// "The human sees the reply live" is the point of the loop: the thread

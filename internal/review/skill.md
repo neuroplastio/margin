@@ -74,11 +74,40 @@ Reviewing with margin is a loop between you and the human. Run it end to end:
 
 5. **Loop.** Take the last line's `id` as the next `--since` and go back to
    step 3. Run `margin export` again whenever you want the whole picture rather
-   than the delta.
+   than the delta. The loop has no end of its own — how to know when the human
+   has finished is the next section.
 
 Resolve what you fixed: a thread whose work is done carries `resolved: true` in
 its thread file's frontmatter (below). The reviewer can set and unset it too, so
 resolving is a suggestion, not a verdict.
+
+## When the review is done
+
+The loop above repeats forever: a "nothing yet" poll looks exactly the same
+whether the human is thinking or has quit. When you are participating live —
+replying as comments land — run the launch and the poll as two parallel jobs,
+and treat the launch's completion as the done-signal.
+
+Launch with `--stdout`, chained to a sentinel, as one backgrounded call:
+
+    margin --stdout FILE.md && echo "__MARGIN_DONE__"
+
+The human quits (`q`) when they are finished. margin prints the whole review to
+stdout — the same content `Y` and `margin export` produce, your replies
+included — the sentinel echoes, and the backgrounded call completes. That
+completion is "the review is done", and the stdout it carried is the final
+state, worth keeping as the record. The `&&` is deliberate: the sentinel fires
+only on a normal quit, so a call that completes with no sentinel (and a non-zero
+exit) is margin erroring, not the review finishing.
+
+While the launch job runs, poll in parallel — step 3 above, looping, replying
+via `margin comment add`:
+
+    margin comments wait --since ID --timeout 60s
+
+Two jobs, one review: the wait loop is your live connection to the human, the
+launch job is your done-signal. When the launch job completes, stop polling —
+there is nothing left to answer, and the review it printed is the whole story.
 
 ## The contracts behind the loop
 

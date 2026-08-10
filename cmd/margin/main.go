@@ -79,7 +79,8 @@ a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).
 margin skill prints the markdown document an agent loads to learn how to take
 part in an interactive review: launch margin in a terminal for the human, poll
 for their comments with margin comments wait, reply with margin comment add,
-and let the thread watcher carry each reply live to their open document.`,
+let the thread watcher carry each reply live to their open document, and treat
+the launch's completion as the signal that the review is done.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if stdin {
 				if len(args) > 0 {
@@ -281,8 +282,9 @@ func newSkillCmd() *cobra.Command {
 the four CLI commands, the interactive review loop that binds them — launch the
 review in a new terminal for the human, poll for their comments with comments
 wait, reply through comment add, and let the thread watcher carry the reply
-live to the open document — and the on-disk contracts the loop depends on: the
-event log, thread files, and anchors.`,
+live to the open document — how a live participant knows when the review is
+done, and the on-disk contracts the loop depends on: the event log, thread
+files, and anchors.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprint(cmd.OutOrStdout(), review.SkillDocument())

@@ -103,8 +103,9 @@ margin comments wait --since 1N7KB52S0NPCH   # block for the next event
 learn how to take part in an interactive review — the same four commands, the
 loop that binds them (launch the review in a new terminal for the human, poll
 for their comments, reply through the CLI, let the thread watcher carry the
-reply live), and the contracts behind it (the event log, thread files,
-anchors).
+reply live), how a live participant knows when the review is done (the launch
+job's completion is the signal), and the contracts behind it (the event log,
+thread files, anchors).
 
 `margin export FILE.md` is non-interactive: it parses the document, loads its
 threads from `.margin/threads/`, and prints the review straight to stdout, so a

@@ -1,9 +1,15 @@
 # Board
 
-Last updated: 2026-08-10 (export agent instructions reconciled with margin skill)
+Last updated: 2026-08-10 (skill document teaches the agent-loop done-signal)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) `margin skill` teaches the done-signal for a live agent:
+  step 5 of the loop now points at a new "When the review is done" section —
+  launch with `--stdout` chained to a sentinel
+  (`margin --stdout FILE.md && echo "__MARGIN_DONE__"`), treat the launch's
+  completion as done while `comments wait` polls in parallel, stop when it
+  fires; `&&` over `;` so a crash prints no sentinel — journal 2026-08-10.13
 - (feedback fix) `margin export`'s agent-instructions note reconciled with
   `margin skill`: the note now leads with `margin comment add` for replies
   ("keeps the thread file and the event log in step"), keeps the file edit as
@@ -215,6 +221,23 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** `margin skill` now teaches an agent participating
+      live how to know when the review is done. A new "When the review is done"
+      section (between the loop and the contracts) spells out the pattern the
+      maintainer's loop actually runs: run the launch and the poll as two
+      parallel jobs and treat the launch's completion as the done-signal —
+      launch with `--stdout` chained to a sentinel
+      (`margin --stdout FILE.md && echo "__MARGIN_DONE__"`), so a normal quit
+      prints the final review (replies included) and echoes the sentinel, while
+      `comments wait` loops in parallel and stops when the launch job
+      completes. `&&` over `;`, stated and explained: a normal quit exits 0, so
+      a call that completes with no sentinel is margin erroring, not the review
+      finishing. Step 5 of the loop now points at the section, so the loop
+      reads as one that terminates; the root/skill help texts and README carry
+      the done-signal clause too. Drains
+      `vault/feedback/2026-08-10-agent-loop-review-done-signal.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.13 — done 2026-08-10
 
 - [x] **(feedback fix)** `margin export`'s "Agent instructions" note reconciled
       with `margin skill`: the note now opens by recommending `margin comment
