@@ -267,7 +267,10 @@ navigation backlog; the tree-view backlog is the only thing left open there).
 
 ## In progress
 
-*(none)*
+- [ ] **Review a directory, not just a file** — claimed by the 2026-08-11 tree-pane
+      leg: `margin` / `margin DIR/` opens a tree of markdown files in a left pane,
+      `tab` toggles focus between it and the document, `enter` opens the focused
+      file. *In progress, 2026-08-11.*
 
 ## Done
 
