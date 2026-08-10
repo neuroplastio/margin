@@ -2440,7 +2440,10 @@ func (m *model) View() tea.View {
 	// frame from scrolling the terminal, so two of the reader's rows went to
 	// chrome nobody asked for.
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	// All-motion (1003), not cell-motion (1002): 1002 makes the terminal
+	// report motion only while a button is held, so hover never fired — the
+	// pointer is not a button.
+	v.MouseMode = tea.MouseModeAllMotion
 	if m.comp != nil && m.paneTop >= 0 {
 		if shape, blink, shown := m.comp.cur.get(); shown {
 			cp := m.comp.em.CursorPosition()

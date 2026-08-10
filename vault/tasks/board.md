@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-08-10 (hover-without-lmb claimed)
+Last updated: 2026-08-10 (hover-without-lmb)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) hover without LMB: the gutter `▌` now lights on a bare
+  pointer move — the view switched from cell-motion (1002) to any-event (1003)
+  mouse tracking, so the terminal reports motion with no button held (the
+  wheel, the composer-pane carve-out and the click paths are unchanged) —
+  journal 2026-08-10.18
 - (feedback feature) mermaid diagrams render as ASCII flowcharts: a
   ` ```mermaid ` fence renders through an in-tree renderer as a boxed tree —
   rectangles, `╭─╮` round and `◇`-marked decision boxes, ├/└ spine junctions
@@ -214,11 +219,7 @@ Last updated: 2026-08-10 (hover-without-lmb claimed)
 
 ## In progress
 
-- (feedback fix) hover works without a button held: the gutter hover `▌`
-  only lit while dragging because the view requested cell-motion mouse mode
-  (1002), so the terminal never reported bare pointer moves. Drains
-  `vault/feedback/2026-08-10-hover-without-lmb.md`. Claimed 2026-08-10 by the
-  do-leg agent.
+*(none)*
 
 ## Backlog — M1
 
@@ -263,6 +264,18 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** hover works without a button held: the gutter
+      hover `▌` only lit while dragging because `View` requested cell-motion
+      mouse tracking (`tea.MouseModeCellMotion`, 1002), under which the
+      terminal reports motion only while a button is held — so a bare pointer
+      move never became a `MouseMotionMsg` at all. The view now requests
+      any-event tracking (`tea.MouseModeAllMotion`, 1003), which reports every
+      move; `handleMotion` was already correct and is unchanged, as are the
+      wheel, the composer-pane carve-out (hover clears over the pane) and the
+      click paths. Drains
+      `vault/feedback/2026-08-10-hover-without-lmb.md`; the file is deleted.
+      `[felt]` — see journal 2026-08-10.18 — done 2026-08-10
 
 - [x] **(feedback feature)** support mermaid diagrams in the review: a
       fenced block whose info string is `mermaid` renders through a new

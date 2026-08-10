@@ -806,6 +806,38 @@ func TestClickInsidePaneDoesNotBlur(t *testing.T) {
 	}
 }
 
+// TestViewRequestsAllMotionMouse pins the hover fix (2026-08-10.18): the view
+// must ask the terminal for any-event tracking (1003), not cell-motion (1002).
+// Under 1002 the terminal only reports motion while a button is held, so a bare
+// pointer move — plain hover — never reached handleMotion at all.
+func TestViewRequestsAllMotionMouse(t *testing.T) {
+	m := newTestModel(t)
+	if got := m.View().MouseMode; got != tea.MouseModeAllMotion {
+		t.Fatalf("MouseMode = %v, want %v (any-event tracking, so hover works without a button)", got, tea.MouseModeAllMotion)
+	}
+}
+
+// TestHoverLightsOnBareMotion is the behaviour the 2026-08-10-hover-without-lmb
+// feedback asked for: a motion event carrying no button — the terminal's 1003
+// hover report — lights hoveredEntry on the block under the pointer, and a
+// motion over nothing clears it.
+func TestHoverLightsOnBareMotion(t *testing.T) {
+	m := newTestModel(t)
+	m.View()
+
+	i := blockEntryFor(t, m, draftAnchor)
+	hover := tea.Mouse{X: 4, Y: m.spans[i].start - m.scroll} // Button zero: no drag
+	m.handleMotion(hover)
+	if m.hoveredEntry != i {
+		t.Fatalf("bare motion over entry %d left hoveredEntry = %d, want %d", i, m.hoveredEntry, i)
+	}
+
+	m.handleMotion(tea.Mouse{X: 4, Y: 1 << 20})
+	if m.hoveredEntry != -1 {
+		t.Fatalf("bare motion over empty space left hoveredEntry = %d, want -1", m.hoveredEntry)
+	}
+}
+
 // --- review marks -----------------------------------------------------------
 
 // TestWrapListWrapsInsteadOfTruncating is the render-level regression test
