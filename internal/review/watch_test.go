@@ -3,6 +3,7 @@ package review
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,5 +256,277 @@ func TestNilThreadWatcherCloseIsANoop(t *testing.T) {
 	var tw *threadWatcher
 	if err := tw.close(); err != nil {
 		t.Fatalf("nil *threadWatcher.close(): %v", err)
+	}
+}
+
+// --- the document file itself is watched too --------------------------------
+
+func TestThreadWatcherFiresOnADocumentChange(t *testing.T) {
+	root := t.TempDir()
+	doc := filepath.Join(root, "document.md")
+	if err := os.WriteFile(doc, []byte("# hi\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	tw, err := newThreadWatcher(root, "document.md")
+	if err != nil {
+		t.Skipf("newThreadWatcher: %v (no inotify in this environment?)", err)
+	}
+	defer tw.close()
+
+	done := make(chan tea.Msg, 1)
+	go func() { done <- tw.wait()() }()
+	time.Sleep(50 * time.Millisecond)
+
+	if err := os.WriteFile(doc, []byte("# hi\n\nChanged.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	select {
+	case msg := <-done:
+		if _, ok := msg.(docChangedMsg); !ok {
+			t.Fatalf("wait() returned %#v, want docChangedMsg", msg)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("wait() did not observe the document write within 5s")
+	}
+}
+
+// TestThreadWatcherIgnoresASiblingDocument: the doc watch is on the document's
+// directory, so it can see every file in it — a sibling markdown document must
+// not masquerade as a thread change (or a document change) for the review in
+// front of it.
+func TestThreadWatcherIgnoresASiblingDocument(t *testing.T) {
+	root := t.TempDir()
+	doc := filepath.Join(root, "document.md")
+	sibling := filepath.Join(root, "sibling.md")
+	if err := os.WriteFile(doc, []byte("# doc\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.WriteFile(sibling, []byte("# sibling\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	tw, err := newThreadWatcher(root, "document.md")
+	if err != nil {
+		t.Skipf("newThreadWatcher: %v (no inotify in this environment?)", err)
+	}
+	defer tw.close()
+
+	done := make(chan tea.Msg, 1)
+	go func() { done <- tw.wait()() }()
+	time.Sleep(50 * time.Millisecond)
+
+	if err := os.WriteFile(sibling, []byte("# sibling\n\nmore\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.WriteFile(doc, []byte("# doc\n\nchanged\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	select {
+	case msg := <-done:
+		if _, ok := msg.(docChangedMsg); !ok {
+			t.Fatalf("wait() returned %#v, want docChangedMsg — the sibling write must not fire first", msg)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("wait() did not observe the document write within 5s")
+	}
+}
+
+// --- reloading the document ------------------------------------------------
+
+func TestReloadDocPicksUpAChangedDocumentAndKeepsFocus(t *testing.T) {
+	root := t.TempDir()
+	docPath := "doc.md"
+	path := filepath.Join(root, docPath)
+	// The marker stamps the block it follows (Second paragraph) with ^deadbeef,
+	// so focus on it survives a reword of the paragraph above.
+	src1 := "# Heading\n\nFirst paragraph.\n\nSecond paragraph.\n\n<!--margin:^deadbeef-->\n"
+	if err := os.WriteFile(path, []byte(src1), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	doc, src, err := loadDoc(path)
+	if err != nil {
+		t.Fatalf("loadDoc: %v", err)
+	}
+	m := newModelAt(path, doc, nil)
+	m.src = src
+	m.store = &threadStore{root: root, docPath: docPath}
+	m.at = cursor{entry: blockEntryFor(t, m, "^deadbeef"), comment: commentNone}
+	m.docChanged = true
+
+	src2 := "# Heading\n\nFirst paragraph — rewritten by the agent.\n\nSecond paragraph.\n\n<!--margin:^deadbeef-->\n"
+	if err := os.WriteFile(path, []byte(src2), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	m.reloadDoc()
+
+	if m.docChanged {
+		t.Fatal("reloadDoc did not clear the file-changed notice")
+	}
+	if string(m.src) != src2 {
+		t.Fatalf("m.src not refreshed by reloadDoc")
+	}
+	if got := m.anchorAt(); got != "^deadbeef" {
+		t.Fatalf("focus anchor = %q, want ^deadbeef — focus must follow the stamped block", got)
+	}
+	var sawRewritten bool
+	for _, b := range m.doc {
+		if strings.Contains(b.text, "rewritten by the agent") {
+			sawRewritten = true
+		}
+	}
+	if !sawRewritten {
+		t.Fatal("reloaded doc does not contain the rewritten paragraph")
+	}
+}
+
+func TestReloadDocWithoutAStoreIsANoop(t *testing.T) {
+	m := newTestModel(t)
+	m.reloadDoc()
+	if m.status != "nothing to reload" {
+		t.Fatalf("status = %q, want %q", m.status, "nothing to reload")
+	}
+}
+
+// TestReloadDocRefusesWhileComposerOpen: the prose is being written to, not
+// read, so a reload must refuse rather than swap the document out from under a
+// live edit (D7).
+func TestReloadDocRefusesWhileComposerOpen(t *testing.T) {
+	requireNvim(t)
+	root := t.TempDir()
+	docPath := "doc.md"
+	path := filepath.Join(root, docPath)
+	if err := os.WriteFile(path, []byte("# Heading\n\nParagraph one.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	doc, src, err := loadDoc(path)
+	if err != nil {
+		t.Fatalf("loadDoc: %v", err)
+	}
+	m := newModelAt(path, doc, nil)
+	m.src = src
+	m.store = &threadStore{root: root, docPath: docPath}
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: blockEntryFor(t, m, doc[1].anchor), comment: commentNone}
+
+	open(t, m, doc[1].anchor, newCommentSlot, "")
+	if m.comp == nil {
+		t.Fatal("composer did not open")
+	}
+	m.reloadDoc()
+	if m.comp == nil {
+		t.Fatal("reloadDoc closed the composer")
+	}
+	if !strings.Contains(m.status, "close the editor") {
+		t.Fatalf("status = %q, want the close-the-editor refusal", m.status)
+	}
+}
+
+// --- the new-comment notice ------------------------------------------------
+
+func TestNoticeNewEventsAnnouncesTheNewestComment(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+
+	id0, err := appendEvent(root, event{kind: eventThreadResolved, anchor: "^old", author: "toly", comment: -1})
+	if err != nil {
+		t.Fatalf("appendEvent: %v", err)
+	}
+	m.lastEventID = id0
+
+	// An agent's reply lands, and a resolution lands after it. The reply is
+	// the news; the cursor still advances past both.
+	if _, err := appendEvent(root, event{kind: eventCommentPosted, anchor: "^b2", author: "agent", comment: 0, text: "Addressed."}); err != nil {
+		t.Fatalf("appendEvent: %v", err)
+	}
+	if _, err := appendEvent(root, event{kind: eventThreadResolved, anchor: "^b2", author: "agent", comment: -1}); err != nil {
+		t.Fatalf("appendEvent: %v", err)
+	}
+
+	m.noticeNewEvents()
+	if m.status != "new comment from agent on ^b2" {
+		t.Fatalf("status = %q, want the new-comment notice", m.status)
+	}
+	evs, err := readEventsAfter(root, m.lastEventID)
+	if err != nil {
+		t.Fatalf("readEventsAfter: %v", err)
+	}
+	if len(evs) != 0 {
+		t.Fatalf("cursor did not advance; %d events are still new", len(evs))
+	}
+}
+
+func TestNoticeNewEventsWithNothingNewIsSilent(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+	id0, err := appendEvent(root, event{kind: eventThreadResolved, anchor: "^a", author: "toly", comment: -1})
+	if err != nil {
+		t.Fatalf("appendEvent: %v", err)
+	}
+	m.lastEventID = id0
+
+	m.status = ""
+	m.noticeNewEvents()
+	if m.status != "" {
+		t.Fatalf("status = %q, want silence when nothing new", m.status)
+	}
+}
+
+// TestReviewersOwnEmitAdvancesTheCursor pins the contract that keeps the
+// reviewer's own comments from being announced back to them: emit hands back
+// the id it wrote, and the model records it as seen (the same assignment
+// dismiss, toggleResolved and deleteFocused make), so the watcher the write
+// wakes finds nothing new to say.
+func TestReviewersOwnEmitAdvancesTheCursor(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+	id0, err := appendEvent(root, event{kind: eventThreadResolved, anchor: "^a", author: "toly", comment: -1})
+	if err != nil {
+		t.Fatalf("appendEvent: %v", err)
+	}
+	m.lastEventID = id0
+
+	id1, err := m.store.emit(event{kind: eventCommentPosted, anchor: "^b", author: "toly", comment: 0, text: "my words"})
+	if err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	if id1 == "" {
+		t.Fatal("emit returned no id")
+	}
+	m.lastEventID = id1
+
+	m.status = ""
+	m.noticeNewEvents()
+	if m.status != "" {
+		t.Fatalf("status = %q, want the reviewer's own comment to be silence", m.status)
+	}
+}
+
+// --- the footer notice ------------------------------------------------------
+
+func TestDocChangedMsgSetsTheNotice(t *testing.T) {
+	m := newTestModel(t)
+	nm, _ := m.Update(docChangedMsg{})
+	mm := nm.(*model)
+	if !mm.docChanged {
+		t.Fatal("docChanged not set by docChangedMsg")
+	}
+	if !strings.Contains(mm.status, "file changed on disk") {
+		t.Fatalf("status = %q, want the file-changed notice", mm.status)
+	}
+}
+
+func TestDocChangedNoticeShowsInTheFooterUntilCleared(t *testing.T) {
+	m := newTestModel(t)
+	m.docChanged = true
+	if footer := m.View().Content; !strings.Contains(footer, "file changed") || !strings.Contains(footer, "ctrl+r") {
+		t.Fatalf("footer with the notice on = %q, want the file-changed marker and its reload key", footer)
+	}
+	m.docChanged = false
+	if footer := m.View().Content; strings.Contains(footer, "file changed") {
+		t.Fatalf("footer without the notice = %q, want it gone", footer)
 	}
 }

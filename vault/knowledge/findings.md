@@ -499,3 +499,23 @@ variant the hard way. Probing tip: `mode()` inside headless `-c` command chains
 does not report insert mode reliably (it reads `n` even after a real
 `startinsert`), so the pty-backed Go tests — which see the DECSCUSR cursor
 shape the child really reports — are the honest check.
+
+## F23 — fsnotify a directory, not a file, if you want to survive save-as
+
+`fsnotify.NewWatcher().Add(file)` watches the **inode**, not the path. An
+editor that saves via temp-file-then-rename (write `x.md.tmp`, `rename` it over
+`x.md`) breaks the watch: the rename event fires once, and every later save of
+the *new* inode is invisible — the watcher is permanently stuck on the file
+that was replaced. The robust shape is `Add(directoryOf(file))` and match
+events by `filepath.Base(ev.Name) == base`. A directory watch is
+**non-recursive**, so it only reports the directory's direct children — which
+is exactly the scope a "this one document changed" watch wants, and is what
+keeps `.margin/events.log` appends (a grandchild) and sibling documents from
+being reported at all.
+
+Attribution gotcha that follows: when one watcher covers two directories (the
+document's directory *and* the `.margin/threads/<doc>` leaf), attribute each
+event to the directory it came from (`filepath.Dir(ev.Name)`), not to its
+suffix — a sibling `.md` in the document's directory otherwise reads as a
+thread change. Discovered building the change-notification leg (2026-08-10.15);
+see `newThreadWatcher` in `internal/review/watch.go`.

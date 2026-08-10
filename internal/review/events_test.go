@@ -201,10 +201,10 @@ func TestMarshalEventEscapesFreeFormFields(t *testing.T) {
 // in.
 func TestAppendEventAndReadEventsRoundTrip(t *testing.T) {
 	root := t.TempDir()
-	if err := appendEvent(root, event{kind: eventCommentPosted, doc: "doc.md", anchor: "^a", author: "agent", comment: 0}); err != nil {
+	if _, err := appendEvent(root, event{kind: eventCommentPosted, doc: "doc.md", anchor: "^a", author: "agent", comment: 0}); err != nil {
 		t.Fatalf("appendEvent: %v", err)
 	}
-	if err := appendEvent(root, event{kind: eventThreadResolved, doc: "doc.md", anchor: "^a", author: "toly", comment: -1}); err != nil {
+	if _, err := appendEvent(root, event{kind: eventThreadResolved, doc: "doc.md", anchor: "^a", author: "toly", comment: -1}); err != nil {
 		t.Fatalf("appendEvent: %v", err)
 	}
 
@@ -299,7 +299,7 @@ func TestParseEventMalformed(t *testing.T) {
 func TestThreadStoreEmitWritesEvent(t *testing.T) {
 	root := t.TempDir()
 	s := &threadStore{root: root, docPath: "docs/spec.md"}
-	if err := s.emit(event{kind: eventThreadResolved, anchor: "^b2", author: "toly", comment: -1}); err != nil {
+	if _, err := s.emit(event{kind: eventThreadResolved, anchor: "^b2", author: "toly", comment: -1}); err != nil {
 		t.Fatalf("emit: %v", err)
 	}
 
@@ -324,7 +324,7 @@ func TestThreadStoreEmitWritesEvent(t *testing.T) {
 // matching save — a seeded or ephemeral model must not touch disk.
 func TestThreadStoreEmitNilSafe(t *testing.T) {
 	var s *threadStore
-	if err := s.emit(event{kind: eventCommentPosted}); err != nil {
+	if _, err := s.emit(event{kind: eventCommentPosted}); err != nil {
 		t.Fatalf("emit on nil store: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(t.TempDir(), ".margin")); !os.IsNotExist(err) {
@@ -542,7 +542,7 @@ func waitRoot(t *testing.T) (root, docPath string) {
 // back on the first poll, no waiting.
 func TestWaitEventsReturnsEventsImmediately(t *testing.T) {
 	root, docPath := waitRoot(t)
-	if err := appendEvent(root, event{kind: eventCommentPosted, doc: "doc.md", anchor: "^a", author: "toly", comment: 0}); err != nil {
+	if _, err := appendEvent(root, event{kind: eventCommentPosted, doc: "doc.md", anchor: "^a", author: "toly", comment: 0}); err != nil {
 		t.Fatalf("appendEvent: %v", err)
 	}
 	lines, err := WaitEvents(docPath, "", time.Second)
@@ -578,7 +578,7 @@ func TestWaitEventsBlocksUntilNewEvent(t *testing.T) {
 	root, docPath := waitRoot(t)
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		_ = appendEvent(root, event{kind: eventThreadResolved, doc: "doc.md", anchor: "^a", author: "toly", comment: -1})
+		_, _ = appendEvent(root, event{kind: eventThreadResolved, doc: "doc.md", anchor: "^a", author: "toly", comment: -1})
 	}()
 	lines, err := WaitEvents(docPath, "", 5*time.Second)
 	if err != nil {

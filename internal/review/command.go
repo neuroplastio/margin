@@ -410,6 +410,17 @@ var commands = []command{
 		Run:         func(m *model, val string) tea.Cmd { m.toggleRaw(); return nil },
 	},
 	{
+		// doc.reload re-reads the document from disk, the reload half of the
+		// change-notification feedback: when the footer's `● file changed`
+		// notice appears, ctrl+r pulls the new prose in. Focus follows the
+		// block by anchor, marks survive (they are keyed by anchor), and the
+		// notice clears. Refuses while a composer is open.
+		ID:          "doc.reload",
+		Description: "Reload the document from disk",
+		Applicable:  func(m *model) bool { return m.store != nil },
+		Run:         func(m *model, val string) tea.Cmd { m.reloadDoc(); return nil },
+	},
+	{
 		ID:          "app.quit",
 		Description: "Quit",
 		Applicable:  func(m *model) bool { return true },
@@ -600,6 +611,7 @@ var keyBindings = []struct {
 	{"m", "mark"},
 	{"s", "goto"},
 	{"\\", "view.raw"},
+	{"ctrl+r", "doc.reload"},
 	{"q", "app.quit"}, {"ctrl+c", "app.quit"},
 }
 

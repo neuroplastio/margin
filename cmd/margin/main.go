@@ -44,6 +44,7 @@ Keys:
   j/k     move            c  comment            space  cycle the mark
   g/G     top/bottom      e  edit               r/f    reviewed / flag
   \\      rendered/raw source Y  copy the review  q  quit
+  ctrl+r  reload the document after it changed on disk
 
 Gutter (the column beside each block):
   ▌  cursor / selection here   │  reviewed (green) / flagged (orange)

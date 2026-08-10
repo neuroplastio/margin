@@ -200,10 +200,12 @@ func (s *threadStore) save(t *thread) error {
 // emit appends one event to the review root's event log, filling in the
 // document path the store already knows. Nil-safe like save: a seeded or
 // ephemeral model has no store and records no events, exactly as it persists
-// no threads.
-func (s *threadStore) emit(ev event) error {
+// no threads. It returns the event's id so the model can advance its
+// "what have I already announced" cursor the moment it writes a line — the
+// reviewer's own action must never be reported back to them as a new event.
+func (s *threadStore) emit(ev event) (string, error) {
 	if s == nil {
-		return nil
+		return "", nil
 	}
 	ev.doc = s.docPath
 	return appendEvent(s.root, ev)

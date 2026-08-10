@@ -1,9 +1,20 @@
 # Board
 
-Last updated: 2026-08-10 (review-change notification claimed)
+Last updated: 2026-08-10 (review-change notification)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) the reviewer is told when the document changes or a new
+  comment lands: the document file is watched (its directory, not the file —
+  temp-rename editors survive, F23) and a change raises a persistent
+  `● file changed — ctrl+r reload` footer marker plus a status line, and
+  `ctrl+r` (`doc.reload`) re-reads the doc, reattaches threads, keeps focus
+  by anchor and clears the notice (refuses while a composer is open); an
+  agent's `comment.posted` — told apart from a plain thread reload by the
+  event log, a `lastEventID` cursor seeded at open and advanced by every
+  self-emit so the reviewer's own comments are never announced — reports
+  `new comment from <author> on <anchor>` in the status line — journal
+  2026-08-10.15
 - (feedback fix) gutter glyphs are distinct and the legend is documented: a
   collapsed open thread's marker is now `▸` (the dive's direction) instead of
   the dim `│` that read as the reviewed/flagged mark rule — "a conversation
@@ -184,10 +195,7 @@ Last updated: 2026-08-10 (review-change notification claimed)
 
 ## In progress
 
-- (feedback feature) visually notify the reviewer when the document changes on
-  disk or a new comment lands — drains
-  `vault/feedback/2026-08-10-review-change-notification.md`. Claimed
-  2026-08-10 by the do-leg agent.
+*(none)*
 
 ## Backlog — M1
 
@@ -232,6 +240,22 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** visually notify the reviewer when the document
+      changes on disk or a new comment lands. The document file is now
+      watched — its directory, not the file, so an editor that saves via
+      temp-file-then-rename still fires (F23) — and a change raises a
+      persistent `● file changed — ctrl+r reload` footer marker plus a status
+      line; `ctrl+r` (`doc.reload`) re-reads the document, reattaches
+      threads, keeps focus on the block by anchor, refreshes the raw source
+      and clears the notice, refusing while a composer is open (D7). A new
+      agent comment is told apart from a plain thread reload by the event log
+      — a `lastEventID` cursor seeded at open from the log tail, advanced by
+      every `emit` the reviewer makes (it now returns the id it wrote) so the
+      reviewer's own comments are never announced back — and reported as
+      `new comment from <author> on <anchor>` in the status line. Drains
+      `vault/feedback/2026-08-10-review-change-notification.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.15 — done 2026-08-10
 
 - [x] **(feedback fix)** the gutter's glyphs are distinct and named: a
       collapsed open thread's marker is now `▸` (the point of the `l`/`enter`

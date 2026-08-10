@@ -120,7 +120,7 @@ func AddComment(path, anchor, author, text string) (string, error) {
 	// re-post and duplicate it — so this is best-effort, exactly as the TUI
 	// treats an event-log failure. The event carries the reply's text so the
 	// agent that reads it need not re-open the thread (D15).
-	_ = appendEvent(root, event{kind: eventCommentPosted, doc: docPath, anchor: t.anchor, author: author, comment: len(t.posted) - 1, text: text})
+	_, _ = appendEvent(root, event{kind: eventCommentPosted, doc: docPath, anchor: t.anchor, author: author, comment: len(t.posted) - 1, text: text})
 	return threadFilePath(root, docPath, anchor), nil
 }
 

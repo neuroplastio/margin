@@ -165,6 +165,20 @@ type model struct {
 	// document. nil wherever store is nil, for the same reason.
 	watcher *threadWatcher
 
+	// docChanged reports that the document file itself changed on disk and the
+	// reviewer has not reloaded it yet (doc.reload). While set, the footer
+	// carries a persistent notice — a status line alone would be overwritten
+	// by the next verb — and the status line spells the affordance out once,
+	// when the change is first seen.
+	docChanged bool
+
+	// lastEventID is the id of the newest event log line this session has
+	// already announced (or simply seen, at open). The cursor for the
+	// change-notification "is there a new comment?" check: noticeNewEvents
+	// reads the events strictly after it, and every emit the reviewer
+	// performs advances it, so their own comments are never announced back.
+	lastEventID string
+
 	at           cursor
 	hoveredEntry int
 	comp         *composer
@@ -815,7 +829,11 @@ func (m *model) toggleResolved() {
 	if !t.resolved {
 		evKind = eventThreadUnresolved
 	}
-	_ = m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: -1})
+	// The event's id is the cursor past it: whatever the thread-file write
+	// wakes the watcher with next, this resolution is not news to announce.
+	if id, err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: -1}); err == nil {
+		m.lastEventID = id
+	}
 }
 
 // deleteFocused tombstones the focused comment (if expanded) or the whole
@@ -858,7 +876,9 @@ func (m *model) deleteFocused() tea.Cmd {
 	if evIdx >= 0 {
 		evText = t.posted[evIdx].body
 	}
-	_ = m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx, text: evText})
+	if id, err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx, text: evText}); err == nil {
+		m.lastEventID = id
+	}
 	return nil
 }
 
@@ -1176,9 +1196,13 @@ func (m *model) dismiss(err error) tea.Cmd {
 			// The thread file is the record; the event log is the notice, so a
 			// failed append degrades the status line rather than the comment.
 			// The event carries the comment's body so an agent sees what was
-			// said without a second read of the thread file (D15).
-			if err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx, text: body}); err != nil {
+			// said without a second read of the thread file (D15), and its id
+			// becomes the cursor, so this own comment is never announced back
+			// to the reviewer by the watcher it just woke.
+			if id, err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx, text: body}); err != nil {
 				m.status += " (event log: " + err.Error() + ")"
+			} else {
+				m.lastEventID = id
 			}
 		}
 	case out == outcomeSubmit:
@@ -1277,6 +1301,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.dismiss(msg.err)
 
+	case docChangedMsg:
+		if m.quitting {
+			return m, nil
+		}
+		// The document moved on disk. The in-memory copy is deliberately left
+		// alone — a change landing mid-read must not yank the prose out from
+		// under the reviewer — and the notice is both spelled out once and
+		// held in the footer until doc.reload clears it.
+		m.docChanged = true
+		m.status = "file changed on disk — ctrl+r to reload"
+		return m, m.watcher.wait()
+
 	case threadsChangedMsg:
 		if m.quitting {
 			return m, nil
@@ -1286,6 +1322,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// documents for a malformed file found on open. Live reload
 			// failing once should not stop watching for the next change.
 			m.status = "reload: " + err.Error()
+		} else if m.store != nil {
+			// The threads on screen are fresh; if what brought them in was an
+			// agent's new comment, say so — the silent reload was the other
+			// half of the change-notification feedback.
+			m.noticeNewEvents()
 		}
 		return m, m.watcher.wait()
 
@@ -2360,6 +2401,12 @@ func (m *model) View() tea.View {
 		if m.raw {
 			hint = "\\ rendered · j/k move · c comment · space mark · Y copy · q quit   "
 		}
+		if m.docChanged {
+			// The persistent half of the change notice: a status line alone is
+			// overwritten by the next verb, so the footer keeps "the document
+			// moved, ctrl+r reloads" in view until the reviewer acts on it.
+			b.WriteString(flagStyle.Render("●") + dimStyle.Render(" file changed — ctrl+r reload   "))
+		}
 		b.WriteString(dimStyle.Render(hint) +
 			dimStyle.Render(progress))
 		if m.status != "" {
@@ -3141,6 +3188,12 @@ func Run(path string, opts RunOptions) error {
 	}
 	if !opts.Stdin {
 		m.store = &threadStore{root: root, docPath: docPath}
+		// The change-notification cursor starts at the newest event already on
+		// disk, so events from before this session are history, not news. A
+		// missing or unreadable log simply means nothing has happened yet.
+		if evs, err := readEvents(root); err == nil && len(evs) > 0 {
+			m.lastEventID = evs[len(evs)-1].id
+		}
 		// Live reload is a nice-to-have on top of a working review, not a
 		// precondition for one — a read-only filesystem or an exhausted inotify
 		// watch budget should not stop the reviewer from opening the document,

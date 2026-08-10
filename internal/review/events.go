@@ -83,8 +83,10 @@ func eventsLogPath(root string) string {
 // notification on top of it: appendEvent must be called only after the thread
 // write it announces has succeeded, and a caller must not let a failure here
 // fail the write it records — the words are already safe, only the notice is
-// lost.
-func appendEvent(root string, ev event) error {
+// lost. It returns the event's id (generated when ev.id is empty), so a
+// caller that tracks "what have I seen" can record the cursor in the same
+// breath as writing the line.
+func appendEvent(root string, ev event) (string, error) {
 	if ev.id == "" {
 		ev.id = newEventID()
 	}
@@ -94,17 +96,17 @@ func appendEvent(root string, ev event) error {
 	ev.at = time.Unix(ev.at.Unix(), 0) // the log's timestamps are whole seconds (D14)
 	path := eventsLogPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("event log: %w", err)
+		return "", fmt.Errorf("event log: %w", err)
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("event log: %w", err)
+		return "", fmt.Errorf("event log: %w", err)
 	}
 	defer f.Close()
 	if _, err := f.WriteString(marshalEvent(ev) + "\n"); err != nil {
-		return fmt.Errorf("event log: %w", err)
+		return "", fmt.Errorf("event log: %w", err)
 	}
-	return nil
+	return ev.id, nil
 }
 
 // marshalEvent renders one event as a JSONL line: a single JSON object with

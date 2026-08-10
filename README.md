@@ -63,6 +63,7 @@ detectably orphaned rather than silently misplaced.
 | `space` | Cycle the mark: unmarked → reviewed → flagged |
 | `r` / `f` | Set reviewed / flagged directly |
 | `R` | Resolve / unresolve the focused thread |
+| `ctrl+r` | Reload the document after it changed on disk (a `● file changed` notice appears in the footer) |
 | `Y` | Copy the whole review to the clipboard |
 | `q` | Quit |
 
@@ -136,7 +137,10 @@ margin comments wait --since 1N7KB52S0NPCH --timeout 60s
 
 The anchor is the `(^id)` shown in a block's export header. `--author` defaults
 to the current user. The reply appears on the reviewer's next open (or live, via
-the file watcher).
+the file watcher) — and while the review is open it is announced in the status
+line (`new comment from agent on ^…`). A document edited on disk mid-review
+raises a `● file changed` notice in the footer until `ctrl+r` reloads it, so an
+agent's rewrite of the prose is visible without quitting and reopening.
 
 Every thread change — a comment posted, edited, deleted or restored, a thread
 resolved or deleted — is also appended to `.margin/events.log` as one JSONL
