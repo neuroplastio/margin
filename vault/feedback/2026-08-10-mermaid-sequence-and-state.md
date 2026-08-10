@@ -8,9 +8,23 @@ Feedback, 2026-08-10. The mermaid renderer (journal 2026-08-10.17) only renders
 2. **state diagrams** (`stateDiagram-v2`) — states, transitions, `[*]` start
    and end.
 
-Same constraints as the flowchart slice: in-tree ASCII renderer, never a
-half-parsed diagram (unparseable falls back to plain source), on-disk format
-untouched. A felt leg with a demo recipe. The flowchart slice set the visual
-language (boxed tree, `◇` decisions, `├`/`└` junctions, `▼` arrowheads, dim
-`↩` references); keep the new kinds consistent with it where their shapes
-allow, and say what you rejected.
+## How the maintainer wants it done (2026-08-10, supersedes the in-tree wording)
+
+Vendor **`github.com/AlexanderGrooff/mermaid-ascii`** (the Go project, MIT) for
+what it already supports — flowchart/graph, sequence, ER — and extend it in-tree
+for the rest (notably state diagrams, which upstream does not have). The
+`agentic-mermaid` fork covers state but is TypeScript/Node and cannot be
+vendored into a Go tree; the maintainer chose the original Go library + in-tree
+extension instead.
+
+Requirements:
+
+- The vendored copy lives in the tree as a real vendor/third-party dir with its
+  upstream MIT license preserved.
+- **Keep a clean changelog inside the vendored copy** (local changes documented
+  as a series of deltas) so the in-tree extensions can be upstreamed later.
+- Unparseable diagrams still fall back to plain source; never a half-parsed
+  diagram. On-disk format untouched. A felt leg with a demo recipe.
+- The existing hand-rolled `internal/review/mermaid.go` (flowchart-only,
+  journal 2026-08-10.17) is superseded — the leg decides how it is retired
+  (deleted or kept as a fallback) and says so.
