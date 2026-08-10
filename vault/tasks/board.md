@@ -155,7 +155,12 @@ Last updated: 2026-08-10 (event log line shape corrected to JSONL + compact ids)
 
 ## In progress
 
-*(none)*
+- (feedback feature) `margin --skill`: AI agent skill output — `margin skill`
+  prints the markdown document an agent loads to learn how to use margin,
+  including the interactive review loop (launch in a new terminal, poll
+  `comments wait`, reply via `comment add`, human sees it live through the
+  watcher). Drains `vault/feedback/2026-08-10-agent-skill-command.md`.
+  — in progress 2026-08-10
 
 ## Backlog — M1
 
