@@ -90,8 +90,9 @@ func TestNewEventIDIsTimeOrdered(t *testing.T) {
 	}
 }
 
-// TestEventLineShape pins the exact on-disk JSONL line D14 specifies, and
-// that it round-trips through parseEvent.
+// TestEventLineShape pins the exact on-disk JSONL line D14 specifies (as
+// extended by D15: a comment-level event carries its body as `text`), and that
+// it round-trips through parseEvent.
 func TestEventLineShape(t *testing.T) {
 	ev := event{
 		id:      "1N7KFA0P7KFA0",
@@ -101,8 +102,9 @@ func TestEventLineShape(t *testing.T) {
 		anchor:  "^a1b2c3",
 		author:  "agent",
 		comment: 2,
+		text:    "rework the third paragraph",
 	}
-	want := `{"id":"1N7KFA0P7KFA0","at":1786363200,"type":"comment.posted","doc":"docs/spec.md","anchor":"^a1b2c3","author":"agent","comment":2}`
+	want := `{"id":"1N7KFA0P7KFA0","at":1786363200,"type":"comment.posted","doc":"docs/spec.md","anchor":"^a1b2c3","author":"agent","comment":2,"text":"rework the third paragraph"}`
 	if got := marshalEvent(ev); got != want {
 		t.Errorf("marshalEvent() = %q, want %q", got, want)
 	}
@@ -112,7 +114,8 @@ func TestEventLineShape(t *testing.T) {
 		t.Fatalf("parseEvent: %v", err)
 	}
 	if round.id != ev.id || round.kind != ev.kind || round.doc != ev.doc ||
-		round.anchor != ev.anchor || round.author != ev.author || round.comment != ev.comment {
+		round.anchor != ev.anchor || round.author != ev.author || round.comment != ev.comment ||
+		round.text != ev.text {
 		t.Errorf("parseEvent round-trip = %+v, want %+v", round, ev)
 	}
 	if !round.at.Equal(ev.at) {
@@ -121,7 +124,9 @@ func TestEventLineShape(t *testing.T) {
 }
 
 // TestEventLineThreadLevel: a thread-level event writes comment -1 and reads
-// back as -1.
+// back as -1, and its line omits the text field entirely (D15) — nothing was
+// said, so the line stays compact, and the reader's shape is "no text = a
+// thread-level event".
 func TestEventLineThreadLevel(t *testing.T) {
 	ev := event{
 		id:      "1N7KFA0R8KFA1",
@@ -140,14 +145,30 @@ func TestEventLineThreadLevel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseEvent: %v", err)
 	}
-	if round.comment != -1 || round.kind != eventThreadResolved {
-		t.Errorf("round = %+v, want comment -1 thread.resolved", round)
+	if round.comment != -1 || round.kind != eventThreadResolved || round.text != "" {
+		t.Errorf("round = %+v, want comment -1 thread.resolved with no text", round)
 	}
 }
 
-// TestMarshalEventEscapesFreeFormFields: an author carrying a tab, newline or
-// quote must not split the JSON — encoding/json escapes them, so the event
-// still parses back with the author whole and the line is one physical line.
+// TestParseEventWithoutTextDefaultsEmpty: a line that predates D15's text
+// field — or a hand-written one that omits it — parses with empty text, per
+// the JSON contract that absent optional fields fall back to zero values. An
+// old log stays readable.
+func TestParseEventWithoutTextDefaultsEmpty(t *testing.T) {
+	line := `{"id":"1N7KFA0P7KFA0","at":1786363200,"type":"comment.posted","doc":"doc.md","anchor":"^a","author":"x","comment":0}`
+	ev, err := parseEvent(line)
+	if err != nil {
+		t.Fatalf("parseEvent: %v", err)
+	}
+	if ev.text != "" {
+		t.Errorf("text = %q, want empty for a line without the field", ev.text)
+	}
+}
+
+// TestMarshalEventEscapesFreeFormFields: an author or a comment body carrying
+// a tab, newline or quote must not split the JSON — encoding/json escapes
+// them, so the event still parses back whole and the line is one physical
+// line.
 func TestMarshalEventEscapesFreeFormFields(t *testing.T) {
 	ev := event{
 		id:      "1N7KFA0P7KFA0",
@@ -157,6 +178,7 @@ func TestMarshalEventEscapesFreeFormFields(t *testing.T) {
 		anchor:  "^a",
 		author:  "ta\tb\nc\"quote",
 		comment: 0,
+		text:    "first line\nsecond line\twith a \"quote\"",
 	}
 	line := marshalEvent(ev)
 	if strings.ContainsAny(line, "\t\n") {
@@ -168,6 +190,9 @@ func TestMarshalEventEscapesFreeFormFields(t *testing.T) {
 	}
 	if round.author != ev.author {
 		t.Errorf("author = %q, want %q (escaped and restored whole)", round.author, ev.author)
+	}
+	if round.text != ev.text {
+		t.Errorf("text = %q, want %q (multi-line comment restored whole)", round.text, ev.text)
 	}
 }
 
@@ -290,6 +315,9 @@ func TestThreadStoreEmitWritesEvent(t *testing.T) {
 		ev.anchor != "^b2" || ev.author != "toly" || ev.comment != -1 {
 		t.Errorf("event = %+v", ev)
 	}
+	if ev.text != "" {
+		t.Errorf("thread-level event text = %q, want empty (D15 omits it)", ev.text)
+	}
 }
 
 // TestThreadStoreEmitNilSafe: a nil store records nothing and is not an error,
@@ -329,8 +357,40 @@ func TestAddCommentWritesEvent(t *testing.T) {
 		first.anchor != anchor || first.author != "agent" || first.comment != 0 {
 		t.Errorf("first event = %+v", first)
 	}
-	if second.kind != eventCommentPosted || second.comment != 1 {
-		t.Errorf("second event = %+v, want comment index 1", second)
+	if first.text != "fixed in rev 3" {
+		t.Errorf("first event text = %q, want the reply's text so the agent need not re-read the thread", first.text)
+	}
+	if second.kind != eventCommentPosted || second.comment != 1 || second.text != "second reply" {
+		t.Errorf("second event = %+v, want comment index 1 carrying its text", second)
+	}
+}
+
+// TestDeleteFocusedEventCarriesBody: tombstoning a comment emits
+// comment.deleted carrying the comment's body — D11 keeps it in the thread
+// file even when deleted, so a listener sees exactly what vanished without a
+// second read (D15).
+func TestDeleteFocusedEventCarriesBody(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+
+	m.at = cursor{entry: entryFor(t, m, convoAnchor), comment: 0}
+	want := m.threads[convoAnchor].posted[0].body
+	m.deleteFocused()
+
+	events, err := readEvents(root)
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("readEvents returned %d events, want 1", len(events))
+	}
+	ev := events[0]
+	if ev.kind != eventCommentDeleted || ev.anchor != convoAnchor || ev.comment != 0 {
+		t.Errorf("event = %+v, want comment.deleted on %s comment 0", ev, convoAnchor)
+	}
+	if ev.text != want {
+		t.Errorf("event text = %q, want %q (the tombstoned body, D11)", ev.text, want)
 	}
 }
 

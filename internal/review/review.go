@@ -851,7 +851,14 @@ func (m *model) deleteFocused() tea.Cmd {
 	if m.store != nil {
 		_ = m.store.save(t)
 	}
-	_ = m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx})
+	// Comment-level events carry the comment's body — even tombstoned, since
+	// D11 keeps it in the thread file — so an agent sees what was deleted or
+	// restored; thread-level events carry none (D15).
+	evText := ""
+	if evIdx >= 0 {
+		evText = t.posted[evIdx].body
+	}
+	_ = m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx, text: evText})
 	return nil
 }
 
@@ -1168,7 +1175,9 @@ func (m *model) dismiss(err error) tea.Cmd {
 		} else if evIdx >= 0 {
 			// The thread file is the record; the event log is the notice, so a
 			// failed append degrades the status line rather than the comment.
-			if err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx}); err != nil {
+			// The event carries the comment's body so an agent sees what was
+			// said without a second read of the thread file (D15).
+			if err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx, text: body}); err != nil {
 				m.status += " (event log: " + err.Error() + ")"
 			}
 		}

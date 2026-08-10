@@ -38,10 +38,11 @@ const waitPollInterval = 200 * time.Millisecond
 //
 // Events are returned as their on-disk log lines, verbatim, in file order, so
 // the same JSONL an agent sees in .margin/events.log — one JSON object per
-// line carrying the id, unix-second timestamp, type, doc, anchor, author and
-// comment index — is what it reads on stdout, and the last line's id is the
-// --since cursor for the next call. Same-second ties come out in file order
-// (readEventsAfter), as D13 requires.
+// line carrying the id, unix-second timestamp, type, doc, anchor, author,
+// comment index and, on comment-level events, the comment's body text — is
+// what it reads on stdout, and the last line's id is the --since cursor for
+// the next call. Same-second ties come out in file order (readEventsAfter), as
+// D13 requires.
 func WaitEvents(path, since string, timeout time.Duration) ([]string, error) {
 	root, _ := resolveReviewRoot(path)
 	deadline := time.Time{}
@@ -117,8 +118,9 @@ func AddComment(path, anchor, author, text string) (string, error) {
 	// (the wait command, a tailer) acts on. A failed append must not fail the
 	// reply that already landed on disk — an agent seeing an error would
 	// re-post and duplicate it — so this is best-effort, exactly as the TUI
-	// treats an event-log failure.
-	_ = appendEvent(root, event{kind: eventCommentPosted, doc: docPath, anchor: t.anchor, author: author, comment: len(t.posted) - 1})
+	// treats an event-log failure. The event carries the reply's text so the
+	// agent that reads it need not re-open the thread (D15).
+	_ = appendEvent(root, event{kind: eventCommentPosted, doc: docPath, anchor: t.anchor, author: author, comment: len(t.posted) - 1, text: text})
 	return threadFilePath(root, docPath, anchor), nil
 }
 

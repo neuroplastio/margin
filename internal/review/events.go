@@ -6,7 +6,8 @@
 // command's --since cursor names is an *event* id, not a comment id, and the
 // log is stored separately from thread files (D13), which are unchanged and
 // gain no id field. The line shape — JSONL, compact 13-character ids, unix
-// timestamps at second precision — is D14.
+// timestamps at second precision, comment text on comment-level events — is
+// D14 as extended by D15.
 package review
 
 import (
@@ -47,11 +48,12 @@ type event struct {
 	anchor  string // the thread's anchor, ^-prefixed as in thread files
 	author  string // who performed the action
 	comment int    // 0-based index into the thread's posted comments; -1 for a thread-level event
+	text    string // the comment's body at emit time; empty for a thread-level event
 }
 
-// eventLine is one log line's JSON shape (D14). Kept separate from event so
-// the on-disk form — id, unix seconds, a `type` key that would fight the Go
-// keyword — does not leak into the in-memory struct.
+// eventLine is one log line's JSON shape (D14, extended by D15). Kept separate
+// from event so the on-disk form — id, unix seconds, a `type` key that would
+// fight the Go keyword — does not leak into the in-memory struct.
 type eventLine struct {
 	ID      string    `json:"id"`
 	At      int64     `json:"at"`
@@ -60,6 +62,7 @@ type eventLine struct {
 	Anchor  string    `json:"anchor"`
 	Author  string    `json:"author"`
 	Comment int       `json:"comment"`
+	Text    string    `json:"text,omitempty"`
 }
 
 // eventsLogPath is the append-only event log for a review root: one file for
@@ -106,10 +109,14 @@ func appendEvent(root string, ev event) error {
 
 // marshalEvent renders one event as a JSONL line: a single JSON object with
 // the id, the unix-second timestamp, the type, the document path, the anchor,
-// the author and the comment index (-1 for a thread-level event). JSON is what
-// keeps a free-form author safe: encoding/json escapes tabs, quotes and
-// newlines, so a line is one physical line whatever the author is called, and
-// the field-sanitizer the tab-separated format needed is gone (D14).
+// the author, the comment index (-1 for a thread-level event) and, for
+// comment-level events, the comment's body text. JSON is what keeps a
+// free-form field safe: encoding/json escapes tabs, quotes and newlines, so a
+// line is one physical line whatever the author — or the comment — is called,
+// and the field-sanitizer the tab-separated format needed is gone (D14). The
+// text is omitted on thread-level events (D15): nothing was said, so the line
+// stays compact, and an agent parses one shape — absent text means a
+// thread-level event.
 func marshalEvent(ev event) string {
 	// Marshal cannot fail: eventLine holds only strings, an int64 and an
 	// eventType, all JSON-native. A failure here would be a bug, not a
@@ -122,6 +129,7 @@ func marshalEvent(ev event) string {
 		Anchor:  ev.anchor,
 		Author:  ev.author,
 		Comment: ev.comment,
+		Text:    ev.text,
 	})
 	if err != nil {
 		panic("event log: marshal event: " + err.Error())
@@ -154,6 +162,7 @@ func parseEvent(line string) (event, error) {
 		anchor:  el.Anchor,
 		author:  el.Author,
 		comment: el.Comment,
+		text:    el.Text,
 	}, nil
 }
 

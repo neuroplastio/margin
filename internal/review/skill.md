@@ -43,9 +43,10 @@ Reviewing with margin is a loop between you and the human. Run it end to end:
 
    - **Exit 0 with lines on stdout** — new events. Each line is one JSONL event
      object:
-     `{"id":"...","at":...,"type":"comment.posted","doc":"FILE.md","anchor":"^...","author":"...","comment":2}`
+     `{"id":"...","at":...,"type":"comment.posted","doc":"FILE.md","anchor":"^...","author":"...","comment":2,"text":"..."}`
      `anchor` names the block, `comment` is the index of the message within its
-     thread (or `-1` for a thread-level event), and `type` is what happened:
+     thread (or `-1` for a thread-level event), `text` is the comment's body
+     itself (absent on thread-level events), and `type` is what happened:
      `comment.posted`, `comment.updated`, `comment.deleted`, `comment.restored`,
      `thread.resolved`, `thread.unresolved`, `thread.deleted`, `thread.restored`.
      Any of them can be work.

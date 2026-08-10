@@ -192,10 +192,10 @@ the reviewer's comment lands in the log, this command notices it, and the
 agent reads the lines to find what to respond to.
 
 The printed lines are the log's own JSONL lines — one JSON object per event,
-carrying the id, unix-second timestamp, event type, document, anchor, author
-and comment index — in file order, so the last line's id is the --since cursor
-for the next call. Two events in the same second are ordered by file position,
-not id comparison.
+carrying the id, unix-second timestamp, event type, document, anchor, author,
+comment index and, on comment-level events, the comment's body text — in file
+order, so the last line's id is the --since cursor for the next call. Two
+events in the same second are ordered by file position, not id comparison.
 
 --since is optional: without it, every event in the log is new. --timeout
 bounds the wait (0 = wait forever); when it elapses with nothing new the

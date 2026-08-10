@@ -240,3 +240,44 @@ granularity; nothing else.
   whose id is not a well-formed 13-character id) is an error — "surface, don't
   drop"; a final unterminated line is a torn append and is skipped. Writes
   still end in `\n`.
+
+**D15 — Comment-level event log lines carry the comment's body text in a
+`text` field.** Addresses the maintainer's 2026-08-10 agent-loop feedback: a
+listener of `.margin/events.log` had to make a second read (the thread file or
+an export) to see what was actually said, since every event was metadata only
+(id, anchor, author, type, comment index). Extends D14's line shape; D13 and
+the rest of D14 stand unchanged.
+
+- **Line shape:** comment-level events (`comment.posted`, `comment.updated`,
+  `comment.deleted`, `comment.restored`) gain a `text` field carrying the
+  comment's body as it stood in the thread file at emit time — the full body,
+  not a prefix or a single line: the round-trip is the same shape every time,
+  and a truncated quote would still be a second read for an agent that needs
+  the words. A multi-line comment stays one physical line: JSON escapes
+  newlines, tabs and quotes (the same guarantee that keeps the author field
+  safe, D14).
+  ```json
+  {"id":"1N7KB52S0NPCH","at":1786363200,"type":"comment.posted","doc":"docs/spec.md","anchor":"^a1b2c3","author":"agent","comment":2,"text":"rework the third paragraph"}
+  ```
+- **Thread-level events omit the field.** `thread.resolved`, `thread.unresolved`,
+  `thread.deleted` and `thread.restored` have no body, so their lines keep the
+  D14 shape — compact, and the absence of `text` is itself the signal that the
+  event is thread-level. Implemented as `json:"text,omitempty"`.
+- **Tombstoned comments still carry their body.** A `comment.deleted` event
+  includes the body because D11's tombstone keeps it in the thread file: the
+  event reports exactly what the file holds, and a listener sees what vanished.
+- **Reader contract, unchanged and backwards-compatible:** a line without
+  `text` — a pre-D15 line, or any old log still on disk — parses with empty
+  text, per the JSON contract that absent optional fields fall back to zero
+  values. No migration; the log is a notice, the thread file remains the record
+  (D5).
+- **Writes remain best-effort after the thread write** (D13/D14 unchanged). The
+  text is captured at emit time by the same call sites that already emit:
+  the TUI's submit (`dismiss`), delete/restore (`deleteFocused`) and
+  `margin comment add`.
+
+Still felt and unsettled, to be judged by the maintainer: whether embedding the
+full text is the right payload versus a digest, and whether the extra log
+growth (one copy of each comment body per event about it) is acceptable. A
+comment edited twice produces two events carrying two bodies; a listener that
+only wants notifications can ignore `text`.

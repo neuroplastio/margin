@@ -253,8 +253,9 @@ func TestSubmitPersistsThroughTheStore(t *testing.T) {
 
 // TestSubmitEmitsAnEvent: a model opened by Run (store set) not only writes
 // the posted comment to the thread file but appends a comment.posted line to
-// the event log, carrying the thread's anchor and the new comment's index —
-// the D13 wiring that a listener (the wait command) reads.
+// the event log, carrying the thread's anchor, the new comment's index and the
+// comment's body text (D15) — the D13 wiring that a listener (the wait
+// command) reads.
 func TestSubmitEmitsAnEvent(t *testing.T) {
 	m := newTestModel(t)
 	root := t.TempDir()
@@ -276,6 +277,9 @@ func TestSubmitEmitsAnEvent(t *testing.T) {
 	if ev.kind != eventCommentPosted || ev.doc != "document.md" ||
 		ev.anchor != soloAnchor || ev.author != "toly" || ev.comment != len(m.threads[soloAnchor].posted)-1 {
 		t.Errorf("event = %+v, want comment.posted on %s, comment %d", ev, soloAnchor, len(m.threads[soloAnchor].posted)-1)
+	}
+	if ev.text != "Notify the agent." {
+		t.Errorf("event text = %q, want the submitted body so the agent need not re-read the thread", ev.text)
 	}
 }
 

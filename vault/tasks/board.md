@@ -164,12 +164,7 @@ Last updated: 2026-08-10 (event log lines carry the comment text)
 
 ## In progress
 
-- **(feedback fix)** event log lines carry the comment text: comment-level
-  events in `.margin/events.log` gain a `text` field holding the comment body,
-  so a listener (an agent in the loop) sees what was said without a second read
-  of the thread file or export. Thread-level events omit the field. Extends
-  D14's line shape as D15. Claimed by the do-leg agent 2026-08-10, addressing
-  `vault/feedback/2026-08-10-agent-loop-event-comment-text.md`.
+*(none)*
 
 ## Backlog — M1
 
@@ -214,6 +209,21 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** event log lines carry the comment text: comment-level
+      events in `.margin/events.log` gain a `text` field holding the comment's
+      body as it stood in the thread file at emit time (the full body, so a
+      listener — an agent in the loop — sees what was said without a second
+      read of the thread file or export). Thread-level events omit the field
+      (`json:"text,omitempty"`), so their lines are byte-identical to the D14
+      shape and absence of `text` is itself the thread-level signal. A
+      tombstoned comment still carries its body (D11 keeps it). Old lines
+      parse with empty text — no migration. Wired through the existing emit
+      call sites: the TUI's submit (`dismiss`), delete/restore
+      (`deleteFocused`) and `margin comment add`. Recorded as **D15**,
+      extending D14's line shape. Drains
+      `vault/feedback/2026-08-10-agent-loop-event-comment-text.md`; the file is
+      deleted. `[mech]` — see journal 2026-08-10.11 — done 2026-08-10
 
 - [x] **(feedback feature)** `margin skill` — the document an agent loads to
       learn how to use margin. A new subcommand prints `review.SkillDocument()`
