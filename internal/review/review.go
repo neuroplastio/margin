@@ -200,9 +200,9 @@ type model struct {
 	// scroll offset the user set directly (SCROLL-02/03) would snap straight
 	// back to focus on the very next render. Starts at an entry index no
 	// cursor legitimately has, so the first render always anchors once.
-	scrollAnchor cursor
-	status       string
-	quitting     bool
+	scrollAnchor  cursor
+	status        string
+	quitting      bool
 	confirmDelete bool // true when the user must press the delete key again
 
 	// showDeleted controls whether tombstoned comments render at all. Default
@@ -845,7 +845,7 @@ func (m *model) deleteFocused() tea.Cmd {
 		return nil
 	}
 	t := m.threads[anchor]
-	
+
 	evKind, evIdx := eventThreadDeleted, -1
 	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
 		evIdx = m.at.comment
@@ -1849,7 +1849,12 @@ func (m *model) renderRaw() []string {
 	codeHL := map[int][]string{}
 	for i, e := range m.entries {
 		if e.b.kind == blockCode && len(e.b.lines) > 0 {
-			codeHL[i] = highlightCode(e.b.lines, e.b.lang)
+			// A mermaid fence stays plain in raw mode: chroma has no
+			// mermaid lexer (2026-08-10 mermaid-diagrams feedback), and
+			// raw mode is the verbatim view anyway.
+			if e.b.lang != "mermaid" {
+				codeHL[i] = highlightCode(e.b.lines, e.b.lang)
+			}
 		}
 	}
 
@@ -2031,8 +2036,23 @@ func (m *model) render() []string {
 				// Chroma's own colours are the highlighting, regardless of
 				// review state — the same call RENDER-06 made for inline
 				// code and links: markup renders as markup, not as prose
-				// that happens to dim once reviewed.
-				out = highlightCode(e.b.lines, e.b.lang)
+				// that happens to dim once reviewed. A mermaid fence renders
+				// through the in-tree ASCII renderer instead
+				// (2026-08-10 mermaid-diagrams feedback): chroma has no
+				// mermaid lexer, so its colours on a diagram were noise.
+				// A mermaid block the renderer does not understand falls
+				// back to plain source lines, not chroma.
+				if e.b.lang == "mermaid" {
+					if md, ok := renderMermaid(e.b.lines); ok {
+						out = md
+						preStyled = true
+					} else {
+						out = e.b.lines
+					}
+				} else {
+					out = highlightCode(e.b.lines, e.b.lang)
+					preStyled = true
+				}
 				off := m.codeScroll[e.b.anchor]
 				if off > 0 || hasOverflow(out, w) {
 					scrolled := make([]string, len(out))
@@ -2041,7 +2061,6 @@ func (m *model) render() []string {
 					}
 					out = scrolled
 				}
-				preStyled = true
 			case blockFrontmatter:
 				// Dimmed key/value lines, never truncated — a field wider
 				// than the measure scrolls horizontally with h/l, the code
@@ -2747,7 +2766,15 @@ func (m *model) scrollBlock(delta int) {
 	var lines []string
 	switch e.b.kind {
 	case blockCode:
-		lines = highlightCode(e.b.lines, e.b.lang)
+		if e.b.lang == "mermaid" {
+			if md, ok := renderMermaid(e.b.lines); ok {
+				lines = md
+			} else {
+				lines = e.b.lines
+			}
+		} else {
+			lines = highlightCode(e.b.lines, e.b.lang)
+		}
 	case blockFrontmatter:
 		lines = frontmatterFields(e.b.text)
 	case blockTable:
@@ -3298,7 +3325,7 @@ func Run(path string, opts RunOptions) error {
 
 func (m *model) renderPalette(w int) string {
 	rows := paletteRows(m, commands, m.paletteQuery)
-	
+
 	if m.paletteSelected >= len(rows) {
 		m.paletteSelected = max(0, len(rows)-1)
 	}
@@ -3308,7 +3335,7 @@ func (m *model) renderPalette(w int) string {
 
 	var b strings.Builder
 	b.WriteString(dimStyle.Render(strings.Repeat("─", w)) + "\n")
-	
+
 	showCount := 7
 	start := 0
 	if m.paletteSelected >= showCount {
@@ -3335,8 +3362,8 @@ func (m *model) renderPalette(w int) string {
 		}
 		b.WriteString(label + "\n")
 	}
-	
+
 	b.WriteString(focusStyle.Render(":") + m.paletteQuery + focusStyle.Render("█"))
-	
+
 	return lipgloss.NewStyle().Width(w).Render(b.String())
 }

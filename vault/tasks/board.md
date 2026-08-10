@@ -1,9 +1,20 @@
 # Board
 
-Last updated: 2026-08-10 (mermaid diagrams claimed)
+Last updated: 2026-08-10 (mermaid diagrams)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) mermaid diagrams render as ASCII flowcharts: a
+  ` ```mermaid ` fence renders through an in-tree renderer as a boxed tree —
+  rectangles, `╭─╮` round and `◇`-marked decision boxes, ├/└ spine junctions
+  with ▼ arrowheads, a single child centred straight below its parent, edge
+  labels that never truncate (a long one gets its own row above the arrow),
+  and a dim `↩ text` reference where a second path reaches an already-shown
+  node (reconvergence, cycles) plus a `(unreachable: …)` line for pure
+  cycles; unparseable mermaid falls back to plain source, never chroma; only
+  `flowchart`/`graph` are understood (`sequenceDiagram` et al. fall back),
+  everything renders top-down, and shapes beyond rectangle/round/decision
+  collapse to a rectangle — journal 2026-08-10.17
 - (feedback feature) comments render markdown: each source line of a comment
   body stays its own rendered line (a line break the reviewer pressed is a
   break they meant — no more run-on paragraphs), a blank line is a paragraph
@@ -203,11 +214,7 @@ Last updated: 2026-08-10 (mermaid diagrams claimed)
 
 ## In progress
 
-- (feedback feature) support mermaid diagrams in the review — an ASCII
-  renderer for the common diagram kinds instead of chroma's meaningless
-  colours on mermaid source; drains
-  `vault/feedback/2026-08-10-mermaid-diagrams.md`. Claimed 2026-08-10 by the
-  do-leg agent.
+*(none)*
 
 ## Backlog — M1
 
@@ -252,6 +259,27 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** support mermaid diagrams in the review: a
+      fenced block whose info string is `mermaid` renders through a new
+      in-tree ASCII renderer (`internal/review/mermaid.go`) instead of
+      chroma, which has no mermaid lexer. `flowchart`/`graph` parse into a
+      node/edge model (both label spellings, chains, `&` joins, `%%`
+      comments, `subgraph` bodies, brackets skipped when scanning links) and
+      lay out as a boxed tree: bordered boxes (rectangle, `╭─╮` round, `◇`
+      decision), a spine with `├`/`└` junctions and `▼`/`│` arrowheads, a
+      single child centred straight below its parent so chains do not
+      staircase, edge labels centred on the run or on their own row when they
+      do not fit (never truncated), and a dim `↩` reference for a node a
+      second path reaches (reconvergence, cycles) so the layout always
+      terminates, with an `(unreachable: …)` line for pure cycles. Anything
+      unparseable — other diagram types, malformed statements — falls back to
+      the block's plain source lines, never chroma and never a half-parsed
+      diagram. Raw mode keeps a mermaid fence plain; H/L horizontal scroll
+      still applies to a diagram wider than the terminal. Export and the
+      thread files are untouched (the on-disk format never changes). Drains
+      `vault/feedback/2026-08-10-mermaid-diagrams.md`; the file is deleted.
+      `[felt]` — see journal 2026-08-10.17 — done 2026-08-10
 
 - [x] **(feedback feature)** comments render markdown formatting: a comment
       body no longer collapses into a run-on paragraph — `wrapComment`
