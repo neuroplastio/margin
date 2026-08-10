@@ -1,7 +1,7 @@
 package graph
 
 import (
-	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/diagram"
 )
 
 // This file is part of the margin local delta set (see CHANGELOG.md, delta

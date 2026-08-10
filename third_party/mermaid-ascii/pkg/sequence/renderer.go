@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/diagram"
 	"github.com/mattn/go-runewidth"
 	log "github.com/sirupsen/logrus"
 )

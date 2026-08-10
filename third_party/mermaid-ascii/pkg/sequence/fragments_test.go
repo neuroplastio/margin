@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/diagram"
 )
 
 // fragmentKinds returns the fragment types opened in the diagram, in order.

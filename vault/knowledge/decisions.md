@@ -283,30 +283,34 @@ comment edited twice produces two events carrying two bodies; a listener that
 only wants notifications can ignore `text`.
 
 **D16 — The mermaid renderer is a vendored copy of
-`github.com/AlexanderGrooff/mermaid-ascii`, wired through a `replace`
-directive; in-tree extensions live inside the vendored copy as documented
-deltas.** Addresses the maintainer's 2026-08-10 mermaid-sequence-and-state
-feedback: vendor the Go project (MIT) for what it supports — flowchart/graph,
-sequence, ER — rather than maintaining a hand-rolled parser, and extend it
-in-tree for what it does not (state diagrams).
+`github.com/AlexanderGrooff/mermaid-ascii`; in-tree extensions live inside the
+vendored copy as documented deltas.** Addresses the maintainer's 2026-08-10
+mermaid-sequence-and-state feedback: vendor the Go project (MIT) for what it
+supports — flowchart/graph, sequence, ER — rather than maintaining a
+hand-rolled parser, and extend it in-tree for what it does not (state
+diagrams).
 
 - **Location and mechanics.** The snapshot lives at
-  `third_party/mermaid-ascii/` as its own module (upstream module path and
-  MIT `LICENSE` preserved), pinned at
-  `v0.0.0-20260807155423-b1b35f67d6a5` in the vendored `README.md`. The root
-  `go.mod` `replace`s the module to that directory, so imports are the
-  upstream import paths and dropping the `replace` later restores a plain
-  module dependency. A real Go `vendor/` directory (snapshotting every
-  dependency) was rejected: it would have vendored the whole module graph for
-  one library.
+  `third_party/mermaid-ascii/` — upstream module path and MIT `LICENSE`
+  preserved, pinned at `v0.0.0-20260807155423-b1b35f67d6a5` in the vendored
+  `README.md`. As of journal 2026-08-10.21 the copy is **folded into the host
+  module**: it carries no `go.mod`, so its packages import as
+  `github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/...` and no
+  `replace` directive exists. This supersedes the original replace-directive
+  wiring: a `replace` broke `go install module@version` (the go command
+  refuses a module whose go.mod would be interpreted differently as a
+  dependency), which the install story in the README relies on. A real Go
+  `vendor/` directory was rejected twice — it would have vendored the whole
+  module graph for one library, and a fork pushed to a real module path was
+  rejected as needing a home to publish to.
 - **Every local change is a numbered delta in the vendored
-  `CHANGELOG.md`** — D1 trimmed go.mod, D2 extracted `pkg/graph` from the
-  upstream CLI's `cmd` package, D3 made the graph parse strict, D4 brought
-  the graph grammar to parity with the hand-rolled renderer it replaced,
-  D5 stripped ANSI from the graph output, D6 tolerates `activate`/
-  `deactivate` in sequences, D7 added `pkg/state` for state diagrams. The
-  changelog is the upstreaming surface: each delta is written to be re-applied
-  to a fresh upstream snapshot.
+  `CHANGELOG.md`** — D1 trimmed go.mod (now a packaging note: the copy is part
+  of the host module), D2 extracted `pkg/graph` from the upstream CLI's `cmd`
+  package, D3 made the graph parse strict, D4 brought the graph grammar to
+  parity with the hand-rolled renderer it replaced, D5 stripped ANSI from the
+  graph output, D6 tolerates `activate`/`deactivate` in sequences, D7 added
+  `pkg/state` for state diagrams. The changelog is the upstreaming surface:
+  each delta is written to be re-applied to a fresh upstream snapshot.
 - **Retirement of the hand-rolled renderer.** `internal/review/mermaid.go`
   (the flowchart-only parser/layout from journal 2026-08-10.17) was **deleted
   in the leg that vendored**; the file is now a thin dispatcher into the

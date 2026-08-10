@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/diagram"
 )
 
 // Keyword is the erDiagram declaration keyword, exported for callers that

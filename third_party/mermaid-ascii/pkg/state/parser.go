@@ -14,7 +14,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/diagram"
 )
 
 // Keyword is the stateDiagram-v2 declaration keyword. The legacy spelling

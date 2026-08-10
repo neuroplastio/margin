@@ -1,6 +1,7 @@
 # Board
 
-Last updated: 2026-08-10 (state diagrams landed; the mermaid feedback is drained)
+Last updated: 2026-08-10 (vendored mermaid-ascii folded into the host module;
+`go install @version` works again)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -244,6 +245,20 @@ Last updated: 2026-08-10 (state diagrams landed; the mermaid feedback is drained
 *(none)*
 
 ## Done
+
+- [x] **(feedback fix)** `go install module@version` works again: the vendored
+      `third_party/mermaid-ascii` was its own module wired through a `replace`
+      directive, which the go command refuses when installing at a version
+      ("The go.mod file for the module providing named packages contains one or
+      more replace directives") — the copy is now **folded into the host
+      module** (its `go.mod`/`go.sum` deleted, imports rewritten to
+      `github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/...`, the
+      root `replace` gone), so the README's `go install ...@latest` story works.
+      Verified against the real install path through a local VCS redirect:
+      the command failed before the fold and installs a binary after it.
+      Deltas/`CHANGELOG.md`/`LICENSE` stay in place; D16 updated. Drains
+      `vault/feedback/2026-08-10-go-install-replace-directive.md`; the file is
+      deleted. `[mech]` — see journal 2026-08-10.21 — done 2026-08-10
 
 - [x] **(feedback feature)** support mermaid `sequenceDiagram` and
       `stateDiagram-v2` in the review. **Slice 1 landed 2026-08-10** (journal

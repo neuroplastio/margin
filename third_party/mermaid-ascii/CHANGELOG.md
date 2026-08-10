@@ -4,6 +4,18 @@ Every change this copy carries against the pinned upstream snapshot, in the
 order it was made. Each delta is written so it can be re-applied to a fresh
 upstream checkout and (where sensible) submitted upstream.
 
+## Packaging note (2026-08-10) — folded into the host module
+
+This copy no longer carries its own `go.mod`: it is a directory of packages
+inside `github.com/neuroplastio/margin`, imported as
+`github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/...`. D1 below
+describes trimming the upstream go.mod; the remaining requirements it listed
+(`orderedmap/v2`, `go-runewidth`, `logrus`) are now the host module's direct
+dependencies. This was done so `go install module@version` works again — a
+nested module wired via `replace` breaks it, because the replaced go.mod would
+be interpreted differently as a dependency. D1's upstreamable intent (split the
+library out of the CLI module) is unchanged.
+
 ## D1 — go.mod trimmed to the library packages
 
 Upstream's `go.mod` also required the cobra CLI and the gin web server

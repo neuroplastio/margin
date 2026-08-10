@@ -6,10 +6,14 @@ This is a vendored snapshot of
 
     v0.0.0-20260807155423-b1b35f67d6a5
 
-It is pulled into the margin build by the `replace` directive in the root
-`go.mod`, so `github.com/AlexanderGrooff/mermaid-ascii/pkg/...` imports resolve
-here. margin renders ` ```mermaid ` fences through it; the in-tree caller is
-`internal/review/mermaid.go`.
+It is **folded into the margin module proper**: this directory carries no
+`go.mod` of its own, so `github.com/neuroplastio/margin/third_party/mermaid-ascii/pkg/...`
+are packages of the host module — no `replace` directive is needed, and
+`go install github.com/neuroplastio/margin/cmd/margin@latest` works from the
+published module graph. (A nested module wired via `replace` broke that:
+`go install module@version` refuses a go.mod whose replace would change how it
+is interpreted as a dependency.) margin renders ` ```mermaid ` fences through
+it; the in-tree caller is `internal/review/mermaid.go`.
 
 The vendored copy is **not** a clean snapshot: it carries local deltas so that
 margin can (a) import the graph renderer without the upstream CLI/web app, and
@@ -18,10 +22,10 @@ upstream is listed in `CHANGELOG.md` as a numbered delta, in a form that could
 be upstreamed. When a new upstream version is adopted, the deltas should be
 re-applied and re-verified against the new snapshot.
 
-The vendored module is self-validating:
+The vendored packages are self-validating as part of the host suite:
 
 ```bash
-cd third_party/mermaid-ascii && go test ./...
+go test ./third_party/mermaid-ascii/...
 ```
 
 What was vendored:
