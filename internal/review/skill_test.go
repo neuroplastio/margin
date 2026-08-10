@@ -107,3 +107,20 @@ func TestSkillIsWellFormedMarkdown(t *testing.T) {
 		t.Errorf("skill document has no interactive-loop section:\n%s", doc)
 	}
 }
+
+// TestSkillNamesTheGutterGlyphs: the 2026-08-10 agent-loop feedback named
+// `margin skill` as one of the places where what a gutter icon means is not
+// obvious — an agent asked to describe the screen got it wrong on the first
+// try. The skill now has a "Reading the human's screen" section naming each
+// glyph and pointing at --help as the same legend.
+func TestSkillNamesTheGutterGlyphs(t *testing.T) {
+	doc := SkillDocument()
+	if !strings.Contains(doc, "Reading the human's screen") {
+		t.Errorf("skill has no screen-reading section:\n%s", doc)
+	}
+	for _, glyph := range []string{"▌", "│", "·", "▸", "✓"} {
+		if !strings.Contains(doc, glyph) {
+			t.Errorf("skill's screen legend does not name %q:\n%s", glyph, doc)
+		}
+	}
+}

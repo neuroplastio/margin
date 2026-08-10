@@ -1386,8 +1386,30 @@ func TestCollapsedThreadIsOneLine(t *testing.T) {
 	}
 }
 
+// TestCollapsedOpenThreadHasDistinctMarker: the 2026-08-10 agent-loop feedback
+// — "what a gutter icon on a block actually means" (cursor vs. an active
+// comment vs. a reviewed/flagged mark) was not obvious, because the collapsed
+// thread's dim │ read as the mark rule's │. A collapsed open thread's marker
+// is now a right-pointing triangle, never the mark rule or the focus bar.
+func TestCollapsedOpenThreadHasDistinctMarker(t *testing.T) {
+	m := newTestModel(t)
+	m.at = cursor{entry: blockEntryFor(t, m, freshAnchor), comment: commentNone}
+	lines := m.render()
+
+	i := entryFor(t, m, convoAnchor)
+	line := lines[m.spans[i].start]
+	if !strings.Contains(line, dimStyle.Render("▸ ")) {
+		t.Errorf("collapsed open thread line = %q, want the ▸ thread marker", line)
+	}
+	for _, other := range []string{okStyle.Render("│"), flagStyle.Render("│"), focusStyle.Render("▌")} {
+		if strings.Contains(line, other) {
+			t.Errorf("collapsed thread line = %q carries %q — the thread marker must not read as it", line, other)
+		}
+	}
+}
+
 // TestCollapsedResolvedThreadShowsCheckmark: THREAD-02's marker swap — a
-// resolved thread's collapsed line trades the plain "│" rule for a
+// resolved thread's collapsed line trades the "▸" marker for a
 // checkmark, still one line, no box.
 func TestCollapsedResolvedThreadShowsCheckmark(t *testing.T) {
 	m := newTestModel(t)

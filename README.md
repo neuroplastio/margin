@@ -68,6 +68,12 @@ detectably orphaned rather than silently misplaced.
 
 On a heading, the mark keys apply to the whole section.
 
+The gutter column beside each block says what state it is in: `▌` the cursor is
+on this block (or it is part of the current selection); `│` the block is
+reviewed (green) or flagged (orange); `·` a section that is only partly
+reviewed; `▸` a comment thread lives here (`l`/`enter` opens it); `✓` the
+thread is resolved.
+
 `margin --stdout FILE.md` runs the same review, but writes it to stdout on
 quit instead of requiring `Y` — the same content `Y` produces — so it can be
 piped straight into an agent:

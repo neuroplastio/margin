@@ -93,6 +93,24 @@ func TestHelpListsTheKeys(t *testing.T) {
 	}
 }
 
+// TestHelpNamesTheGutterGlyphs: the 2026-08-10 agent-loop feedback — even
+// reading the docs, it was not obvious what a gutter glyph means. The help
+// names each glyph, so the legend is one --help away.
+func TestHelpNamesTheGutterGlyphs(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "Gutter") {
+		t.Errorf("help has no Gutter legend:\n%s", out)
+	}
+	for _, glyph := range []string{"▌", "│", "·", "▸", "✓"} {
+		if !strings.Contains(out, glyph) {
+			t.Errorf("help's gutter legend does not name %q:\n%s", glyph, out)
+		}
+	}
+}
+
 func TestUnknownFlagIsRejected(t *testing.T) {
 	called := false
 	if _, err := exec(t, func(string, review.RunOptions) error { called = true; return nil }, "--nope", "spec.md"); err == nil {

@@ -41,9 +41,14 @@ comments anchored to blocks, mark what you have reviewed and what still needs
 attention, then copy the whole review out for whatever wrote the document.
 
 Keys:
-  j/k     move                c  comment            space  cycle the mark
-  g/G     top/bottom          e  edit               r/f    reviewed / flag
-  \\      rendered/raw source Y  copy the review    q  quit
+  j/k     move            c  comment            space  cycle the mark
+  g/G     top/bottom      e  edit               r/f    reviewed / flag
+  \\      rendered/raw source Y  copy the review  q  quit
+
+Gutter (the column beside each block):
+  ▌  cursor / selection here   │  reviewed (green) / flagged (orange)
+  ·  partly marked section     ▸  comment thread (l/enter to open)
+  ✓  resolved thread
 
 On a heading, the mark keys apply to the whole section.
 

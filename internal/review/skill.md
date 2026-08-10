@@ -20,6 +20,19 @@ disagree, trust this — it is the loop that has been settled and tested.
 All four operate on the same `.margin/` directory the TUI reads and writes, so
 they work in a pipe, a CI job, or a bare shell — no terminal, no running margin.
 
+## Reading the human's screen
+
+You never drive the interface, but you may be asked to describe what is on it.
+The gutter column beside each block says what state the block is in — the same
+legend is in `margin --help`:
+
+- `▌` — the cursor is on this block (pink), or it is part of the current
+  selection (blue)
+- `│` — reviewed (green) or flagged (orange)
+- `·` — a section that is only partly reviewed
+- `▸` — a comment thread lives on this block; `l`/`enter` opens it
+- `✓` — the thread is resolved
+
 ## The interactive review loop
 
 Reviewing with margin is a loop between you and the human. Run it end to end:

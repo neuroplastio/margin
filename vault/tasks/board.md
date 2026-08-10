@@ -1,9 +1,17 @@
 # Board
 
-Last updated: 2026-08-10 (skill document teaches the agent-loop done-signal)
+Last updated: 2026-08-10 (gutter glyphs made distinct and documented)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) gutter glyphs are distinct and the legend is documented: a
+  collapsed open thread's marker is now `▸` (the dive's direction) instead of
+  the dim `│` that read as the reviewed/flagged mark rule — "a conversation
+  lives here" and "reviewed or flagged" are no longer the same glyph two
+  columns apart, and the cursor `▌`, mark `│`, partial `·`, thread `▸` and
+  resolved `✓` are each named in a new Gutter legend in `--help`, the README,
+  and a "Reading the human's screen" section in `margin skill` — journal
+  2026-08-10.14
 - (feedback feature) `margin skill` teaches the done-signal for a live agent:
   step 5 of the loop now points at a new "When the review is done" section —
   launch with `--stdout` chained to a sentinel
@@ -221,6 +229,16 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** the gutter's glyphs are distinct and named: a
+      collapsed open thread's marker is now `▸` (the point of the `l`/`enter`
+      dive) instead of the dim `│` that read as the reviewed/flagged mark rule
+      — cursor `▌`, mark `│` (green/orange), partial `·`, thread `▸` and
+      resolved `✓` are now each its own shape, and a Gutter legend in
+      `--help`, a paragraph in the README, and a "Reading the human's screen"
+      section in `margin skill` name what each means. Drains
+      `vault/feedback/2026-08-10-agent-loop-gutter-icon-ambiguity.md`; the file
+      is deleted. `[felt]` — see journal 2026-08-10.14 — done 2026-08-10
 
 - [x] **(feedback feature)** `margin skill` now teaches an agent participating
       live how to know when the review is done. A new "When the review is done"

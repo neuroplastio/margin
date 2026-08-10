@@ -2205,15 +2205,19 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 
 	// Collapsed: literally one line, no box. A bordered one-liner costs three
 	// rows, and with a thread every few paragraphs that crowds out the document
-	// — which is what the reader came for. A resolved thread swaps the plain
-	// rule for a dim green checkmark: still one line, still no box, but a
-	// glance down the gutter now tells collapsed-and-done apart from
-	// collapsed-and-open without expanding either. It does not also mute the
-	// draft/pending-edit colour below — unsaved text is the more urgent signal
-	// of the two and should not go quiet just because the thread was resolved
-	// around it.
+	// — which is what the reader came for. The marker is a right-pointing
+	// triangle, deliberately distinct from the mark rule's │ and the focus
+	// bar's ▌ (2026-08-10 agent-loop feedback: the old dim │ read as a review
+	// mark, so "a thread lives here" and "reviewed/flagged" were
+	// indistinguishable); the point of the triangle is the dive that l/enter
+	// perform on it. A resolved thread swaps it for a dim green checkmark:
+	// still one line, still no box, but a glance down the gutter now tells
+	// collapsed-and-done apart from collapsed-and-open without expanding
+	// either. It does not also mute the draft/pending-edit colour below —
+	// unsaved text is the more urgent signal of the two and should not go
+	// quiet just because the thread was resolved around it.
 	if !focused {
-		marker := dimStyle.Render("│ ")
+		marker := dimStyle.Render("▸ ")
 		if t.resolved {
 			marker = resolvedTxt.Render("✓ ")
 		}
