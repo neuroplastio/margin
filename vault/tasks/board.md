@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (Q-0003 answered — event log; claiming its first slice)
+Last updated: 2026-08-10 (Q-0003 answered → D13; event log slice done, wait command remains)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -148,11 +148,7 @@ Last updated: 2026-08-10 (Q-0003 answered — event log; claiming its first slic
 
 ## In progress
 
-- **(feedback feature)** interactive agent review, slice 1: the event log at
-  `.margin/events.log` — record every thread mutation (post, edit, delete,
-  restore, resolve) as one append-only line carrying a time-ordered ULID id,
-  and close Q-0003 (answer: the log is separate from thread files; the `--since`
-  cursor is an event id). Claimed 2026-08-10.
+*(none)*
 
 ## Backlog — M1
 
@@ -185,7 +181,7 @@ Q-0003 was answered 2026-08-10 and folded into `knowledge/decisions.md` as
 **D13** (the event log at `.margin/events.log`); the question file is deleted.
 The interactive-agent-review feature in
 `vault/feedback/2026-08-10-interactive-agent-review.md` is being built in
-slices: the event log itself (2026-08-10.7) is this leg, and `margin comments
+slices: the event log itself (2026-08-10.7) is done, and `margin comments
 wait [--since <last_known_id>]` — the CLI half that reads the log — remains a
 leg. The feedback file stays until that lands.
 
@@ -196,6 +192,24 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** interactive agent review, slice 1: the event log
+      at `.margin/events.log`. Records the maintainer's answer to Q-0003 as
+      **D13**: the identity the wait command's `--since` names is an *event*
+      id, not a comment id — thread files are unchanged. The log is a single
+      append-only file (sibling of `threads/` inside `.margin`), one
+      tab-separated line per event (`id at type doc anchor author comment`),
+      ids being 26-char ULIDs (48-bit ms time + 80-bit entropy) hand-rolled
+      in-tree and pinned by known-value tests. Wired into every thread
+      mutation: the TUI's post/edit (`dismiss`), resolve toggle and
+      comment/thread delete-restore each emit after `store.save`, surfacing a
+      failed append in the status line, and `margin comment add` emits
+      `comment.posted` best-effort so a lost notice can never make an agent
+      re-post. Reader contract: a malformed completed line is an error, an
+      unterminated final line is a torn append and is skipped. Closes
+      `vault/questions/Q-0003-comment-identity-for-wait.md` (deleted). The
+      feedback file stays until the wait command lands. `[mech]` — see journal
+      2026-08-10.7 — done 2026-08-10
 
 - [x] **(feedback fix)** raw mode horizontal scroll: `H`/`L` pan the whole raw
       source view sideways (the raw-mode analogue of the rendered view's

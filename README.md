@@ -109,6 +109,13 @@ The anchor is the `(^id)` shown in a block's export header. `--author` defaults
 to the current user. The reply appears on the reviewer's next open (or live, via
 the file watcher).
 
+Every thread change — a comment posted, edited, deleted or restored, a thread
+resolved or deleted — is also appended to `.margin/events.log` as one line with
+a time-ordered id (`id`, UTC timestamp, event type, document, anchor, author,
+comment index, tab-separated). A listener can tail or watch that single file to
+answer "what happened since the last thing I saw", instead of parsing thread
+files.
+
 The export leaves resolved threads out by default — it's a list of what still
 needs doing, not a transcript of everything ever said. Pass `--include-resolved`
 (with `Y` or `--stdout` alike) to get the full history back, including what

@@ -57,6 +57,12 @@ func AddComment(path, anchor, author, text string) (string, error) {
 	if err := writeThreadFile(root, docPath, t); err != nil {
 		return "", err
 	}
+	// The thread file is the record; the event log is the notice a listener
+	// (the wait command, a tailer) acts on. A failed append must not fail the
+	// reply that already landed on disk — an agent seeing an error would
+	// re-post and duplicate it — so this is best-effort, exactly as the TUI
+	// treats an event-log failure.
+	_ = appendEvent(root, event{kind: eventCommentPosted, doc: docPath, anchor: t.anchor, author: author, comment: len(t.posted) - 1})
 	return threadFilePath(root, docPath, anchor), nil
 }
 

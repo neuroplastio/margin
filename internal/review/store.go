@@ -190,6 +190,18 @@ func (s *threadStore) save(t *thread) error {
 	return writeThreadFile(s.root, s.docPath, t)
 }
 
+// emit appends one event to the review root's event log, filling in the
+// document path the store already knows. Nil-safe like save: a seeded or
+// ephemeral model has no store and records no events, exactly as it persists
+// no threads.
+func (s *threadStore) emit(ev event) error {
+	if s == nil {
+		return nil
+	}
+	ev.doc = s.docPath
+	return appendEvent(s.root, ev)
+}
+
 // marshalThread renders a thread as the markdown-with-frontmatter file an
 // agent reads and writes directly: anchor and document identify what the
 // thread is attached to, the quoted block is the fallback for a human (or an

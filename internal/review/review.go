@@ -811,6 +811,11 @@ func (m *model) toggleResolved() {
 	if m.store != nil {
 		_ = m.store.save(t)
 	}
+	evKind := eventThreadResolved
+	if !t.resolved {
+		evKind = eventThreadUnresolved
+	}
+	_ = m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: -1})
 }
 
 // deleteFocused tombstones the focused comment (if expanded) or the whole
@@ -823,23 +828,30 @@ func (m *model) deleteFocused() tea.Cmd {
 	}
 	t := m.threads[anchor]
 	
+	evKind, evIdx := eventThreadDeleted, -1
 	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
-		if t.toggleDeleteComment(m.at.comment) {
+		evIdx = m.at.comment
+		if t.toggleDeleteComment(evIdx) {
+			evKind = eventCommentDeleted
 			m.status = "comment deleted"
 		} else {
+			evKind = eventCommentRestored
 			m.status = "comment restored"
 		}
 	} else {
 		if t.toggleDeleteThread() {
+			evKind = eventThreadDeleted
 			m.status = "thread deleted"
 		} else {
+			evKind = eventThreadRestored
 			m.status = "thread restored"
 		}
 	}
-	
+
 	if m.store != nil {
 		_ = m.store.save(t)
 	}
+	_ = m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx})
 	return nil
 }
 
@@ -1135,12 +1147,15 @@ func (m *model) dismiss(err error) tea.Cmd {
 
 	switch {
 	case out == outcomeSubmit && body != "":
+		evKind, evIdx := eventCommentPosted, -1
 		if target == newCommentSlot {
 			t.posted = append(t.posted, comment{author: "toly", body: body, at: time.Now()})
+			evIdx = len(t.posted) - 1
 			m.status = "comment posted"
 		} else if target < len(t.posted) {
 			t.posted[target].body = body
 			t.posted[target].at = time.Now()
+			evKind, evIdx = eventCommentUpdated, target
 			m.status = "comment updated"
 		}
 		t.setDraft(target, "")
@@ -1150,6 +1165,12 @@ func (m *model) dismiss(err error) tea.Cmd {
 			// session — but it will not survive reopening the document, and
 			// that gap is worth surfacing rather than quietly succeeding.
 			m.status += " (not saved to disk: " + err.Error() + ")"
+		} else if evIdx >= 0 {
+			// The thread file is the record; the event log is the notice, so a
+			// failed append degrades the status line rather than the comment.
+			if err := m.store.emit(event{kind: evKind, anchor: t.anchor, author: "toly", comment: evIdx}); err != nil {
+				m.status += " (event log: " + err.Error() + ")"
+			}
 		}
 	case out == outcomeSubmit:
 		m.status = "nothing to submit"

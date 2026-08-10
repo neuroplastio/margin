@@ -251,6 +251,34 @@ func TestSubmitPersistsThroughTheStore(t *testing.T) {
 	}
 }
 
+// TestSubmitEmitsAnEvent: a model opened by Run (store set) not only writes
+// the posted comment to the thread file but appends a comment.posted line to
+// the event log, carrying the thread's anchor and the new comment's index —
+// the D13 wiring that a listener (the wait command) reads.
+func TestSubmitEmitsAnEvent(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+
+	open(t, m, soloAnchor, newCommentSlot, "")
+	typeText(m.comp, "Notify the agent.")
+	typeKeys(m.comp, keyCtrlS)
+	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+
+	events, err := readEvents(root)
+	if err != nil {
+		t.Fatalf("readEvents: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("readEvents returned %d events, want 1", len(events))
+	}
+	ev := events[0]
+	if ev.kind != eventCommentPosted || ev.doc != "document.md" ||
+		ev.anchor != soloAnchor || ev.author != "toly" || ev.comment != len(m.threads[soloAnchor].posted)-1 {
+		t.Errorf("event = %+v, want comment.posted on %s, comment %d", ev, soloAnchor, len(m.threads[soloAnchor].posted)-1)
+	}
+}
+
 // TestSubmitWithoutAStoreDoesNotTouchDisk: seedModel and every other test
 // build a model with no store, and dismiss must not start writing to the
 // process's working directory just because a comment was submitted.

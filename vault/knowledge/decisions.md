@@ -151,3 +151,54 @@ parsing — is left for whoever does that.
 The general question the feedback also raised — line-level focus inside a
 code fence or table, and what an anchor on a *line* (not an item) means when
 the block is rewritten — is not addressed by this decision and remains open.
+
+**D13 — An append-only event log at `.margin/events.log` is the identity
+`margin comments wait --since` names.** Answers Q-0003, per the maintainer's
+2026-08-10 answer: comment identity for the agent-polling wait command is not
+a comment id in the thread file (option B) nor the comment timestamp (option
+A), but a separate event log with its own time-ordered ids. Thread files are
+**unchanged** — comments keep author + timestamp, no `id:` field, no
+migration.
+
+- **Location:** one file, `.margin/events.log`, in the review root's `.margin`
+  directory, a sibling of `threads/`. Stored separately from thread files so a
+  listener can fsnotify or tail one file instead of watching the thread tree.
+- **Append-only.** margin never rewrites or truncates it. Each line is written
+  as a single `O_APPEND` write syscall, so concurrent writers (a running TUI
+  and `margin comment add`) cannot interleave within a line.
+- **Line shape** — seven fields, tab-separated:
+  `<id>\t<at>\t<type>\t<doc>\t<anchor>\t<author>\t<comment>`
+  - `id`: a 26-character ULID (Crockford base32, minus I/L/O/U): 48 bits of
+    millisecond time then 80 bits of randomness. Lexicographic string order is
+    creation order at millisecond granularity, so `--since` is a string
+    comparison; ties within one millisecond are resolved by file position (the
+    id is a cursor into an append-only file), not by id comparison.
+  - `at`: the event's RFC3339Nano UTC timestamp (the same format thread files
+    use for comment times).
+  - `type`: one of `comment.posted`, `comment.updated`, `comment.deleted`,
+    `comment.restored`, `thread.resolved`, `thread.unresolved`,
+    `thread.deleted`, `thread.restored`. The set is deliberately small: every
+    thread-file mutation a listener might care about, nothing else.
+  - `doc`: the document path relative to the review root (the thread file's
+    `document:` field).
+  - `anchor`: the thread's anchor, `^`-prefixed as in thread files.
+  - `author`: who performed the action.
+  - `comment`: the 0-based index of the comment within its thread — comments
+    have no id of their own; the *event* id identifies the event, the index
+    locates the comment — or `-` for a thread-level event.
+  - Free-form fields (author, and defensively doc/anchor) have tabs, CR and LF
+    replaced with spaces at write time, so a hostile or careless `--author`
+    cannot split a line.
+- **Reader contract:** a completed line that does not parse is an error —
+  "surface, don't drop", like a malformed thread file. The one exception is
+  the final line when the file does not end in a newline: writes always end in
+  `\n`, so an unterminated tail is an append still in flight and is skipped.
+- **Writes are best-effort after the thread write they announce.** The thread
+  file is the source of truth (D5); the log is a notification. A failed append
+  degrades the TUI status line but must not fail the comment it records —
+  losing a notice must not lose or block the words, and an agent that saw an
+  error would re-post and duplicate.
+
+Still felt and unsettled, to be judged in a later leg: `margin comments wait
+[--since <id>]`'s exact surface — what it prints, its exit code, its
+timeout/loop shape, and how it reports events that share a millisecond.
