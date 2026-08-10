@@ -148,7 +148,9 @@ Last updated: 2026-08-10 (Q-0003 answered → D13; event log slice done, wait co
 
 ## In progress
 
-*(none)*
+- **(feedback feature)** interactive agent review, slice 2: `margin comments
+      wait [--since <id>]` — the CLI half that reads the event log — claimed
+      by the 2026-08-10.8 leg
 
 ## Backlog — M1
 
