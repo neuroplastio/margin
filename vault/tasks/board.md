@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (comments markdown formatting)
+Last updated: 2026-08-10 (mermaid diagrams claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -203,7 +203,11 @@ Last updated: 2026-08-10 (comments markdown formatting)
 
 ## In progress
 
-*(none)*
+- (feedback feature) support mermaid diagrams in the review — an ASCII
+  renderer for the common diagram kinds instead of chroma's meaningless
+  colours on mermaid source; drains
+  `vault/feedback/2026-08-10-mermaid-diagrams.md`. Claimed 2026-08-10 by the
+  do-leg agent.
 
 ## Backlog — M1
 
