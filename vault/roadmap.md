@@ -86,9 +86,11 @@ threads it considers resolved.
       marks to it); the pane's look/position/toggle/focus is felt, journal
       2026-08-11.1
 - [ ] Navigation between documents, and a cross-document comment inbox
-      *(the navigation half started: cross-document link following — `ctrl+]`
-      on a link to another file in the tree opens it — landed 2026-08-11,
-      journal 2026-08-11.2; the comment inbox remains)*
+      *(both halves landed 2026-08-11: cross-document link following —
+      `ctrl+]` on a link to another file in the tree opens it — journal
+      2026-08-11.2, and the comment inbox — `i` lists every thread across the
+      tree, newest first, `enter` jumping to its document and block — journal
+      2026-08-11.3)*
 - [x] A scroll offset the user owns, decoupled from focus-follow (SCROLL-01)
 - [x] Page and half-page keys (SCROLL-02)
 - [x] Mouse wheel (SCROLL-03)

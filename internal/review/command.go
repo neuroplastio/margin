@@ -472,6 +472,21 @@ var commands = []command{
 		Run:         func(m *model, val string) tea.Cmd { return m.exportToClipboard() },
 	},
 	{
+		// inbox.toggle swaps the document column for the cross-document
+		// comment inbox (inbox.go): every thread across the tree's documents,
+		// newest first, `enter` jumping to the thread's block. `i` is the
+		// binding — unbound before, and reading as "inbox". Tree reviews only:
+		// a single-document review has no other documents to aggregate (D10),
+		// so Applicable is false and `i` stays unbound there.
+		ID:          "inbox.toggle",
+		Description: "Show the cross-document comment inbox",
+		Applicable:  func(m *model) bool { return m.tree != nil },
+		Run: func(m *model, val string) tea.Cmd {
+			m.toggleInbox()
+			return nil
+		},
+	},
+	{
 		// view.raw toggles between the rendered document and the raw markdown
 		// source of the same file (2026-08-09 navigation-feature-requests,
 		// "rich/raw mode toggle"). `\` is the binding: unbound before this,
@@ -691,6 +706,7 @@ var keyBindings = []struct {
 	{"m", "mark"},
 	{"s", "goto"},
 	{"\\", "view.raw"},
+	{"i", "inbox.toggle"},
 	{"tab", "tree.focus"},
 	{"ctrl+r", "doc.reload"},
 	{"q", "app.quit"}, {"ctrl+c", "app.quit"},

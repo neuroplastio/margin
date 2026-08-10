@@ -69,6 +69,7 @@ detectably orphaned rather than silently misplaced.
 | `ctrl+r` | Reload the document after it changed on disk (a `● file changed` notice appears in the footer) |
 | `Y` | Copy the whole review to the clipboard |
 | `tab` | Toggle focus between the document and the file-tree pane (directory reviews) |
+| `i` | Show the cross-document comment inbox (directory reviews): every thread across the tree, newest first — `enter` jumps to the thread's document and block |
 | `q` | Quit |
 
 On a heading, the mark keys apply to the whole section.

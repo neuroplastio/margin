@@ -137,6 +137,17 @@ type model struct {
 	treeScroll int
 	treeW      int
 
+	// inbox is the cross-document comment inbox view (inbox.go): `i` in a tree
+	// review swaps the document column for the tree's threads, newest first.
+	// inboxAt is the focused row, inboxScroll the inbox's own scroll offset
+	// (independent of the document's, like the pane's), and inboxItems the
+	// current list, rebuilt every time the view opens so a comment posted in
+	// another document shows up on the next visit.
+	inbox       bool
+	inboxAt     int
+	inboxScroll int
+	inboxItems  []inboxItem
+
 	// raw switches the view to the document's verbatim markdown source — the
 	// 2026-08-09 navigation-feature-requests "rich/raw mode toggle". Rendered
 	// view re-reads m.doc's blocks; raw view re-reads m.src, the exact bytes
@@ -1481,6 +1492,13 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.handlePaneKey(msg)
 	}
 
+	// While the inbox holds the document column it owns the keyboard, the
+	// same modal rule the tree pane and the search prompt follow: j/k move
+	// through the threads, enter opens, esc/h/tab hand the column back.
+	if m.inbox {
+		return m.handleInboxKey(msg)
+	}
+
 	// esc cancels an active selection first — vim's rule, the composer's own
 	// esc (owned by the child while it is open) is untouched. Outside visual
 	// mode esc is move.surface: the undive key, a no-op where there is no
@@ -1745,6 +1763,13 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 		}
 	}
 
+	// The document column is the inbox list, not the document — a click there
+	// is inert until the inbox learns to select rows. Clicks in the pane
+	// column above already handled the tree.
+	if m.inbox {
+		return nil
+	}
+
 	target, ok := m.hitTest(line)
 	if m.comp != nil {
 		// Clicking away is a blur, and the click's landing spot becomes the
@@ -1782,6 +1807,13 @@ func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 		}
 	}
 
+	// The inbox column is not the document — hovering it clears any document
+	// hover rather than misattributing it to a block that is not there.
+	if m.inbox {
+		m.hoveredEntry = -1
+		return nil
+	}
+
 	target, ok := m.hitTest(line)
 	if ok {
 		m.hoveredEntry = target.entry
@@ -1795,6 +1827,23 @@ func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 // composer if the pointer is over it. Focus is explicitly left alone.
 func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
+
+	// The inbox scrolls its own list, like the pane.
+	if m.inbox {
+		delta := m.wheelSpeed
+		if delta < 1 {
+			delta = 1
+		}
+		if mo.Button == uv.MouseWheelUp {
+			m.inboxScroll -= delta
+		} else if mo.Button == uv.MouseWheelDown {
+			m.inboxScroll += delta
+		}
+		if m.inboxScroll < 0 {
+			m.inboxScroll = 0
+		}
+		return nil
+	}
 
 	if m.comp != nil && m.paneTop >= 0 {
 		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
@@ -2514,8 +2563,15 @@ func (m *model) View() tea.View {
 	}
 
 	viewport := max(m.h-footerRows-paletteHeight-searchHeight, 1)
-	m.scroll = m.clampScroll(len(lines), viewport)
-	visible := lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
+	var visible []string
+	if m.inbox {
+		// The inbox replaces the document column; it has its own scroll, so
+		// the document's offset is left untouched for when it returns.
+		visible = m.renderInbox(viewport)
+	} else {
+		m.scroll = m.clampScroll(len(lines), viewport)
+		visible = lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
+	}
 
 	// A directory review puts the file tree in a left column: each visible
 	// document line is prefixed with the pane's row at the same height, so
@@ -2544,6 +2600,12 @@ func (m *model) View() tea.View {
 		b.WriteString(paletteBox)
 	} else if m.searchOpen {
 		b.WriteString(searchBox)
+	} else if m.inbox {
+		b.WriteString(dimStyle.Render(fmt.Sprintf(
+			"inbox — %d thread(s) · j/k move · enter open · esc close   ", len(m.inboxItems))))
+		if m.status != "" {
+			b.WriteString(dimStyle.Render(m.status))
+		}
 	} else if m.visual {
 		n := 0
 		if lo, hi, ok := m.selectionRange(); ok {

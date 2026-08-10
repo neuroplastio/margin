@@ -153,7 +153,12 @@ These have been raised but not judged. Each needs a felt leg and a review.
   in the tree opens it, journal 2026-08-11.2) is **not settled** either: the
   switch-document-on-follow semantics, the root-relative `/x` spelling, the
   jumplist restarting on a switch, and whether single-document reviews ever
-  follow are all the leg's best guess. What review progress looks like rolled
+  follow are all the leg's best guess. The cross-document comment inbox (`i`,
+  journal 2026-08-11.3) is **not settled** either: it replaces the document
+  column with every thread across the tree, newest first, `enter` jumping to
+  the thread's document and block — whether that is the right surface, whether
+  it should refresh live, what a row should carry, and whether clicks should
+  select rows are the leg's best guess. What review progress looks like rolled
   up across a tree, and whether the export covers one document or all of them,
   are still open.
 - Whether marks and comments belong in the same gutter column.

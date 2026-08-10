@@ -1,11 +1,24 @@
 # Board
 
-Last updated: 2026-08-11 (cross-document link navigation landed: `ctrl+]` on
-a link naming another markdown file in a directory review opens it — the first
-slice of "Navigation between documents"; the comment inbox remains).
+Last updated: 2026-08-11 (the cross-document comment inbox landed: `i` in a
+directory review replaces the document column with every thread across the
+tree, newest first, `enter` jumping to the thread's document and block).
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (comment inbox) `i` in a directory review replaces the document column with
+  every thread across the tree, newest activity first — `enter`/`l` opens the
+  thread's document (the pane-open path) and lands centred on its block,
+  `ctrl+o` walks back, `esc`/`h`/`tab` return, j/k/g/G move, the wheel
+  scrolls the list, and the tree pane stays rendered beside it; a thread
+  whose document left the tree stays, dimmed `[doc not in tree]`, and is
+  reported on enter; resolved threads render dimmed with `✓`; the list
+  refreshes on open (no live tree-wide watcher yet), clicks in the inbox
+  column are inert, and `i` is unbound in single-document reviews — whether a
+  whole-column view is the right surface, whether `i` is the key, whether the
+  tree pane should stay visible, whether resolved threads should dim, whether
+  the inbox should refresh live, and whether the enter landing (open +
+  centre, like a link follow) is the jump expected — journal 2026-08-11.3
 - (cross-document links) `ctrl+]` on a link naming another markdown file in a
   directory review opens it — `[a](other.md)` or `[b](other.md#section)`, the
   path resolved relative to the current document (`/x` = review root);
@@ -290,12 +303,30 @@ slice of "Navigation between documents"; the comment inbox remains).
 
 ## In progress
 
-- [ ] **A cross-document comment inbox** — claimed by the 2026-08-11 inbox leg:
-      the tree review gains an inbox view aggregating every thread across the
-      tree's documents, openable with `i`, jumpable from with `enter`.
-      *In progress, 2026-08-11.*
+*(none)*
 
 ## Done
+
+- [x] **A cross-document comment inbox** — `i` in a directory review (D10)
+      replaces the document column with the comment inbox: `loadInbox` walks
+      the thread files under `.margin/threads/` (D9 keys them by document
+      path, so the walk mirrors the tree without parsing any document) and
+      returns one row per thread, newest activity first. `enter`/`l` on a row
+      opens the thread's document through the same `openTreeFile` a pane open
+      performs — re-pointed store/watcher, fresh session — and lands on the
+      thread's block, centred, with the landing recorded in the jumplist
+      (`ctrl+o` walks back); j/k/g/G move, the wheel scrolls the inbox's own
+      offset, `esc`/`h`/`tab` return to the document (scroll preserved), `q`
+      quits, and the tree pane stays rendered beside it so a thread's home is
+      always in view. A thread whose document left the tree stays, dimmed
+      `[doc not in tree]`, and is reported on enter — nothing silently drops.
+      Resolved threads render dimmed with `✓`. The list refreshes on open,
+      not live; clicks in the inbox column are inert; single-document
+      reviews have no inbox (D10), so `i` stays unbound there. Chosen:
+      whole-column view over a tree-pane mode, `i` over `c`/`m`/`x`, keeping
+      the tree pane visible, one line per thread (document + collapsed
+      summary), live refresh deferred. `[felt]` — see journal 2026-08-11.3 —
+      done 2026-08-11
 
 - [x] **Cross-document link navigation (first slice of "Navigation between
       documents")** — `ctrl+]` on a link naming another markdown file in a
@@ -438,7 +469,7 @@ position, toggle and focus are on `Needs a look:` until judged.
 
 - *(Review a directory, not just a file — landed, see Done 2026-08-11.)*
 - *(Cross-document link navigation — landed, see Done 2026-08-11.)*
-- A cross-document comment inbox
+- *(A cross-document comment inbox — landed, see Done 2026-08-11.)*
 - Review progress across the whole tree
 
 ## Backlog — M3 (navigation)
