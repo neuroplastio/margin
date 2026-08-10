@@ -290,7 +290,10 @@ slice of "Navigation between documents"; the comment inbox remains).
 
 ## In progress
 
-*(none)*
+- [ ] **A cross-document comment inbox** — claimed by the 2026-08-11 inbox leg:
+      the tree review gains an inbox view aggregating every thread across the
+      tree's documents, openable with `i`, jumpable from with `enter`.
+      *In progress, 2026-08-11.*
 
 ## Done
 
