@@ -1,10 +1,19 @@
 # Board
 
-Last updated: 2026-08-10 (vendored mermaid-ascii folded into the host module;
-`go install @version` works again)
+Last updated: 2026-08-10 (j/k walk through blocks taller than the viewport,
+so a long diagram/code block/table reads instead of leaping past)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) `j`/`k` on a block taller than the viewport (a long mermaid
+  diagram, a big code block, a huge table) no longer leap focus to the next
+  block — the plain walk hopped by the whole block height, one `j` and you were
+  a screen away. While focus sits on such a block, `j`/`k` scroll the viewport
+  through it 3 lines at a time (the `tallWalkStep`, matching J/K) and move
+  focus on only at the block's far edge; landing on a tall block opens at the
+  edge the walk is entering from (top when walking down, bottom when walking
+  up) and the walked offset survives clampScroll; visual mode keeps the
+  blockwise leap — journal 2026-08-10.22
 - (feedback feature) `stateDiagram`/`stateDiagram-v2` fences now render as
   state diagrams through the vendored library's new `pkg/state` (third_party
   delta D7): each transition draws a `│ label` run and `▼` head between its
@@ -245,6 +254,28 @@ Last updated: 2026-08-10 (vendored mermaid-ascii folded into the host module;
 *(none)*
 
 ## Done
+
+- [x] **(feedback fix)** `j`/`k` on a block taller than the viewport scroll the
+      viewport through it a few lines at a time instead of hopping focus to the
+      next block — the plain walk's leap by the whole block height is what made
+      a long mermaid diagram, big code block or huge table unreadable (one `j`
+      and you were a screen away). `moveFocus`'s block-level walk
+      (`internal/review/review.go`) now treats a tall span specially: while
+      focus sits on it, `j`/`k` move the viewport `tallWalkStep` lines (3,
+      matching J/K) and keep focus; only at the block's far edge — last row at
+      the viewport bottom, first row at the top — does the next press move
+      focus to the neighbour. Landing on a tall block opens at the edge the
+      walk enters from (top walking down, bottom walking up — `clampScroll`
+      would otherwise drop into the middle or pin the tail), with `scroll` and
+      `scrollAnchor` set so the walked offset survives the next render. Visual
+      mode keeps the plain leap: a blockwise selection wants the block as one
+      stop, and mid-block scrolling would make j/k dead presses mid-selection.
+      Chosen: the 3-line step (matches J/K, the default wheel tick) over a
+      quarter-viewport step; the entering-edge landing over always re-opening
+      at the top; applying it to every tall span including long thread rows.
+      Drains
+      `vault/feedback/2026-08-10-tall-block-jk-incremental-scroll.md`; the file
+      is deleted. `[felt]` — see journal 2026-08-10.22 — done 2026-08-10
 
 - [x] **(feedback fix)** `go install module@version` works again: the vendored
       `third_party/mermaid-ascii` was its own module wired through a `replace`

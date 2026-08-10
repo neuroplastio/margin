@@ -42,6 +42,11 @@ const (
 	// 999,999 — beyond any document margin will open — and stops a key-mash
 	// from growing an unbounded string.
 	maxCountDigits = 6
+	// tallWalkStep is how many lines j/k scroll the viewport when walking
+	// through a block taller than the viewport (the 2026-08-10
+	// tall-block-jk-incremental-scroll feedback). Matches the 3-line feel of
+	// J/K's incremental scroll and the default wheel tick.
+	tallWalkStep = 3
 )
 
 // damageMsg says the child wrote something, so the grid may have changed. It is
@@ -515,12 +520,52 @@ func (m *model) moveFocus(d int) {
 	// special case here: entering it lifts focus off comments, so the dive
 	// branch above can never fire mid-selection, and entry-only movement is
 	// what a blockwise selection already wanted.
+	//
+	// A block taller than the viewport is one focus stop but too long to read
+	// in a screen, so the plain walk would leap past most of it in one press
+	// (the 2026-08-10 tall-block-jk-incremental-scroll feedback). While focus
+	// sits on such a block, j/k scroll the viewport through it tallWalkStep
+	// lines at a time instead of moving on, and only once the viewport is at
+	// the block's far edge does the next press move focus to the neighbour.
+	// Landing on a tall block opens at the edge the walk is entering from —
+	// its top when walking down, its bottom when walking up — so the whole
+	// block reads in order instead of dropping into its middle. Visual mode
+	// keeps the plain leap: a blockwise selection wants the block as one
+	// stop, and mid-block scrolling would make j/k dead presses
+	// mid-selection.
 	j := m.at.entry + d
 	if j < 0 {
 		j = 0
 	}
 	if j >= len(m.entries) {
 		j = len(m.entries) - 1
+	}
+	if !m.visual && m.at.entry >= 0 && m.at.entry < len(m.spans) {
+		viewport := max(m.h-footerRows, 1)
+		f := m.spans[m.at.entry]
+		if f.end-f.start+1 > viewport {
+			if d > 0 {
+				if m.scroll < f.end-viewport+1 {
+					m.scroll = min(f.end-viewport+1, m.scroll+tallWalkStep)
+					m.scrollAnchor = m.at
+					return
+				}
+			} else if m.scroll > f.start {
+				m.scroll = max(f.start, m.scroll-tallWalkStep)
+				m.scrollAnchor = m.at
+				return
+			}
+		}
+		if j != m.at.entry && j < len(m.spans) {
+			if g := m.spans[j]; g.end-g.start+1 > viewport {
+				if d > 0 {
+					m.scroll = g.start
+				} else {
+					m.scroll = max(0, g.end-viewport+1)
+				}
+				m.scrollAnchor = cursor{entry: j, comment: commentNone}
+			}
+		}
 	}
 	m.at = cursor{entry: j, comment: commentNone}
 }
