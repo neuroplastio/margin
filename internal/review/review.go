@@ -37,7 +37,6 @@ const (
 	minPaneCol = 40
 	gutterW    = 3 // focus bar + mark rule + space
 	borderW    = 1
-	maxMeasure = 76 // the comfortable reading measure
 	footerRows = 2
 	// maxCountDigits caps the `<num>gg` digit buffer. Six digits reach line
 	// 999,999 — beyond any document margin will open — and stops a key-mash
@@ -357,8 +356,14 @@ func (m *model) waitForChild() tea.Cmd {
 	return func() tea.Msg { return childExitMsg{gen: c.gen, err: c.cmd.Wait()} }
 }
 
+// contentWidth is the reading measure: the width the document's prose wraps
+// to and the composer pane occupies. It adapts to the terminal — the
+// maintainer's 2026-08-10 viewport-width feedback — so a wide terminal reads
+// at its full width instead of parking columns past a fixed 76-column measure.
+// The floor keeps a very narrow terminal readable; there is deliberately no
+// upper cap, since the terminal's own width is the physical limit.
 func (m *model) contentWidth() int {
-	return max(min(m.w-2*gutterW, maxMeasure), minPaneCol)
+	return max(m.w-2*gutterW, minPaneCol)
 }
 
 // --- focus ------------------------------------------------------------------
@@ -1929,7 +1934,20 @@ func (m *model) render() []string {
 				// carries that (reviewedTxt above), and renderTable's header
 				// row builds on it with .Bold(true), the same "build on top
 				// of body" call RENDER-06 made for a paragraph's bold runs.
-				out = renderTable(e.b.table, w, body)
+				// A table wider than the terminal keeps its natural column
+				// widths and scrolls horizontally with H/L, the code-block
+				// treatment — renderTable no longer narrows columns to fit
+				// (2026-08-10 viewport-width feedback), because shaving a
+				// column hides the data the table exists to show.
+				out = renderTable(e.b.table, body)
+				off := m.codeScroll[e.b.anchor]
+				if off > 0 || hasOverflow(out, w) {
+					scrolled := make([]string, len(out))
+					for idx, l := range out {
+						scrolled[idx] = scrollCodeLine(l, off, w)
+					}
+					out = scrolled
+				}
 				preStyled = true
 			default:
 				out = e.b.lines
@@ -2547,10 +2565,13 @@ func (m *model) focusedKind() blockKind {
 }
 
 // scrollBlock shifts the horizontal scroll offset of the focused block by
-// delta, for the two kinds that do not wrap to the measure: code blocks and
-// the frontmatter block. l scrolls right, h scrolls left, 4 columns per press
-// (the same step size the code block horizontal scroll feedback settled for
-// blockCode and the frontmatter feedback asks to extend to blockFrontmatter).
+// delta, for the block kinds that do not wrap to the measure: code blocks,
+// the frontmatter block, and — since the 2026-08-10 viewport-width feedback —
+// tables, which now keep their natural column widths and scroll instead of
+// narrowing. H scrolls left, L scrolls right, 4 columns per press (the same
+// step size the code block horizontal scroll feedback settled for blockCode).
+// The scroll offset lives in m.codeScroll per anchor and is bounded between 0
+// and the block's widest rendered line minus the content width.
 func (m *model) scrollBlock(delta int) {
 	if m.at.entry < 0 || m.at.entry >= len(m.entries) {
 		return
@@ -2562,6 +2583,8 @@ func (m *model) scrollBlock(delta int) {
 		lines = highlightCode(e.b.lines, e.b.lang)
 	case blockFrontmatter:
 		lines = frontmatterFields(e.b.text)
+	case blockTable:
+		lines = renderTable(e.b.table, textStyle)
 	default:
 		return
 	}
@@ -2743,12 +2766,16 @@ func renderFrontmatterFields(b block, w, off int) []string {
 // reads as a column break without spending a whole glyph column on it.
 const tableColumnSpacing = "  "
 
-// renderTable lays out a blockTable as aligned columns: a bold header row, a
-// dim rule under it, then one row per line, colours all resolved against
-// body so a reviewed table dims exactly like the paragraph and quote text
-// beside it. Column widths come from the content itself (tableColumnWidths)
-// so a narrow table (most of them) is not stretched to the full measure.
-func renderTable(tb *tableBlock, w int, body lipgloss.Style) []string {
+// renderTable lays out a blockTable as aligned columns at their natural
+// widths: a bold header row, a dim rule under it, then one row per line,
+// colours all resolved against body so a reviewed table dims exactly like the
+// paragraph and quote text beside it. Column widths come from the content
+// itself (tableNaturalWidths) so a narrow table (most of them) is not
+// stretched to the full measure — and a wide one is not shrunk to it either:
+// the 2026-08-10 viewport-width feedback replaced the old narrowing with
+// horizontal scroll, so renderTable renders the data at its true width and
+// the caller clips the rows through scrollCodeLine when they overflow.
+func renderTable(tb *tableBlock, body lipgloss.Style) []string {
 	if tb == nil {
 		return nil
 	}
@@ -2756,7 +2783,7 @@ func renderTable(tb *tableBlock, w int, body lipgloss.Style) []string {
 	if cols == 0 {
 		return nil
 	}
-	widths := tableColumnWidths(tableNaturalWidths(tb, cols), w)
+	widths := tableNaturalWidths(tb, cols)
 
 	lines := make([]string, 0, 2+len(tb.rows))
 	lines = append(lines, tableRowLine(tb.header, widths, tb.aligns, body.Bold(true)))
@@ -2798,40 +2825,6 @@ func tableNaturalWidths(tb *tableBlock, cols int) []int {
 				widths[i] = l
 			}
 		}
-	}
-	return widths
-}
-
-// tableColumnWidths narrows natural column widths to fit w, when they do not
-// already. It repeatedly shaves one rune off the currently-widest column
-// above a 3-rune floor (enough room for truncate's own ellipsis) until the
-// row fits or every column has hit the floor — an even, proportional
-// narrowing rather than truncating one column down to nothing while its
-// neighbours stay full width. A row so packed with columns that even the
-// floor does not fit is left over-width rather than unreadable; that is a
-// terminal too narrow for this table, not a bug in the algorithm.
-func tableColumnWidths(natural []int, w int) []int {
-	const floor = 3
-	widths := append([]int(nil), natural...)
-	spacing := len(tableColumnSpacing) * (len(widths) - 1)
-	total := func() int {
-		sum := spacing
-		for _, x := range widths {
-			sum += x
-		}
-		return sum
-	}
-	for total() > w {
-		widest := -1
-		for i, x := range widths {
-			if x > floor && (widest < 0 || x > widths[widest]) {
-				widest = i
-			}
-		}
-		if widest < 0 {
-			break
-		}
-		widths[widest]--
 	}
 	return widths
 }

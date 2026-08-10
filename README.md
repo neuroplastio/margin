@@ -53,6 +53,7 @@ detectably orphaned rather than silently misplaced.
 | `j` / `k` | Move between blocks and thread rows (a thread is one stop) |
 | `\` | Toggle between the rendered document and its raw markdown source |
 | `l` / `h` — or `enter` / `esc` | Dive into the focused thread's comments, or a table/raw block's lines / surface back out |
+| `H` / `L` | Scroll a wide block (code, table, frontmatter) horizontally |
 | `/` | Search: type to highlight matches live, `enter` to jump, `esc` to cancel |
 | `n` / `N` | Jump to the next / previous search match |
 | `V` | Select blocks (visual mode): movement extends, `esc` cancels |

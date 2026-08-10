@@ -142,15 +142,14 @@ var commands = []command{
 		// multi-line table or raw block line by line (the same feedback's
 		// "dive into multi-line blocks" bullet) — a line dive walks the
 		// block's source lines and c/gy anchor a comment to the one under
-		// focus.
+		// focus. Since the 2026-08-10 viewport-width feedback it never
+		// scrolls a block horizontally — that is move.hscrollRight's job —
+		// so l/h mean dive/surface everywhere, code blocks included.
 		ID:          "move.dive",
-		Description: "Dive into thread or block lines / scroll code block right",
+		Description: "Dive into thread or block lines",
 		Applicable: func(m *model) bool {
 			if m.visual {
 				return false
-			}
-			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
-				return true
 			}
 			if m.at.comment != commentNone || m.at.line != 0 {
 				return false
@@ -165,32 +164,70 @@ var commands = []command{
 			if m.raw {
 				return nil
 			}
-			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
-				m.scrollBlock(4)
-				return nil
-			}
 			m.dive()
 			return nil
 		},
 	},
 	{
 		ID:          "move.surface",
-		Description: "Surface back to block / thread / scroll code block left",
+		Description: "Surface back to block or thread",
 		Applicable: func(m *model) bool {
-			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) && m.codeScroll[m.anchorAt()] > 0 {
-				return true
-			}
 			return m.at.comment != commentNone || m.at.line != 0
 		},
 		Run: func(m *model, val string) tea.Cmd {
 			if m.raw {
 				return nil
 			}
-			if m.at.comment == commentNone && (m.focusedKind() == blockCode || m.focusedKind() == blockFrontmatter) {
-				m.scrollBlock(-4)
+			m.surface()
+			return nil
+		},
+	},
+	{
+		// move.hscrollLeft/Right are horizontal scroll, the 2026-08-10
+		// viewport-width feedback's re-binding: H/L scroll a wide block
+		// (code, table, frontmatter) sideways, and l/h keep their dive and
+		// surface meanings everywhere — the old double meaning of l/h on a
+		// code block is what the feedback removed. scrollBlock is the same
+		// verb the code-block horizontal scroll feedback settled, now on its
+		// own keys and extended to tables.
+		ID:          "move.hscrollLeft",
+		Description: "Scroll horizontally left",
+		Applicable: func(m *model) bool {
+			if m.raw {
+				return false
+			}
+			switch m.focusedKind() {
+			case blockCode, blockFrontmatter, blockTable:
+				return true
+			}
+			return false
+		},
+		Run: func(m *model, val string) tea.Cmd {
+			if m.raw {
 				return nil
 			}
-			m.surface()
+			m.scrollBlock(-4)
+			return nil
+		},
+	},
+	{
+		ID:          "move.hscrollRight",
+		Description: "Scroll horizontally right",
+		Applicable: func(m *model) bool {
+			if m.raw {
+				return false
+			}
+			switch m.focusedKind() {
+			case blockCode, blockFrontmatter, blockTable:
+				return true
+			}
+			return false
+		},
+		Run: func(m *model, val string) tea.Cmd {
+			if m.raw {
+				return nil
+			}
+			m.scrollBlock(4)
 			return nil
 		},
 	},
@@ -525,6 +562,8 @@ var keymap = map[string]string{
 	"k": "move.up", "up": "move.up",
 	"J": "move.scrollDown",
 	"K": "move.scrollUp",
+	"L": "move.hscrollRight",
+	"H": "move.hscrollLeft",
 	"l": "move.dive", "right": "move.dive", "enter": "move.dive",
 	"h": "move.surface", "left": "move.surface", "esc": "move.surface",
 	"ctrl+d": "move.halfPageDown",

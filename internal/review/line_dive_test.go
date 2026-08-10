@@ -12,8 +12,8 @@ import (
 // a row (a table or a raw block) dives into its lines, j/k walk them, h
 // surfaces, and c/gy anchor a comment to the line under focus (the L12-18
 // payload). Paragraphs and quotes wrap, so their source lines have no visual
-// identity and they stay out of the dive; code blocks keep l/h for horizontal
-// scroll.
+// identity and they stay out of the dive; code blocks are not line-diveable
+// either — H/L scroll them horizontally (2026-08-10 viewport-width).
 
 const lineDiveDoc = `# Header
 
@@ -240,8 +240,9 @@ func TestLineDiveNotOnWrappedProse(t *testing.T) {
 	}
 }
 
-// TestLineDiveNotOnCodeBlock: code blocks keep l/h for horizontal scroll, so
-// they are not line-diveable either.
+// TestLineDiveNotOnCodeBlock: code blocks are not line-diveable either —
+// H/L scroll them horizontally (2026-08-10 viewport-width feedback), and a
+// line dive layered on top would make one key do two jobs.
 func TestLineDiveNotOnCodeBlock(t *testing.T) {
 	m := newModelAt("doc.md", parseDoc([]byte("```go\nfunc f() {\n    return\n}\n```\n")), nil)
 	m.w, m.h = 100, 60
@@ -249,6 +250,6 @@ func TestLineDiveNotOnCodeBlock(t *testing.T) {
 		t.Fatalf("expected a code block at 0, got %d", m.entries[m.at.entry].b.kind)
 	}
 	if _, _, ok := m.lineDiveRange(); ok {
-		t.Fatal("code block is line-diveable; l/h already scroll it")
+		t.Fatal("code block is line-diveable; H/L already scroll it")
 	}
 }

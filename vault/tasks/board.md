@@ -1,9 +1,15 @@
 # Board
 
-Last updated: 2026-08-10 (viewport width and horizontal scroll — claimed)
+Last updated: 2026-08-10 (viewport width and horizontal scroll — done)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) viewport width and horizontal scroll: `contentWidth()` is
+  the terminal's width, not a fixed 76-column measure; wide blocks (code,
+  tables, frontmatter) ride it too; tables keep natural column widths and
+  scroll instead of narrowing (`tableColumnWidths` deleted); horizontal scroll
+  is now `H`/`L` (`move.hscrollLeft/Right`), leaving `l`/`h`/`enter`/`esc`
+  dive/surface everywhere — journal 2026-08-10.3
 - (feedback fix) enter/esc dive bindings: `enter` dives, `esc` undives, as
   straight aliases of `l`/`h` — the whole dive flow is now reachable as
   `enter`/`j`/`esc`. esc still cancels a visual selection first, is inert
@@ -124,14 +130,7 @@ Last updated: 2026-08-10 (viewport width and horizontal scroll — claimed)
 
 ## In progress
 
-- **(feedback feature)** viewport width and horizontal scroll: `contentWidth()`
-      uses the terminal's width instead of capping prose at `maxMeasure` (76);
-      wide blocks (code blocks, and tables once they scroll) are allowed up to
-      the full terminal width; tables keep their natural column widths and
-      scroll horizontally like a code block instead of narrowing; horizontal
-      scroll moves from `l`/`h` to `H`/`L`, leaving `l`/`h` dive/surface
-      everywhere. Drains `vault/feedback/2026-08-10-viewport-width-and-horizontal-scroll.md`.
-      `[felt]` — claimed 2026-08-10
+*(none)*
 
 ## Backlog — M1
 
@@ -167,6 +166,19 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** viewport width and horizontal scroll:
+      `contentWidth()` is the terminal's width (minus gutter, 40-col floor)
+      rather than a fixed 76-column measure, so a wide terminal reads at its
+      full width; wide blocks (code, and tables once they scroll) are allowed
+      the full terminal width; tables keep their natural column widths and
+      scroll horizontally with H/L like a code block instead of narrowing
+      (`tableColumnWidths` deleted with its tests); horizontal scroll moved
+      from `l`/`h` to `H`/`L` (`move.hscrollLeft/Right`, bound to previously
+      unbound keys), leaving `l`/`h`/`enter`/`esc` dive/surface everywhere —
+      `l` on a code block no longer scrolls it. Drains
+      `vault/feedback/2026-08-10-viewport-width-and-horizontal-scroll.md`; the
+      file is deleted. `[felt]` — see journal 2026-08-10.3 — done 2026-08-10
 
 - [x] **(feedback fix)** dive/undive also binds to `enter`/`esc`: `enter` dives,
       `esc` undives, in addition to the existing `l`/`h` bindings. Straight

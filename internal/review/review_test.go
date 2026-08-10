@@ -1027,16 +1027,19 @@ func TestHighlightCodeDegradesForAnUnknownLanguage(t *testing.T) {
 	}
 }
 
-// TestRenderTableAlignsColumnsAndStaysInMeasure pins renderTable's basic
-// shape: header above a rule above the rows, every line the same
-// de-styled width (columns line up), and alignment honoured per column.
-func TestRenderTableAlignsColumnsAndStaysInMeasure(t *testing.T) {
+// TestRenderTableAlignsColumnsAtNaturalWidth pins renderTable's basic shape:
+// header above a rule above the rows, every line the same de-styled width
+// (columns line up), and alignment honoured per column. Widths are the
+// content's own natural widths — a table is no longer narrowed to fit a
+// measure, since the 2026-08-10 viewport-width feedback replaced narrowing
+// with horizontal scroll.
+func TestRenderTableAlignsColumnsAtNaturalWidth(t *testing.T) {
 	tb := &tableBlock{
 		header: []string{"Name", "Age"},
 		rows:   [][]string{{"Alice", "30"}, {"Bob", "5"}},
 		aligns: []tableAlign{alignLeft, alignRight},
 	}
-	out := renderTable(tb, 40, textStyle)
+	out := renderTable(tb, textStyle)
 	if len(out) != 4 {
 		t.Fatalf("renderTable returned %d line(s), want 4 (header, rule, 2 rows): %q", len(out), out)
 	}
@@ -1059,35 +1062,57 @@ func TestRenderTableAlignsColumnsAndStaysInMeasure(t *testing.T) {
 	}
 }
 
-// TestTableColumnWidthsNarrowsToFit exercises tableColumnWidths directly: a
-// table wider than the measure narrows to fit rather than running off it,
-// down to its 3-rune floor per column.
-func TestTableColumnWidthsNarrowsToFit(t *testing.T) {
-	natural := []int{40, 40}
-	w := 20
-	widths := tableColumnWidths(natural, w)
-	total := len(tableColumnSpacing)
-	for _, x := range widths {
-		total += x
+// TestTableScrollsHorizontally: a table wider than the terminal keeps its
+// natural column widths and scrolls horizontally with H/L — the code-block
+// treatment the 2026-08-10 viewport-width feedback asked for in place of
+// narrowing columns to fit. The table renders at its natural width (nothing
+// shaved), and once an offset is set the render loop clips the rows through
+// scrollCodeLine exactly as it clips a code block, so scrolling right pushes
+// the leading column off the left edge instead of squeezing it.
+func TestTableScrollsHorizontally(t *testing.T) {
+	wide := &tableBlock{
+		header: []string{"AlphabetColumn", "Notes"},
+		rows:   [][]string{{"alpha", strings.Repeat("n", 40)}},
 	}
-	if total > w {
-		t.Errorf("narrowed widths %v (+spacing) sum to %d, wider than the measure %d", widths, total, w)
+	m := newModel([]block{{kind: blockTable, table: wide, anchor: "^t"}}, nil)
+	m.w, m.h = 40, 60
+	contentW := m.contentWidth()
+	if m.codeScroll["^t"] != 0 {
+		t.Fatalf("initial table scroll offset = %d, want 0", m.codeScroll["^t"])
 	}
-	for i, x := range widths {
-		if x < 3 {
-			t.Errorf("column %d narrowed to %d, below the 3-rune floor", i, x)
-		}
-	}
-}
 
-// TestTableColumnWidthsLeavesRoomWhenItFits is the non-narrowing half of the
-// same contract: a table that already fits keeps its natural widths exactly,
-// rather than always shrinking to the measure.
-func TestTableColumnWidthsLeavesRoomWhenItFits(t *testing.T) {
-	natural := []int{4, 3}
-	got := tableColumnWidths(natural, 40)
-	if got[0] != 4 || got[1] != 3 {
-		t.Errorf("widths = %v, want the natural widths %v unchanged (table already fits)", got, natural)
+	// The long Notes cell overflows the content width, so there is something
+	// to scroll to.
+	natural := renderTable(wide, textStyle)
+	if w := visualWidth(natural[2]); w <= contentW {
+		t.Fatalf("table's widest line is %d cols, need an overflow of the %d-col content width", w, contentW)
+	}
+
+	// At offset 0 nothing is clipped off the left: the header's first column
+	// is on screen at its natural width.
+	lines := m.render()
+	if plain := string([]rune(ansiRe.ReplaceAllString(lines[0], ""))[gutterW:]); !strings.Contains(plain, "AlphabetColumn") {
+		t.Errorf("offset 0 header = %q, want the natural-width leading column", plain)
+	}
+
+	// L scrolls right; the rendered header is now the natural header clipped
+	// at the offset — the columns did not narrow to fit.
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
+	off := m.codeScroll["^t"]
+	if off <= 0 {
+		t.Fatalf("after 'L' table scroll offset = %d, want > 0", off)
+	}
+	lines = m.render()
+	got := string([]rune(ansiRe.ReplaceAllString(lines[0], ""))[gutterW:])
+	want := ansiRe.ReplaceAllString(scrollCodeLine(natural[0], off, contentW), "")
+	if got != want {
+		t.Errorf("scrolled header = %q, want the natural header clipped at offset %d: %q", got, off, want)
+	}
+
+	// H scrolls back to the left edge.
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'H', Text: "H"}))
+	if off := m.codeScroll["^t"]; off != 0 {
+		t.Fatalf("after 'H' table scroll offset = %d, want 0", off)
 	}
 }
 
@@ -1164,9 +1189,34 @@ func TestFrontmatterIsAKeyboardFocusStop(t *testing.T) {
 	}
 }
 
-// TestFrontmatterScrollsHorizontally: l/h on a focused frontmatter block scroll
+// TestContentWidthAdaptsToTheTerminal pins the 2026-08-10 viewport-width
+// feedback's first part: contentWidth is the terminal's own width (minus the
+// gutter), not a fixed 76-column measure, so a wide terminal reads at its
+// full width instead of parking the extra columns. The floor still keeps a
+// very narrow terminal readable.
+func TestContentWidthAdaptsToTheTerminal(t *testing.T) {
+	m := newTestModel(t)
+
+	m.w = 200
+	if w := m.contentWidth(); w != 200-2*gutterW {
+		t.Fatalf("contentWidth on a 200-col terminal = %d, want %d (the full width, not the old 76 measure)", w, 200-2*gutterW)
+	}
+
+	m.w = 100
+	if w := m.contentWidth(); w != 100-2*gutterW {
+		t.Fatalf("contentWidth on a 100-col terminal = %d, want %d", w, 100-2*gutterW)
+	}
+
+	m.w = 10
+	if w := m.contentWidth(); w != minPaneCol {
+		t.Fatalf("contentWidth on a 10-col terminal = %d, want the %d-col floor", w, minPaneCol)
+	}
+}
+
+// TestFrontmatterScrollsHorizontally: H/L on a focused frontmatter block scroll
 // a long field horizontally, the code-block treatment the frontmatter feedback
-// asked for in place of the ellipsis truncation.
+// asked for in place of the ellipsis truncation (moved from l/h to H/L by the
+// 2026-08-10 viewport-width feedback).
 func TestFrontmatterScrollsHorizontally(t *testing.T) {
 	fm := block{
 		kind:   blockFrontmatter,
@@ -1182,14 +1232,14 @@ func TestFrontmatterScrollsHorizontally(t *testing.T) {
 		t.Fatalf("initial frontmatter scroll offset = %d, want 0", off)
 	}
 
-	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'l', Text: "l"}))
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
 	if off := m.codeScroll["^fm"]; off <= 0 {
-		t.Errorf("after 'l' frontmatter scroll offset = %d, want > 0", off)
+		t.Errorf("after 'L' frontmatter scroll offset = %d, want > 0", off)
 	}
 
-	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'h', Text: "h"}))
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'H', Text: "H"}))
 	if off := m.codeScroll["^fm"]; off != 0 {
-		t.Errorf("after 'h' frontmatter scroll offset = %d, want 0", off)
+		t.Errorf("after 'H' frontmatter scroll offset = %d, want 0", off)
 	}
 }
 
@@ -2080,17 +2130,20 @@ func TestScrollCodeLineANSI(t *testing.T) {
 	}
 }
 
-// TestCodeBlockHorizontalScroll verifies that l and h scroll code blocks horizontally.
+// TestCodeBlockHorizontalScroll verifies that H and L scroll code blocks
+// horizontally — the 2026-08-10 viewport-width feedback moved the binding
+// from l/h (dive/surface) to H/L so the double meaning is gone.
 func TestCodeBlockHorizontalScroll(t *testing.T) {
 	doc := []block{
 		{
-			kind:   blockCode,
+			kind: blockCode,
 			anchor: "^code1",
-			lines:  []string{"func veryLongFunctionNameThatExceedsTheMeasureWidth(ctx context.Context, req *Request) (*Response, error)"},
-			lang:   "go",
+			lines: []string{"func veryLongFunctionNameThatExceedsTheMeasureWidth(ctx context.Context, req *Request, opts *Options) (*Response, error, *Result)"},
+			lang: "go",
 		},
 	}
 	m := newModel(doc, nil)
+	m.w, m.h = 100, 60
 	m.at = cursor{entry: 0, comment: commentNone}
 	anchor := "^code1"
 
@@ -2099,16 +2152,45 @@ func TestCodeBlockHorizontalScroll(t *testing.T) {
 		t.Fatalf("initial code scroll offset = %d, want 0", off)
 	}
 
-	// 2. Press l to scroll right
-	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'l', Text: "l"}))
+	// 2. Press L to scroll right
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
 	if off := m.codeScroll[anchor]; off <= 0 {
-		t.Errorf("after 'l' press code scroll offset = %d, want > 0", off)
+		t.Errorf("after 'L' press code scroll offset = %d, want > 0", off)
 	}
 
-	// 3. Press h to scroll left back to 0
-	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'h', Text: "h"}))
+	// 3. Press H to scroll left back to 0
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'H', Text: "H"}))
 	if off := m.codeScroll[anchor]; off != 0 {
-		t.Errorf("after 'h' press code scroll offset = %d, want 0", off)
+		t.Errorf("after 'H' press code scroll offset = %d, want 0", off)
+	}
+}
+
+// TestLCodeBlockNoLongerScrolls: the flip side of the H/L re-binding — l on a
+// code block is dive now, and with no thread and no line dive to enter it is
+// a quiet no-op that leaves the code block's horizontal offset untouched.
+func TestLCodeBlockNoLongerScrolls(t *testing.T) {
+	doc := []block{
+		{
+			kind: blockCode,
+			anchor: "^code1",
+			lines: []string{"func veryLongFunctionNameThatExceedsTheMeasureWidth(ctx context.Context, req *Request, opts *Options) (*Response, error, *Result)"},
+			lang: "go",
+		},
+	}
+	m := newModel(doc, nil)
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: 0, comment: commentNone}
+	anchor := "^code1"
+	if off := m.codeScroll[anchor]; off != 0 {
+		t.Fatalf("initial code scroll offset = %d, want 0", off)
+	}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'l', Text: "l"}))
+	if off := m.codeScroll[anchor]; off != 0 {
+		t.Errorf("'l' scrolled the code block to offset %d — l must not scroll, H/L own that", off)
+	}
+	if m.status == "" {
+		t.Error("'l' on a code block with no thread left no status hint")
 	}
 }
 

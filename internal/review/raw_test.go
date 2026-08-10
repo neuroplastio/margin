@@ -157,9 +157,9 @@ func TestRawMoveAndMarksStillWork(t *testing.T) {
 	}
 }
 
-// TestRawDiveIsInert: l/h dive into threads or block lines, and scroll code
-// blocks horizontally — all meaningless against a view that already shows
-// every source line. In raw mode they do nothing.
+// TestRawDiveIsInert: l/h dive into threads or block lines, and H/L scroll
+// wide blocks horizontally — all meaningless against a view that already
+// shows every source line. In raw mode they do nothing.
 func TestRawDiveIsInert(t *testing.T) {
 	m := modelFromSource(t, sampleDoc)
 	m.toggleRaw()
@@ -171,6 +171,10 @@ func TestRawDiveIsInert(t *testing.T) {
 	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'h', Text: "h"}))
 	if m.at != at {
 		t.Fatalf("h in raw mode moved focus to %+v, want it inert", m.at)
+	}
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
+	if m.at != at {
+		t.Fatalf("L in raw mode moved focus to %+v, want it inert", m.at)
 	}
 }
 

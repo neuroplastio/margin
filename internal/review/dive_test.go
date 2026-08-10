@@ -178,6 +178,41 @@ func TestDiveKeysRouteThroughTheRegistry(t *testing.T) {
 	}
 }
 
+// TestHScrollKeysRouteThroughTheRegistry: H and L resolve to the horizontal
+// scroll commands (the 2026-08-10 viewport-width re-binding), and on a code
+// block they scroll it sideways.
+func TestHScrollKeysRouteThroughTheRegistry(t *testing.T) {
+	for key, want := range map[string]string{
+		"H": "move.hscrollLeft",
+		"L": "move.hscrollRight",
+	} {
+		if got := keymap[key]; got != want {
+			t.Errorf("keymap[%q] = %q, want %q", key, got, want)
+		}
+	}
+
+	doc := []block{
+		{
+			kind: blockCode,
+			anchor: "^code1",
+			lines: []string{"func veryLongFunctionNameThatExceedsTheMeasureWidth(ctx context.Context, req *Request, opts *Options) (*Response, error, *Result)"},
+			lang: "go",
+		},
+	}
+	m := newModel(doc, nil)
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: 0, comment: commentNone}
+
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
+	if off := m.codeScroll["^code1"]; off <= 0 {
+		t.Errorf("L on a code block scrolled to %d, want > 0", off)
+	}
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'H', Text: "H"}))
+	if off := m.codeScroll["^code1"]; off != 0 {
+		t.Errorf("H on a code block scrolled to %d, want 0", off)
+	}
+}
+
 // TestEnterEscDiveAndSurface: the 2026-08-09 feedback's "enter = dive,
 // esc = undive" bindings, end to end through handleKey. enter steps into the
 // thread's comments like l does; esc steps back out to the thread row like h;
