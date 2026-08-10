@@ -112,3 +112,23 @@ func TestPersistentExportStillPointsAtThreadFiles(t *testing.T) {
 		t.Errorf("file-backed export lost its thread-file instructions:\n%s", out)
 	}
 }
+
+// TestPersistentExportMatchesTheSkillOnReplies pins the reconciliation of the
+// agent-loop feedback: the export's instructions must not tell an agent to
+// reply by editing thread files directly while `margin skill` says to prefer
+// the CLI. The note now recommends `comment add` for replies, keeps the file
+// edit as the way to resolve (no resolve CLI exists yet), and says plainly
+// that a direct edit writes no event-log line.
+func TestPersistentExportMatchesTheSkillOnReplies(t *testing.T) {
+	path, doc, threads, marks := exportFixture()
+	out := exportReview(path, doc, threads, marks, false, false)
+	if !strings.Contains(out, "margin comment add") {
+		t.Errorf("file-backed export does not recommend the CLI for replies:\n%s", out)
+	}
+	if !strings.Contains(out, "no event-log line") {
+		t.Errorf("file-backed export does not mention the direct-edit tradeoff:\n%s", out)
+	}
+	if !strings.Contains(out, "resolved: true") {
+		t.Errorf("file-backed export lost how an agent resolves a thread:\n%s", out)
+	}
+}

@@ -1,9 +1,15 @@
 # Board
 
-Last updated: 2026-08-10 (event log lines carry the comment text)
+Last updated: 2026-08-10 (export agent instructions reconciled with margin skill)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) `margin export`'s agent-instructions note reconciled with
+  `margin skill`: the note now leads with `margin comment add` for replies
+  ("keeps the thread file and the event log in step"), keeps the file edit as
+  the way to resolve (`resolved: true` in the frontmatter — no resolve CLI yet,
+  an M2 item), and states the tradeoff a direct edit writes no event-log line;
+  the skill doc was already right and is unchanged — journal 2026-08-10.12
 - (feedback feature) `margin skill`: prints the markdown document an agent
   loads to learn how to use margin — the four CLI commands, the interactive
   review loop spelled out end to end (launch in a new terminal, poll
@@ -209,6 +215,19 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** `margin export`'s "Agent instructions" note reconciled
+      with `margin skill`: the note now opens by recommending `margin comment
+      add` for replies (the CLI "keeps the thread file and the event log in
+      step" — the skill's stance, the settled loop), keeps the thread-file edit
+      as the way to resolve a thread (`resolved: true` in the frontmatter; no
+      resolve CLI exists yet, an M2 item), and states the tradeoff: "a direct
+      file edit reaches the human (the thread watcher reloads it) but writes no
+      event-log line". The skill document already said the right thing and is
+      unchanged. Drains
+      `vault/feedback/2026-08-10-agent-loop-export-instructions-conflict.md`;
+      the file is deleted. `[felt]` — see journal 2026-08-10.12 — done
+      2026-08-10
 
 - [x] **(feedback fix)** event log lines carry the comment text: comment-level
       events in `.margin/events.log` gain a `text` field holding the comment's

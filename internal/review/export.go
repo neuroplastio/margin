@@ -41,7 +41,7 @@ func exportReview(path string, doc []block, threads map[string]*thread, marks ma
 	if ephemeral {
 		fmt.Fprintf(&b, "**Agent instructions:** this review is of piped content — nothing was saved, and there are no thread files to reply in. Address each item against the source document and report back; the quote under each header identifies the block.\n\n")
 	} else {
-		fmt.Fprintf(&b, "**Agent instructions:** to reply or resolve a thread, edit its markdown file in `.margin/threads/%s/<id>.md`. The anchor id is in parentheses in the block header. To resolve, add `resolved: true` to the frontmatter.\n\n", path)
+		fmt.Fprintf(&b, "**Agent instructions:** reply with `margin comment add FILE.md --anchor <id> --text \"...\" --author agent`, the anchor id in parentheses in the block header — the CLI keeps the thread file and the event log in step. To resolve a thread, add `resolved: true` to the frontmatter of its file in `.margin/threads/%s/<id>.md`; a direct file edit reaches the human (the thread watcher reloads it) but writes no event-log line.\n\n", path)
 	}
 
 	done, flagged, total, drafts, resolvedHidden := 0, 0, 0, 0, 0
