@@ -1,6 +1,8 @@
 package review
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -317,4 +319,184 @@ func teaKey(s string) tea.KeyPressMsg {
 		k = tea.Key{Code: 'i', Mod: uv.ModCtrl}
 	}
 	return tea.KeyPressMsg(k)
+}
+
+// treeLinkFixture is a tree whose root README links to a nested spec: a
+// relative link to the file, one carrying a #fragment that names a heading,
+// a root-relative spelling, a link to a file that does not exist, and an
+// external URL — each its own paragraph, so a test can focus the exact link
+// it wants to follow. spec.md has a "## Setup" heading for the fragment
+// links to land on.
+func treeLinkFixture(t *testing.T) (root, a, b string) {
+	t.Helper()
+	root = t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".margin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a = "README.md"
+	b = "docs/spec.md"
+	if err := os.MkdirAll(filepath.Join(root, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	readme := "# Home\n\n" +
+		"See the [spec](docs/spec.md).\n\n" +
+		"See the [setup](docs/spec.md#setup).\n\n" +
+		"See the [root](/docs/spec.md).\n\n" +
+		"See the [missing](docs/nope.md).\n\n" +
+		"See the [web](https://example.com).\n"
+	if err := os.WriteFile(filepath.Join(root, a), []byte(readme), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(b)), []byte("# Spec\n\n## Setup\n\nThe steps.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root, a, b
+}
+
+// linkTreeModel builds a tree review model over treeLinkFixture, sized and
+// rendered so jumpToEntry has spans to centre against.
+func linkTreeModel(t *testing.T) *model {
+	t.Helper()
+	root, _, _ := treeLinkFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatalf("newTreeModel: %v", err)
+	}
+	m.w, m.h = 100, 60
+	m.render()
+	return m
+}
+
+// TestFollowLinkOpensAnotherDoc: ctrl+] on a cross-document link in a tree
+// review opens the file the link names — the same fresh review openTreeFile
+// performs — landing at its top, with focus out of the pane.
+func TestFollowLinkOpensAnotherDoc(t *testing.T) {
+	root, _, b := treeLinkFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatalf("newTreeModel: %v", err)
+	}
+	m.at = cursor{entry: 1, comment: commentNone} // the "See the spec." paragraph
+	m.followLink()
+	if m.store.docPath != b {
+		t.Errorf("store.docPath = %q, want %q", m.store.docPath, b)
+	}
+	if filepath.Base(m.path) != "spec.md" {
+		t.Errorf("path = %q, want the spec", m.path)
+	}
+	if m.treeFocus {
+		t.Error("following a link left focus in the tree pane")
+	}
+	if m.at.entry != 0 {
+		t.Errorf("focus = entry %d, want the new document's first block 0", m.at.entry)
+	}
+	if !strings.Contains(m.status, b) {
+		t.Errorf("status = %q, want it to name the opened file", m.status)
+	}
+}
+
+// TestFollowLinkLandsOnFragment: a link carrying a #fragment opens the target
+// document and lands focus on the heading the fragment names, centred; the
+// jumplist restarts on the document switch, seeded at the landing so ctrl+o
+// from a later jump returns to the followed heading.
+func TestFollowLinkLandsOnFragment(t *testing.T) {
+	root, _, b := treeLinkFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatalf("newTreeModel: %v", err)
+	}
+	m.w, m.h = 100, 60
+	m.render()
+	m.at = cursor{entry: 2, comment: commentNone} // the "See the setup." paragraph
+	m.followLink()
+	if m.store.docPath != b {
+		t.Errorf("store.docPath = %q, want %q", m.store.docPath, b)
+	}
+	if m.at.entry != 1 {
+		t.Errorf("focus = entry %d, want the Setup heading entry 1", m.at.entry)
+	}
+	if !strings.Contains(m.status, "setup") {
+		t.Errorf("status = %q, want it to report the followed fragment", m.status)
+	}
+	if m.scrollAnchor != m.at {
+		t.Errorf("scrollAnchor = %+v, want the landing %+v", m.scrollAnchor, m.at)
+	}
+	if len(m.jumps) != 1 || m.jumps[0] != m.at {
+		t.Errorf("jumps = %+v, want it seeded at the landing %+v", m.jumps, m.at)
+	}
+}
+
+// TestFollowLinkRootRelative: a leading / in the href resolves against the
+// review root, not the current document's directory.
+func TestFollowLinkRootRelative(t *testing.T) {
+	m := linkTreeModel(t)
+	m.at = cursor{entry: 3, comment: commentNone} // the "/docs/spec.md" paragraph
+	m.followLink()
+	if m.store.docPath != "docs/spec.md" {
+		t.Errorf("store.docPath = %q, want docs/spec.md", m.store.docPath)
+	}
+}
+
+// TestFollowLinkMissingFile: a link naming a file that is not in the tree is
+// reported as outside the review, not opened.
+func TestFollowLinkMissingFile(t *testing.T) {
+	m := linkTreeModel(t)
+	m.at = cursor{entry: 4, comment: commentNone} // the "docs/nope.md" paragraph
+	m.followLink()
+	if m.status != "links here point outside this document" {
+		t.Errorf("status = %q, want the outside-document message", m.status)
+	}
+	if m.store.docPath != "README.md" {
+		t.Errorf("store.docPath = %q, want it unchanged", m.store.docPath)
+	}
+}
+
+// TestFollowLinkExternalStillOutsideInATree: an absolute URL is external even
+// in a tree review — followDoc refuses it before any path lookup.
+func TestFollowLinkExternalStillOutsideInATree(t *testing.T) {
+	m := linkTreeModel(t)
+	m.at = cursor{entry: 5, comment: commentNone} // the "https://example.com" paragraph
+	m.followLink()
+	if m.status != "links here point outside this document" {
+		t.Errorf("status = %q, want the outside-document message", m.status)
+	}
+	if m.store.docPath != "README.md" {
+		t.Errorf("store.docPath = %q, want it unchanged", m.store.docPath)
+	}
+}
+
+// TestFollowLinkSelfFragment: a link back at the document under review
+// resolves its fragment against it without switching documents.
+func TestFollowLinkSelfFragment(t *testing.T) {
+	m := linkTreeModel(t)
+	m.entries[1].b.text = "See [home](#home)."
+	m.at = cursor{entry: 1, comment: commentNone}
+	m.followLink()
+	if m.store.docPath != "README.md" {
+		t.Errorf("store.docPath = %q, want it unchanged", m.store.docPath)
+	}
+	if m.at.entry != 0 {
+		t.Errorf("focus = entry %d, want the Home heading entry 0", m.at.entry)
+	}
+	if !strings.Contains(m.status, "followed #home") {
+		t.Errorf("status = %q, want it to report the followed fragment", m.status)
+	}
+}
+
+// TestFollowLinkFragmentMissingInTarget: opening a cross-document link whose
+// fragment names no heading surfaces it rather than silently dropping it.
+func TestFollowLinkFragmentMissingInTarget(t *testing.T) {
+	m := linkTreeModel(t)
+	m.entries[1].b.text = "See [x](docs/spec.md#nope)."
+	m.at = cursor{entry: 1, comment: commentNone}
+	m.followLink()
+	if m.store.docPath != "docs/spec.md" {
+		t.Errorf("store.docPath = %q, want the document switched", m.store.docPath)
+	}
+	if m.at.entry != 0 {
+		t.Errorf("focus = entry %d, want the new document's first block", m.at.entry)
+	}
+	if !strings.Contains(m.status, "no heading matches #nope") {
+		t.Errorf("status = %q, want it to surface the missing fragment", m.status)
+	}
 }

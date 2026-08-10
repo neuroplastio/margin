@@ -135,16 +135,18 @@ var commands = []command{
 	},
 	{
 		// jump.follow is the M3 navigation item "link navigation between
-		// blocks": it follows the first in-document link in the focused block
-		// — a `[text](#heading-slug)` — jumping focus to that heading and
-		// recording the landing in the jumplist (jump.go). `ctrl+]` is the
+		// blocks": it follows the first navigable link in the focused block —
+		// an in-document `[text](#heading-slug)` jumping focus to that heading,
+		// or, in a tree review, a cross-document `[text](other.md)` (optionally
+		// `[text](other.md#section)`) opening the file it names — and records
+		// the in-document landings in the jumplist (jump.go). `ctrl+]` is the
 		// binding, vim's "jump to the reference under the cursor" (tag-jump),
 		// which pairs with the jumplist's `ctrl+o`/`ctrl+i` exactly the way
 		// vim's tag navigation does. Applicable requires an actual link in the
 		// block so the palette does not offer a jump that will only report
 		// "no link here".
 		ID:          "jump.follow",
-		Description: "Follow the in-document link in the focused block",
+		Description: "Follow the link in the focused block",
 		Applicable:  func(m *model) bool { return len(m.focusedLinks()) > 0 },
 		Run: func(m *model, val string) tea.Cmd {
 			m.followLink()

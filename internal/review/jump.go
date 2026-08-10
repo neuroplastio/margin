@@ -1,8 +1,11 @@
-// Jumplist and in-document link navigation (M3, navigation):
-// `jump.follow` follows the first in-document link in the focused block,
-// jumping focus to the heading it names, and the jumplist records where each
-// jump landed so `ctrl+o` / `ctrl+i` walk back and forward through the review
-// the way vim's jumplist walks a file. The roadmap names the two walk keys
+// Jumplist and link navigation (M3, navigation):
+// `jump.follow` follows the first navigable link in the focused block —
+// in-document (`[text](#heading-slug)`) jumping focus to the heading it
+// names, or, in a tree review (D10), cross-document (`[text](other.md)`,
+// `[text](other.md#section)`) switching the review to the file the link names
+// — and the jumplist records where each in-document jump landed so
+// `ctrl+o` / `ctrl+i` walk back and forward through the review the way vim's
+// jumplist walks a file. The roadmap names the two walk keys
 // (`ctrl+o` older, `ctrl+i` newer); the follow key is `ctrl+]` — vim's "jump
 // to the reference under the cursor", which is exactly the gesture a tag
 // jumplist pair belongs to — chosen over `gf`/`gx` (both `g`-prefixed, and
@@ -19,6 +22,7 @@
 package review
 
 import (
+	"path/filepath"
 	"strings"
 )
 
@@ -93,13 +97,16 @@ func (m *model) focusedLinks() []string {
 	return hrefs
 }
 
-// followLink follows the first in-document link in the focused block — one
-// whose href is a `#fragment` naming a heading — jumping focus to that
-// heading and recording the landing in the jumplist. A link to anything
-// outside the document (an external URL, a relative file) is the tree-view
-// milestone's job and is not followed here; it is reported as such, and a
-// fragment that names no heading is reported too rather than silently
-// dropped.
+// followLink follows the first navigable link in the focused block. A
+// `#fragment` link resolves against the current document's headings — jumping
+// focus to that heading and recording the landing in the jumplist (the
+// in-document half, unchanged). Any other href — a path naming another
+// document, optionally carrying a `#fragment` — is the cross-document half and
+// only exists in a tree review (D10): it opens the file the link names,
+// landing on the fragment's heading when there is one. A link to anything
+// outside the review tree (an external URL, a file not beneath the review
+// root) is reported as such, and a fragment that names no heading is reported
+// too rather than silently dropped.
 func (m *model) followLink() {
 	hrefs := m.focusedLinks()
 	if len(hrefs) == 0 {
@@ -107,20 +114,118 @@ func (m *model) followLink() {
 		return
 	}
 	for _, href := range hrefs {
-		if !strings.HasPrefix(href, "#") {
-			continue
-		}
-		target, ok := m.headingSlugs[strings.TrimPrefix(href, "#")]
-		if !ok {
-			m.status = "no heading matches " + href
+		if strings.HasPrefix(href, "#") {
+			target, ok := m.headingSlugs[strings.TrimPrefix(href, "#")]
+			if !ok {
+				m.status = "no heading matches " + href
+				return
+			}
+			m.pushJump(cursor{entry: target, comment: commentNone})
+			m.jumpToEntry(target)
+			m.status = "followed " + href + " — " + m.entries[target].b.text
 			return
+		}
+		// Cross-document: only a tree review has another document to switch
+		// to — a single-document review (`margin FILE.md`, D10) stays one
+		// document, so its outside-document report is unchanged.
+		if m.tree != nil && m.store != nil && m.followDoc(href) {
+			return
+		}
+	}
+	m.status = "links here point outside this document"
+}
+
+// followDoc follows a cross-document link: an href naming a markdown file in
+// the review tree. The path is resolved markdown's way — relative to the
+// current document's own directory (`[next](docs/spec.md)`), with a leading
+// `/` meaning relative to the review root (`[/spec](docs/spec.md)`), the two
+// spellings an agent's links actually use — and then looked up in the tree, so
+// only a file the review can open is ever opened. It switches to that file
+// exactly as openTreeFile would (fresh review: doc, threads, store and watcher
+// re-point, session state resets) and, when the href carries a `#fragment`,
+// lands on the heading it names, centred like an in-document follow. A link
+// back at the document under review resolves its fragment without switching.
+// Returns false for anything that is not a path to a markdown file in the tree
+// — an absolute URL, a `mailto:`, a file outside the review root, a
+// non-markdown file — so followLink falls through to its outside-document
+// report.
+func (m *model) followDoc(href string) bool {
+	pathPart, frag, _ := strings.Cut(href, "#")
+	if pathPart == "" {
+		return false
+	}
+	var abs string
+	switch {
+	case strings.HasPrefix(pathPart, "/"):
+		abs = filepath.Join(m.store.root, filepath.FromSlash(pathPart[1:]))
+	case strings.Contains(pathPart, "://"):
+		return false
+	default:
+		abs = filepath.Join(filepath.Dir(m.path), filepath.FromSlash(pathPart))
+	}
+	rel, err := filepath.Rel(m.store.root, abs)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	if !strings.HasSuffix(rel, ".md") && !strings.HasSuffix(rel, ".markdown") {
+		return false
+	}
+	i := -1
+	for j, e := range m.tree {
+		if !e.isDir && e.rel == rel {
+			i = j
+			break
+		}
+	}
+	if i < 0 {
+		return false
+	}
+
+	if rel == m.store.docPath {
+		// The link points back at the document under review — no switch, just
+		// resolve the fragment against it. A fragmentless self-link is a quiet
+		// no-op with a status line.
+		if frag == "" {
+			m.status = "already on " + rel
+			return true
+		}
+		target, ok := m.headingSlugs[frag]
+		if !ok {
+			m.status = "no heading matches #" + frag + " in " + rel
+			return true
 		}
 		m.pushJump(cursor{entry: target, comment: commentNone})
 		m.jumpToEntry(target)
-		m.status = "followed " + href + " — " + m.entries[target].b.text
-		return
+		m.status = "followed #" + frag + " — " + m.entries[target].b.text
+		return true
 	}
-	m.status = "links here point outside this document"
+
+	// Switching while an editor is open is refused the way openTreeFile
+	// refuses it; keep that message. Unreachable from the key (the composer
+	// owns the keyboard), but a direct call must not silently clobber it.
+	if m.comp != nil {
+		m.status = "close the editor before opening a file"
+		return true
+	}
+	m.openTreeFile(i)
+	if frag == "" {
+		// openTreeFile's own "opened <rel> — N blocks" status says it.
+		return true
+	}
+	target, ok := m.headingSlugs[frag]
+	if !ok {
+		m.status = "opened " + rel + " — no heading matches #" + frag
+		return true
+	}
+	m.jumpToEntry(target)
+	// The jumplist restarts on the document switch (openTreeFile seeds it at
+	// the new top); seed it at the actual landing so ctrl+o from a later jump
+	// walks back to the followed heading.
+	m.jumps = []cursor{m.at}
+	m.jumpIdx = 0
+	m.status = "followed " + rel + "#" + frag + " — " + m.entries[target].b.text
+	return true
 }
 
 // jumpToEntry moves focus to entry i and centres it in the viewport, the way

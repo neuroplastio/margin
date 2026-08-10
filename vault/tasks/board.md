@@ -1,11 +1,22 @@
 # Board
 
-Last updated: 2026-08-11 (directory review landed: `margin DIR/` / bare
-`margin` opens a left file-tree pane with tab focus-toggle, j/k and enter
-to open files — the first M3 tree-view item).
+Last updated: 2026-08-11 (cross-document link navigation landed: `ctrl+]` on
+a link naming another markdown file in a directory review opens it — the first
+slice of "Navigation between documents"; the comment inbox remains).
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (cross-document links) `ctrl+]` on a link naming another markdown file in a
+  directory review opens it — `[a](other.md)` or `[b](other.md#section)`, the
+  path resolved relative to the current document (`/x` = review root);
+  in-document `#fragment` links unchanged; a file outside the tree, a
+  non-markdown file or an absolute URL still reports "links here point outside
+  this document"; a link back at the current document resolves its fragment
+  without switching; a fragment naming no heading is surfaced — whether
+  following a relative link should switch documents at all vs staying, whether
+  a switched-to doc's session should reset (it does, like a pane open), whether
+  root-relative `/x` belongs, and whether single-document reviews should follow
+  too (they don't yet) — journal 2026-08-11.2
 - (directory review) `margin DIR/` / bare `margin` opens a left file-tree pane
   of the markdown files beneath the dir (dimmed dir headers for dirs with
   markdown under them, files indented); `tab` toggles focus between pane and
@@ -279,11 +290,29 @@ to open files — the first M3 tree-view item).
 
 ## In progress
 
-- Cross-document link navigation — first slice of "Navigation between
-  documents, and a cross-document comment inbox": `ctrl+]` on a link naming
-  another markdown file in the tree opens it — claimed 2026-08-11
+*(none)*
 
 ## Done
+
+- [x] **Cross-document link navigation (first slice of "Navigation between
+      documents")** — `ctrl+]` on a link naming another markdown file in a
+      directory review opens it. `jump.follow`'s non-`#` hrefs are now
+      followed, not reported as outside: the path resolves markdown's way
+      (relative to the current document's directory, or to the review root
+      when it starts with `/`), is looked up in the tree, and switches to the
+      file exactly as `openTreeFile` does — fresh review, doc/threads/store/
+      watcher re-point, session state resets, tree cursor follows — landing
+      on the `#fragment`'s heading (centred, like an in-document follow) when
+      there is one, at the top otherwise. A link back at the current document
+      resolves its fragment without switching; a fragment naming no heading is
+      surfaced; a file outside the tree, a non-markdown file and an absolute
+      URL still report "links here point outside this document". Single-
+      document reviews stay single-document (D10) — no tree to switch into.
+      Chosen: resolving against the containing file's directory (markdown's
+      own rule) plus `/` = root for root-relative links; switching via
+      `openTreeFile` so a follow and a pane open behave identically; landing
+      centred; scoped to tree reviews only. `[felt]` — see journal
+      2026-08-11.2 — done 2026-08-11
 
 - [x] **Review a directory, not just a file** — `margin DIR/` and bare `margin`
       (D10) walk the directory for markdown files and open the first one with a
@@ -405,7 +434,7 @@ pane's first build landed 2026-08-11 (journal 2026-08-11.1); its appearance,
 position, toggle and focus are on `Needs a look:` until judged.
 
 - *(Review a directory, not just a file — landed, see Done 2026-08-11.)*
-- *(Cross-document link navigation — claimed, see In progress.)*
+- *(Cross-document link navigation — landed, see Done 2026-08-11.)*
 - A cross-document comment inbox
 - Review progress across the whole tree
 

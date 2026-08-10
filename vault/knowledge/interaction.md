@@ -149,6 +149,11 @@ These have been raised but not judged. Each needs a felt leg and a review.
   toggles focus, `j`/`k` move, `enter`/`l` opens the focused file, dirs are
   dimmed headers, the open file carries a `▸` and focus a `▌`. It is **not
   settled**: those choices were the leg's best guess and need the maintainer's
-  look. What review progress looks like rolled up across a tree, and whether
-  the export covers one document or all of them, are still open.
+  look. Cross-document link following (`ctrl+]` on a link naming another file
+  in the tree opens it, journal 2026-08-11.2) is **not settled** either: the
+  switch-document-on-follow semantics, the root-relative `/x` spelling, the
+  jumplist restarting on a switch, and whether single-document reviews ever
+  follow are all the leg's best guess. What review progress looks like rolled
+  up across a tree, and whether the export covers one document or all of them,
+  are still open.
 - Whether marks and comments belong in the same gutter column.
