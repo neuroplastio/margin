@@ -193,8 +193,11 @@ var commands = []command{
 		ID:          "move.hscrollLeft",
 		Description: "Scroll horizontally left",
 		Applicable: func(m *model) bool {
+			// In raw mode H/L pan the whole source view sideways (scrollRaw) —
+			// the 2026-08-10 raw-mode-horizontal-scroll feedback. In the
+			// rendered view they scroll the focused wide block.
 			if m.raw {
-				return false
+				return true
 			}
 			switch m.focusedKind() {
 			case blockCode, blockFrontmatter, blockTable:
@@ -204,6 +207,7 @@ var commands = []command{
 		},
 		Run: func(m *model, val string) tea.Cmd {
 			if m.raw {
+				m.scrollRaw(-4)
 				return nil
 			}
 			m.scrollBlock(-4)
@@ -215,7 +219,7 @@ var commands = []command{
 		Description: "Scroll horizontally right",
 		Applicable: func(m *model) bool {
 			if m.raw {
-				return false
+				return true
 			}
 			switch m.focusedKind() {
 			case blockCode, blockFrontmatter, blockTable:
@@ -225,6 +229,7 @@ var commands = []command{
 		},
 		Run: func(m *model, val string) tea.Cmd {
 			if m.raw {
+				m.scrollRaw(4)
 				return nil
 			}
 			m.scrollBlock(4)

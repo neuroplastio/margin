@@ -204,9 +204,10 @@ func TestRawMoveAndMarksStillWork(t *testing.T) {
 	}
 }
 
-// TestRawDiveIsInert: l/h dive into threads or block lines, and H/L scroll
-// wide blocks horizontally — all meaningless against a view that already
-// shows every source line. In raw mode they do nothing.
+// TestRawDiveIsInert: l/h dive into threads or block lines — meaningless
+// against a view that already shows every source line — so in raw mode they do
+// nothing. H/L are the exception: they pan the raw view sideways (scrollRaw),
+// see TestRawHScrollPansTheSourceView.
 func TestRawDiveIsInert(t *testing.T) {
 	m := modelFromSource(t, sampleDoc)
 	m.toggleRaw()
@@ -219,9 +220,112 @@ func TestRawDiveIsInert(t *testing.T) {
 	if m.at != at {
 		t.Fatalf("h in raw mode moved focus to %+v, want it inert", m.at)
 	}
+}
+
+// TestRawHScrollPansTheSourceView: H/L in raw mode scroll the whole source view
+// horizontally (the 2026-08-10 raw-mode-horizontal-scroll feedback) — L pans
+// right, H back to the left edge, with the offset bounded by the widest source
+// line minus the content width. Unlike the rendered view's per-block offsets,
+// the raw offset is a single viewport-wide value (m.rawH), because raw mode is
+// a flat source list. Short lines clip too, so a scrolled line reads its tail
+// instead of wrapping.
+func TestRawHScrollPansTheSourceView(t *testing.T) {
+	// A 120-rune paragraph line against a 94-rune content width (100-col
+	// terminal, contentWidth = w - 2*gutterW): max scroll is 26.
+	src := "# Title\n\n" + strings.Repeat("x", 120) + "\n"
+	m := modelFromSource(t, src)
+	m.toggleRaw()
+
+	// At offset 0 the long line is clipped at the content width, not wrapped.
+	lines := m.render()
+	foundLeft := false
+	for _, l := range lines {
+		plain := string([]rune(ansiRe.ReplaceAllString(l, "")))
+		if len(plain) < gutterW {
+			continue
+		}
+		body := plain[gutterW:]
+		if body == string([]rune(strings.Repeat("x", 120))[:94]) {
+			foundLeft = true
+		}
+	}
+	if !foundLeft {
+		t.Errorf("no rendered line showed the clipped left edge; lines:\n%q", lines)
+	}
+
+	// L scrolls right 4 columns and the render shows that slice of the line.
 	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
-	if m.at != at {
-		t.Fatalf("L in raw mode moved focus to %+v, want it inert", m.at)
+	if m.rawH != 4 {
+		t.Fatalf("rawH after one L = %d, want 4", m.rawH)
+	}
+	lines = m.render()
+	foundScrolled := false
+	for _, l := range lines {
+		plain := string([]rune(ansiRe.ReplaceAllString(l, "")))
+		if len(plain) < gutterW {
+			continue
+		}
+		body := plain[gutterW:]
+		if body == string([]rune(strings.Repeat("x", 120))[4:98]) {
+			foundScrolled = true
+		}
+	}
+	if !foundScrolled {
+		t.Errorf("no rendered line showed the scrolled slice; lines:\n%q", lines)
+	}
+
+	// H returns to the left edge.
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'H', Text: "H"}))
+	if m.rawH != 0 {
+		t.Fatalf("rawH after H = %d, want 0", m.rawH)
+	}
+	if m.status != "source scrolled to left edge" {
+		t.Errorf("status after H = %q, want the left-edge message", m.status)
+	}
+
+	// A short line scrolls too — its tail, never a wrap. "# Title" at offset 4
+	// shows columns 4..6 ("tle").
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
+	lines = m.render()
+	if got := string([]rune(ansiRe.ReplaceAllString(lines[0], ""))[gutterW:]); got != "tle" {
+		t.Errorf("short line at rawH=4 = %q, want its tail \"tle\"", got)
+	}
+}
+
+// TestRawHScrollBoundsAndReset: the raw scroll offset clamps at the widest
+// line minus the content width (reaching the line's tail and no further), a
+// document that fits reports so instead of scrolling, and toggling out of raw
+// and back resets the offset so the file is shown from its left edge again.
+func TestRawHScrollBoundsAndReset(t *testing.T) {
+	src := "# Title\n\nShort.\n"
+	m := modelFromSource(t, src)
+	m.toggleRaw()
+
+	// Everything fits: L reports it, the offset stays 0.
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
+	if m.status != "raw source fits within measure" {
+		t.Errorf("status on a fitting document = %q, want the fits message", m.status)
+	}
+	if m.rawH != 0 {
+		t.Errorf("rawH on a fitting document = %d, want 0", m.rawH)
+	}
+
+	// A long line scrolls to its tail and clamps there.
+	m.src = []byte("# Title\n\n" + strings.Repeat("y", 100) + "\n")
+	m.toggleRaw() // back to rendered
+	m.toggleRaw() // into raw again: rawH reset to 0
+	if m.rawH != 0 {
+		t.Fatalf("rawH after a toggle round-trip = %d, want the reset to 0", m.rawH)
+	}
+	for i := 0; i < 10; i++ {
+		m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'L', Text: "L"}))
+	}
+	// w=100 → contentWidth 94, maxLen 100 → maxScroll 6; 10 L presses clamp at 6.
+	if m.rawH != 6 {
+		t.Errorf("rawH after 10 L presses = %d, want the clamp at 6", m.rawH)
+	}
+	if m.status != "source scrolled to col 6" {
+		t.Errorf("status at the clamp = %q, want the col 6 message", m.status)
 	}
 }
 

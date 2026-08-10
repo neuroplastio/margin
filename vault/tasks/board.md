@@ -1,9 +1,16 @@
 # Board
 
-Last updated: 2026-08-10 (raw mode horizontal scroll — in progress)
+Last updated: 2026-08-10 (raw mode horizontal scroll — done)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) raw mode horizontal scroll: `H`/`L` pan the whole raw source
+  view sideways through a single viewport-wide offset (`m.rawH`), clipped by
+  the same `scrollCodeLine` the rendered view uses on code blocks and tables
+  (every line clips at the measure once any overflows, so line length never
+  jumps); the offset clamps at the widest line minus the measure and resets to
+  0 on every `\` into raw, so the file always opens at column 0; short lines
+  read their tail, the gutter stays pinned left — journal 2026-08-10.6
 - (feedback fix) raw mode keeps code syntax colours: `\` still shows the
   source verbatim, but lines *inside* a code fence carry chroma's
   highlighting instead of plain text; the ``` fence lines and every other
@@ -141,9 +148,7 @@ Last updated: 2026-08-10 (raw mode horizontal scroll — in progress)
 
 ## In progress
 
-- (feedback feature) raw mode horizontal scroll: drains
-  `vault/feedback/2026-08-10-raw-mode-horizontal-scroll.md` — claimed 2026-08-10
-  by the /do-leg agent
+*(none)*
 
 ## Backlog — M1
 
@@ -179,6 +184,25 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** raw mode horizontal scroll: `H`/`L` pan the whole raw
+      source view sideways (the raw-mode analogue of the rendered view's
+      `scrollBlock`). `move.hscrollLeft/Right` are no longer inert while `\`
+      is on: `Run` routes to a new `scrollRaw` when `m.raw`, which shifts a
+      single viewport-wide offset `m.rawH` — one offset for the whole "the
+      file" view, not `scrollBlock`'s per-anchor map, because raw mode is a
+      flat source list and a per-block offset would leave half the screen
+      frozen — bounded between 0 and the widest source line minus the content
+      width. `renderRaw` clips every line through the same `scrollCodeLine` the
+      rendered view uses on code blocks and tables: once any line overflows the
+      measure, every line clips at it, so line lengths never jump when the
+      offset moves off 0, and a short line reads its tail rather than wrapping.
+      The gutter stays pinned left; chroma highlighting (2026-08-10.5) survives
+      the clip. `toggleRaw` resets `rawH` to 0 on entering raw, so the file
+      always opens from its left edge — a stale global offset would blank a
+      document whose lines are all shorter than it. Drains
+      `vault/feedback/2026-08-10-raw-mode-horizontal-scroll.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.6 — done 2026-08-10
 
 - [x] **(feedback fix)** raw mode keeps code syntax colours: `\` still renders
       the source verbatim, but a source line inside a fenced code block now

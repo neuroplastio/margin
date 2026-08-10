@@ -131,6 +131,16 @@ type model struct {
 	// codeScroll stores horizontal scroll offsets (in visual columns) per code block anchor.
 	codeScroll map[string]int
 
+	// rawH is the horizontal scroll offset (in visual columns) of the raw
+	// source view — H/L pan the whole "the file" view sideways, the raw-mode
+	// analogue of scrollBlock's per-block offsets in the rendered view. It is
+	// single and viewport-wide because raw mode is a flat source list: a
+	// per-block offset would leave half the screen frozen while the other
+	// half slides, which means nothing when every line is already visible.
+	// toggleRaw resets it to 0 on entering raw mode, so the file always opens
+	// from its left edge.
+	rawH int
+
 	// includeResolved controls whether exportReview (Y and --stdout alike)
 	// includes resolved threads or leaves them out per D11's export-safety
 	// rationale. False on every model a test builds; only Run threads through
@@ -1748,6 +1758,15 @@ func (m *model) renderRaw() []string {
 		srcLines = strings.Split(src, "\n")
 	}
 	lines := make([]string, len(srcLines))
+	w := m.contentWidth()
+
+	// A raw source line is never wrapped, so a long one must clip or scroll.
+	// H/L pan the whole view sideways through m.rawH (scrollRaw), the same
+	// scrollCodeLine clipping the rendered view applies to a code block or
+	// table — once any line overflows the measure, every line clips at it, so
+	// a line's length does not jump when the offset moves off 0. The gutter
+	// stays fixed on the left, focus bar and mark rule included.
+	scroll := m.rawH > 0 || hasOverflow(srcLines, w)
 
 	// codeHL holds, per entry index, the chroma-highlighted content lines of
 	// a fenced code block, so a source line inside a code block can borrow
@@ -1809,6 +1828,9 @@ func (m *model) renderRaw() []string {
 				text = hl[k]
 			}
 		}
+		if scroll {
+			text = scrollCodeLine(text, m.rawH, w)
+		}
 		if selected {
 			text = selLine(text)
 		}
@@ -1849,6 +1871,10 @@ func (m *model) toggleRaw() {
 	// render rather than holding the old offset.
 	m.scrollAnchor = cursor{entry: -1, comment: commentNone}
 	if m.raw {
+		// A fresh raw view opens from the file's left edge — a stale global
+		// offset would blank a document whose lines are all shorter than it,
+		// and "show me the file" should start at column 0.
+		m.rawH = 0
 		m.status = "raw source view — \\ toggles back"
 	} else {
 		m.status = "rendered view"
@@ -2652,6 +2678,53 @@ func (m *model) scrollBlock(delta int) {
 		m.status = "block scrolled to left edge"
 	} else {
 		m.status = fmt.Sprintf("block scrolled to col %d", next)
+	}
+}
+
+// scrollRaw shifts the horizontal scroll offset of the whole raw source view by
+// delta — the H/L horizontal scroll of the rendered view, applied to raw mode
+// (2026-08-10 raw-mode-horizontal-scroll feedback). Raw mode is a flat "the
+// file" view, so the offset is a single viewport-wide value in m.rawH rather
+// than scrollBlock's per-anchor map; it is bounded between 0 and the widest
+// source line minus the content width, so the tail of a long line is exactly
+// reachable and no further.
+func (m *model) scrollRaw(delta int) {
+	src := strings.TrimRight(string(m.src), "\n")
+	if src == "" {
+		m.status = "no source to scroll"
+		return
+	}
+	srcLines := strings.Split(src, "\n")
+	maxLen := 0
+	for _, l := range srcLines {
+		if lw := visualWidth(l); lw > maxLen {
+			maxLen = lw
+		}
+	}
+	w := m.contentWidth()
+	maxScroll := maxLen - w
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+
+	next := m.rawH + delta
+	if next < 0 {
+		next = 0
+	}
+	if next > maxScroll {
+		next = maxScroll
+	}
+
+	if m.rawH == next && delta > 0 && maxScroll == 0 {
+		m.status = "raw source fits within measure"
+		return
+	}
+
+	m.rawH = next
+	if next == 0 {
+		m.status = "source scrolled to left edge"
+	} else {
+		m.status = fmt.Sprintf("source scrolled to col %d", next)
 	}
 }
 
