@@ -1246,6 +1246,48 @@ func TestRenderTableAlignsColumnsAtNaturalWidth(t *testing.T) {
 	}
 }
 
+// TestRenderTableStylesInlineMarkupInCells pins the 2026-08-10
+// inline-code-in-tables feedback: a cell's **bold**, `code` and [links](url)
+// render styled inside the column layout — each run carries fragStyle's
+// treatment the way a paragraph's runs do — while the rows still line up,
+// because widths are measured on the stripped text and padding fills the
+// rest with plain spaces.
+func TestRenderTableStylesInlineMarkupInCells(t *testing.T) {
+	tb := &tableBlock{
+		header: []string{"Command", "Notes"},
+		rows: [][]string{
+			{"margin", "Runs `in` a **TUI**, [really](https://example.com/x)"},
+			{"ls", "plain"},
+		},
+		aligns: []tableAlign{alignLeft, alignRight},
+	}
+	out := renderTable(tb, textStyle)
+	if len(out) != 4 {
+		t.Fatalf("renderTable returned %d line(s), want 4 (header, rule, 2 rows)", len(out))
+	}
+	row := out[2]
+	for _, want := range []string{
+		codeStyle.Render("in"),
+		textStyle.Bold(true).Render("TUI"),
+		linkStyle.Render("really"),
+	} {
+		if !strings.Contains(row, want) {
+			t.Errorf("row = %q, want the cell's inline markup styled (%q)", row, want)
+		}
+	}
+	// The styled row must still line up with the others once ANSI is
+	// stripped — styling adds bytes, not columns.
+	widths := map[int]int{}
+	for i, l := range out {
+		widths[i] = len([]rune(ansiRe.ReplaceAllString(l, "")))
+	}
+	for i, w := range widths {
+		if w != widths[0] {
+			t.Errorf("line %d is %d runes wide once de-styled, want %d like every other row: %q", i, w, widths[0], out)
+		}
+	}
+}
+
 // TestTableScrollsHorizontally: a table wider than the terminal keeps its
 // natural column widths and scrolls horizontally with H/L — the code-block
 // treatment the 2026-08-10 viewport-width feedback asked for in place of

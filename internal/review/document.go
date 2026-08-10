@@ -112,11 +112,11 @@ type block struct {
 	lang string
 
 	// table holds a blockTable's parsed rows and columns, nil for every
-	// other kind. Cell text has already had RENDER-06's inline markup
-	// stripped (see cellText in parse.go) — a table cell is prose too, but
-	// styling it in place would tangle column-width math with ANSI byte
-	// counts, so this first pass renders plain text and defers colour
-	// inside cells the same way RENDER-06 deferred lists and quotes.
+	// other kind. Cell text keeps its RENDER-06 inline markup (**bold**,
+	// `code`, [links](url)) intact (see cellText in parse.go) — the renderer
+	// styles the runs in place against the column layout, measuring the
+	// stripped text for widths and padding the styled result, so a table cell
+	// reads the way a paragraph does.
 	table *tableBlock
 
 	// items holds a blockListItem's own item, wrapped in a one-element slice

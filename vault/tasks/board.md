@@ -1,10 +1,21 @@
 # Board
 
-Last updated: 2026-08-10 (j/k walk through blocks taller than the viewport,
-so a long diagram/code block/table reads instead of leaping past)
+Last updated: 2026-08-10 (inline markup renders inside table cells — a
+`| `margin` runs in a TUI |` cell now shows `margin` styled as code, bold and
+links carried through the column layout)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) table cells render their own inline markup: `` `code` ``,
+  **bold** and [links] inside a cell now carry RENDER-06's styles the way a
+  paragraph's runs do — `tableCellsFor` keeps each cell's markup (cellText
+  only trims), `tableNaturalWidths` measures the stripped text via a new
+  `cellWidth` so `` `margin` `` still measures 6, and `padCell` renders each
+  run through `fragStyle` then pads with plain spaces, so the columns line up
+  and the padding stays colourless; the dead `truncate`-to-width path is
+  dropped (a column's width is the widest cell in it) and the header row stays
+  bold while a header `` `code` `` run still renders as code — journal
+  2026-08-10.23
 - (feedback fix) `j`/`k` on a block taller than the viewport (a long mermaid
   diagram, a big code block, a huge table) no longer leap focus to the next
   block — the plain walk hopped by the whole block height, one `j` and you were
@@ -251,13 +262,23 @@ so a long diagram/code block/table reads instead of leaping past)
 
 ## In progress
 
-- **(feedback feature)** inline code (and bold/link) renders inside table
-      cells: `| `margin` runs in a TUI |` shows `margin` styled as code rather
-      than plain text, carrying RENDER-06's bold/code/link runs through the
-      column-width layout — claimed 2026-08-10 (drains
-      `vault/feedback/2026-08-10-inline-code-in-tables.md`)
+*(none)*
 
 ## Done
+
+- [x] **(feedback feature)** inline code (and bold/link) renders inside table
+      cells: a `| `margin` runs in a TUI |` cell now shows `margin` styled as
+      code instead of plain text — `tableCellsFor` keeps each cell's
+      RENDER-06 inline markup (cellText trims only, never strips), column
+      widths are measured on the stripped text (`cellWidth`), and `padCell`
+      renders the runs through the same `fragStyle` a paragraph uses then
+      pads with plain spaces, so the columns still line up and the padding
+      stays colourless; the dead `truncate`-to-width path is dropped and the
+      bold header now styles per-run so a header `` `code` `` cell still reads
+      as code. Drains
+      `vault/feedback/2026-08-10-inline-code-in-tables.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.23 — done 2026-08-10
+
 
 - [x] **(feedback fix)** `j`/`k` on a block taller than the viewport scroll the
       viewport through it a few lines at a time instead of hopping focus to the

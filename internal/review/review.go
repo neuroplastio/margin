@@ -2118,11 +2118,16 @@ func (m *model) render() []string {
 				// carries that (reviewedTxt above), and renderTable's header
 				// row builds on it with .Bold(true), the same "build on top
 				// of body" call RENDER-06 made for a paragraph's bold runs.
-				// A table wider than the terminal keeps its natural column
-				// widths and scrolls horizontally with H/L, the code-block
-				// treatment — renderTable no longer narrows columns to fit
-				// (2026-08-10 viewport-width feedback), because shaving a
-				// column hides the data the table exists to show.
+				// Cells keep their own inline markup too (2026-08-10
+				// inline-code-in-tables feedback): **bold**, `code` and
+				// [links](url) render inside a cell the way they do in a
+				// paragraph, measured and padded by visible width so the
+				// columns still line up. A table wider than the terminal
+				// keeps its natural column widths and scrolls horizontally
+				// with H/L, the code-block treatment — renderTable no longer
+				// narrows columns to fit (2026-08-10 viewport-width
+				// feedback), because shaving a column hides the data the
+				// table exists to show.
 				out = renderTable(e.b.table, body)
 				off := m.codeScroll[e.b.anchor]
 				if off > 0 || hasOverflow(out, w) {
@@ -3102,20 +3107,34 @@ func tableColumns(tb *tableBlock) int {
 
 // tableNaturalWidths is each column's content width before any narrowing —
 // the widest cell (header included) in that column, in runes rather than
-// bytes so a multi-byte cell does not read as artificially wide.
+// bytes so a multi-byte cell does not read as artificially wide. Widths are
+// measured on the cell's *visible* text (its inline markup stripped, the way
+// the renderer will show it) so a bold/code/link cell still lines up.
 func tableNaturalWidths(tb *tableBlock, cols int) []int {
 	widths := make([]int, cols)
 	for i := range widths {
-		widths[i] = len([]rune(cellAt(tb.header, i)))
+		widths[i] = cellWidth(cellAt(tb.header, i))
 	}
 	for _, row := range tb.rows {
 		for i := range widths {
-			if l := len([]rune(cellAt(row, i))); l > widths[i] {
+			if l := cellWidth(cellAt(row, i)); l > widths[i] {
 				widths[i] = l
 			}
 		}
 	}
 	return widths
+}
+
+// cellWidth is a cell's visible width — the rune count of its text once
+// parseInline strips the markup, so `margin` measures 6 whether or not it is
+// wrapped in backticks. The ANSI the styled cell will carry adds no runes, so
+// this is also the width the padded, styled cell lines up at.
+func cellWidth(raw string) int {
+	n := 0
+	for _, run := range parseInline(raw) {
+		n += len([]rune(run.text))
+	}
+	return n
 }
 
 // cellAt returns row's i'th cell, or "" past its end — the ragged-row
@@ -3136,13 +3155,22 @@ func tableAlignAt(aligns []tableAlign, i int) tableAlign {
 	return aligns[i]
 }
 
-// padCell truncates s to width (via truncate, the same rune-aware ellipsis
-// thread summaries already use) and pads it out to width according to align.
-func padCell(s string, width int, align tableAlign) string {
-	if width > 0 {
-		s = truncate(s, width)
+// padCell lays out one cell at its column's width: the cell's RENDER-06
+// inline markup is styled in place — **bold**, `code` and [links](url) render
+// through fragStyle against body, exactly as a paragraph's runs do — and the
+// result is padded out to width according to align with plain spaces, so the
+// padding itself carries no colour (which matters for alignRight and
+// alignCenter's leading spaces). The width was measured on the stripped text
+// (cellWidth), and styling adds no runes, so the padded cell is exactly as
+// wide as its plain sibling would have been — a cell never needs truncating
+// because the column's width is the widest cell in it.
+func padCell(raw string, width int, align tableAlign, body lipgloss.Style) string {
+	var sb strings.Builder
+	for _, run := range parseInline(raw) {
+		sb.WriteString(fragStyle(run, body).Render(run.text))
 	}
-	pad := width - len([]rune(s))
+	s := sb.String()
+	pad := width - cellWidth(raw)
 	if pad < 0 {
 		pad = 0
 	}
@@ -3158,13 +3186,15 @@ func padCell(s string, width int, align tableAlign) string {
 }
 
 // tableRowLine renders one row (header or body) as a single already-styled
-// line: every cell padded to its column's width and alignment, then style
-// applied per cell before joining — so the padding spaces themselves carry no
-// colour, which matters for alignRight and alignCenter's leading spaces.
+// line: every cell padded to its column's width and alignment. Each cell is
+// styled run-wise by padCell against body — the header row builds bold into
+// body so the header reads emphasised while its own **bold** runs and `code`
+// still render as themselves (fragStyle's rules) — and the join spacing
+// carries no colour.
 func tableRowLine(row []string, widths []int, aligns []tableAlign, style lipgloss.Style) string {
 	cells := make([]string, len(widths))
 	for i, width := range widths {
-		cells[i] = style.Render(padCell(cellAt(row, i), width, tableAlignAt(aligns, i)))
+		cells[i] = padCell(cellAt(row, i), width, tableAlignAt(aligns, i), style)
 	}
 	return strings.Join(cells, tableColumnSpacing)
 }

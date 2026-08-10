@@ -223,10 +223,12 @@ func TestTableExtensionKeepsRowsIntact(t *testing.T) {
 	}
 }
 
-// TestTableCellsStripInlineMarkupAndRespectAlignment pins tableFor's two other
-// jobs: a cell's own inline markup is stripped down to plain text (cellText),
-// and each column's alignment carries over from the delimiter row.
-func TestTableCellsStripInlineMarkupAndRespectAlignment(t *testing.T) {
+// TestTableCellsKeepInlineMarkupAndRespectAlignment pins tableFor's two jobs:
+// a cell's own inline markup is kept intact (cellText trims only the
+// surrounding whitespace — the renderer styles **bold**/`code`/[links] in
+// place via padCell), and each column's alignment carries over from the
+// delimiter row.
+func TestTableCellsKeepInlineMarkupAndRespectAlignment(t *testing.T) {
 	src := "| Name | Age | Notes |\n| :--- | ---: | :---: |\n| Alice | 30 | Likes **bold** things |\n"
 	blocks := parseDoc([]byte(src))
 	if len(blocks) != 1 || blocks[0].kind != blockTable {
@@ -237,8 +239,8 @@ func TestTableCellsStripInlineMarkupAndRespectAlignment(t *testing.T) {
 	if !reflect.DeepEqual(tb.aligns, wantAligns) {
 		t.Errorf("aligns = %v, want %v", tb.aligns, wantAligns)
 	}
-	if len(tb.rows) != 1 || tb.rows[0][2] != "Likes bold things" {
-		t.Errorf("row = %v, want the Notes cell markup-stripped to %q", tb.rows, "Likes bold things")
+	if len(tb.rows) != 1 || tb.rows[0][2] != "Likes **bold** things" {
+		t.Errorf("row = %v, want the Notes cell's markup kept for the renderer to style: %q", tb.rows, "Likes **bold** things")
 	}
 }
 

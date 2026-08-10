@@ -654,9 +654,11 @@ func tableFor(t *eastast.Table, src []byte) *tableBlock {
 	return tb
 }
 
-// tableCellsFor reads one table row's cells, each stripped of its inline
-// markup by cellText the same way parseInline strips a paragraph's — a table
-// cell is prose too, just prose that has to fit a column instead of wrap.
+// tableCellsFor reads one table row's cells, each trimmed of its surrounding
+// whitespace by cellText while its RENDER-06 inline markup is left intact — a
+// table cell is prose too, so **bold**, `code` and [links](url) render inside
+// it the way they do in a paragraph (cellWidth/padCell in review.go style
+// them against the column layout).
 func tableCellsFor(row ast.Node, src []byte) []string {
 	var cells []string
 	for c := row.FirstChild(); c != nil; c = c.NextSibling() {
@@ -678,16 +680,14 @@ func cellRaw(n ast.Node, src []byte) string {
 	return buf.String()
 }
 
-// cellText strips a cell's inline markup down to plain text via parseInline,
-// discarding the styling: RENDER-06's bold/code/link colours are deliberately
-// not carried into a table cell yet (see tableBlock's field comment) — this
-// first pass wants only the words a column-width layout has to fit.
+// cellText trims a cell's source text without touching its inline markup: the
+// raw **bold**/`code`/[link](url) stays in the cell string so the renderer can
+// style it against the column layout (see padCell in review.go). The width
+// math measures the stripped text while the markup is carried through —
+// stripping here would throw the styling away, and styling without stripping
+// would tangle the column-width math with ANSI byte counts.
 func cellText(raw string) string {
-	var buf strings.Builder
-	for _, run := range parseInline(raw) {
-		buf.WriteString(run.text)
-	}
-	return strings.TrimSpace(buf.String())
+	return strings.TrimSpace(raw)
 }
 
 // convertAlign maps goldmark's own alignment enum onto tableAlign, so
