@@ -304,8 +304,9 @@ in-tree for what it does not (state diagrams).
   upstream CLI's `cmd` package, D3 made the graph parse strict, D4 brought
   the graph grammar to parity with the hand-rolled renderer it replaced,
   D5 stripped ANSI from the graph output, D6 tolerates `activate`/
-  `deactivate` in sequences. The changelog is the upstreaming surface: each
-  delta is written to be re-applied to a fresh upstream snapshot.
+  `deactivate` in sequences, D7 added `pkg/state` for state diagrams. The
+  changelog is the upstreaming surface: each delta is written to be re-applied
+  to a fresh upstream snapshot.
 - **Retirement of the hand-rolled renderer.** `internal/review/mermaid.go`
   (the flowchart-only parser/layout from journal 2026-08-10.17) was **deleted
   in the leg that vendored**; the file is now a thin dispatcher into the
@@ -316,7 +317,11 @@ in-tree for what it does not (state diagrams).
 - **Fallback contract, unchanged:** any error or panic inside the vendored
   renderers degrades to the block's plain source lines. On-disk format is
   untouched.
-- **Where state diagrams attach.** The next leg adds them inside the vendored
-  copy as `pkg/state`, following the deltas' package shape (Parse + Render +
-  `Keyword`), so the extension is upstreamable. Deltas carry the changelog
-  burden; `internal/review/mermaid.go` only grows a dispatch branch.
+- **Where state diagrams attach.** Added **inside the vendored copy as
+  `pkg/state`** (delta **D7** in the vendored `CHANGELOG.md`, journal
+  2026-08-10.20), following the deltas' package shape (`Parse` + `Render` +
+  `Keyword` + `IsStateDiagram`), so the extension is upstreamable. Both
+  `stateDiagram` and `stateDiagram-v2` route there through a single new
+  dispatch branch in `internal/review/mermaid.go`; the parser is strict
+  (composite states and notes reject the whole diagram, which then falls back
+  to plain source), so the fallback contract needs no carve-out.

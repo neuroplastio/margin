@@ -1,9 +1,18 @@
 # Board
 
-Last updated: 2026-08-10 (mermaid vendoring slice 1 landed; state remains)
+Last updated: 2026-08-10 (state diagrams landed; the mermaid feedback is drained)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) `stateDiagram`/`stateDiagram-v2` fences now render as
+  state diagrams through the vendored library's new `pkg/state` (third_party
+  delta D7): each transition draws a `│ label` run and `▼` head between its
+  boxes on one centred spine, `[*]` start/end markers draw as `○`, and a
+  chain shares boxes while a branching source draws its box again per branch;
+  declarations accept `state "Long description" as Short` (referencable by id
+  or description), and anything outside the subset — composite states, notes —
+  still falls back to plain source (strict, never half-parsed) —
+  journal 2026-08-10.20
 - (feedback feature) the mermaid renderer is now the vendored
   `github.com/AlexanderGrooff/mermaid-ascii` (third_party/mermaid-ascii,
   MIT, deltas in its CHANGELOG), so ` ```mermaid ` fences render flowchart/
@@ -16,8 +25,7 @@ Last updated: 2026-08-10 (mermaid vendoring slice 1 landed; state remains)
   a long edge label on a vertical run can split across the spine
   (`over│here`), plain `---` links draw an arrowhead, and the flat output is
   re-styled run-wise (frame muted, text bright) so edge labels read bright not
-  dim; `stateDiagram-v2` still falls back to plain source (next leg) —
-  journal 2026-08-10.19
+  dim; state diagrams are the separate entry above — journal 2026-08-10.19
 - (feedback fix) hover without LMB: the gutter `▌` now lights on a bare
   pointer move — the view switched from cell-motion (1002) to any-event (1003)
   mouse tracking, so the terminal reports motion with no button held (the
@@ -233,16 +241,22 @@ Last updated: 2026-08-10 (mermaid vendoring slice 1 landed; state remains)
 
 ## In progress
 
-- (feedback feature) support mermaid `sequenceDiagram` and `stateDiagram-v2`
-  in the review. **Slice 1 landed 2026-08-10** (journal 2026-08-10.19): the
-  library is vendored at `third_party/mermaid-ascii` (MIT preserved, deltas in
-  its CHANGELOG, wired via a `replace`) and flowchart/graph, sequence and ER
-  render through it; the hand-rolled flowchart renderer is deleted. The
-  `stateDiagram-v2` half remains — the next leg adds state diagrams inside the
-  vendored copy as `pkg/state` (states, transitions, `[*]` start/end, same
-  fallback contract) and then drains
-  `vault/feedback/2026-08-10-mermaid-sequence-and-state.md` and moves this to
-  Done. Claimed 2026-08-10 by the do-leg agent.
+*(none)*
+
+## Done
+
+- [x] **(feedback feature)** support mermaid `sequenceDiagram` and
+      `stateDiagram-v2` in the review. **Slice 1 landed 2026-08-10** (journal
+      2026-08-10.19): the library is vendored at `third_party/mermaid-ascii`
+      (MIT preserved, deltas in its CHANGELOG, wired via a `replace`) and
+      flowchart/graph, sequence and ER render through it. **Slice 2 landed
+      2026-08-10** (journal 2026-08-10.20): `stateDiagram`/`stateDiagram-v2`
+      render through a new `pkg/state` inside the vendored copy (delta D7) —
+      states, transitions, `[*]` start/end, strict fallback for composite
+      states and notes. Drains
+      `vault/feedback/2026-08-10-mermaid-sequence-and-state.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.19 and 2026-08-10.20 — done
+      2026-08-10
 
 ## Backlog — M1
 

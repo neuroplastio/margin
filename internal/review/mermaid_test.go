@@ -165,12 +165,64 @@ func TestRenderMermaidER(t *testing.T) {
 	}
 }
 
+// TestRenderMermaidState: a state diagram renders its states, start/end
+// markers and transition labels.
+func TestRenderMermaidState(t *testing.T) {
+	out, ok := renderMermaid([]string{
+		"stateDiagram-v2",
+		"[*] --> Idle",
+		"Idle --> Active: power on",
+		"Active --> [*]",
+	})
+	if !ok {
+		t.Fatal("renderMermaid failed on a state diagram")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"Idle", "Active", "power on", "○", "▼"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered state diagram missing %q:\n%s", want, got)
+		}
+	}
+	for _, gone := range []string{"stateDiagram-v2", "-->"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("state source leaked into the render: %q\n%s", gone, got)
+		}
+	}
+}
+
+// TestRenderMermaidStateLegacyKeyword: the v1 `stateDiagram` spelling routes
+// through the same package.
+func TestRenderMermaidStateLegacyKeyword(t *testing.T) {
+	out, ok := renderMermaid([]string{"stateDiagram", "A --> B"})
+	if !ok {
+		t.Fatal("renderMermaid failed on a legacy state diagram")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"A", "B"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered state diagram missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestRenderMermaidStateRejectsComposite: a composite state is beyond the
+// vendored subset, so the block falls back rather than half-render.
+func TestRenderMermaidStateRejectsComposite(t *testing.T) {
+	if _, ok := renderMermaid([]string{
+		"stateDiagram-v2",
+		"state Working {",
+		"    Idle --> Busy",
+		"}",
+	}); ok {
+		t.Error("renderMermaid rendered a composite state as a diagram")
+	}
+}
+
 // TestRenderMermaidRejectsUnknownKinds: kinds the vendored library does not
-// support — state diagrams (a later leg) and class/gantt — fall back to plain
-// source rather than rendering anything.
+// support — class and gantt — fall back to plain source rather than rendering
+// anything.
 func TestRenderMermaidRejectsUnknownKinds(t *testing.T) {
 	for _, src := range [][]string{
-		{"stateDiagram-v2", "[*] --> Idle", "Idle --> [*]"},
 		{"classDiagram", "A <|-- B"},
 		{"gantt", "section One"},
 	} {
@@ -256,10 +308,10 @@ func TestMermaidSequenceBlockRendersInModel(t *testing.T) {
 // renderer does not understand shows its source lines, not chroma colours and
 // not a diagram.
 func TestMermaidUnsupportedBlockFallsBackToPlainSource(t *testing.T) {
-	src := "# Title\n\n```mermaid\nstateDiagram-v2\n    [*] --> Idle\n    Idle --> [*]\n```\n"
+	src := "# Title\n\n```mermaid\nclassDiagram\n    Animal <|-- Dog\n```\n"
 	m := modelFromSource(t, src)
 	plain := strings.Join(m.render(), "\n")
-	if !strings.Contains(plain, "stateDiagram-v2") {
+	if !strings.Contains(plain, "classDiagram") {
 		t.Error("unsupported mermaid block did not fall back to its source")
 	}
 }

@@ -7,16 +7,17 @@ import (
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/er"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/graph"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/sequence"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/state"
 )
 
 // mermaid.go renders fenced blocks whose info string is `mermaid` as ASCII
 // diagrams. The renderer is the vendored
 // github.com/AlexanderGrooff/mermaid-ascii library (third_party/mermaid-ascii,
-// MIT), which handles graph/flowchart, sequence and ER; the local deltas
-// against upstream — including the in-tree extensions — live in that copy's
-// CHANGELOG.md. This file is a thin dispatcher: pick a vendored package,
-// render, and on any failure fall back to the block's plain source lines —
-// never chroma's meaningless colours on mermaid source, and never a
+// MIT), which handles graph/flowchart, sequence, ER and — through the in-tree
+// extension delta D7 — state diagrams; the local deltas against upstream live
+// in that copy's CHANGELOG.md. This file is a thin dispatcher: pick a vendored
+// package, render, and on any failure fall back to the block's plain source
+// lines — never chroma's meaningless colours on mermaid source, and never a
 // half-parsed diagram.
 //
 // (The hand-rolled flowchart renderer that shipped in 2026-08-10.17 was
@@ -70,6 +71,16 @@ func renderMermaidDiagram(lines []string) ([]string, bool) {
 			return nil, false
 		}
 		s, err := sequence.Render(sd, cfg)
+		if err != nil {
+			return nil, false
+		}
+		return styleMermaidDiagram(splitMermaidOutput(s)), true
+	case state.IsStateDiagram(rest):
+		sd, err := state.Parse(rest)
+		if err != nil {
+			return nil, false
+		}
+		s, err := state.Render(sd, cfg)
 		if err != nil {
 			return nil, false
 		}

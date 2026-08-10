@@ -84,6 +84,24 @@ that uses activations still renders; the activation bars themselves are **not
 drawn** — that is the obvious next delta. Note in the demo recipe for
 2026-08-10.19.
 
+## D7 — new `pkg/state`: state diagrams (in-tree extension)
+
+Upstream has no state renderer, so this package is the in-tree extension the
+vendoring leg promised. `stateDiagram` and `stateDiagram-v2` parse into a
+state/transition model and render top-down on a single centred spine:
+`Parse` + `Render` + `Keyword` + `IsStateDiagram`, following D2's package
+shape. Each transition draws a `│ label` run and a `▼` head between its state
+boxes; `[*]` start/end markers draw as a `○`; consecutive transitions that
+share a state keep the box (a chain reads as one flow), while a branching
+source draws its box again per branch — the simple tradeoff for not routing
+edges. Declarations accept `state Name`, `state "Name"` and
+`state "Long description" as Short` (a transition may then reference the state
+by either id or description). The parser is strict, so anything outside the
+subset — composite states (`state X { … }`), notes — fails the whole diagram
+and the dispatcher falls back to plain source, the never-a-half-parsed
+contract. `direction` lines are skipped, not rejected. Upstreamable as a new
+library package.
+
 ## Known gaps (candidate future deltas)
 
 - **Graph node shapes render as rectangles.** D4 parses the shape families but
@@ -96,6 +114,7 @@ drawn** — that is the obvious next delta. Note in the demo recipe for
 - **Plain `---` links draw an arrowhead** — upstream draws every edge with
   `▼` regardless of the link form. Felt.
 - **Sequence activations are skipped** (D6) — bars are not drawn.
-- **No state diagrams.** `stateDiagram`/`stateDiagram-v2` is the in-tree
-  extension the next leg adds here as `pkg/state`, following D2's package
-  shape (Parse + Render + `Keyword`).
+- **State diagrams cover the transition subset only** (D7): composite states
+  (`state X { … }`) and notes (`note left of X: …`) are rejected, so a diagram
+  using them falls back to plain source; the layout draws a branch's source
+  box again per branch rather than routing edges.
