@@ -519,3 +519,30 @@ event to the directory it came from (`filepath.Dir(ev.Name)`), not to its
 suffix — a sibling `.md` in the document's directory otherwise reads as a
 thread change. Discovered building the change-notification leg (2026-08-10.15);
 see `newThreadWatcher` in `internal/review/watch.go`.
+
+## F24 — upstream mermaid-ascii's graph parser is lenient: unparseable statements render as boxes
+
+The vendored `pkg/graph` (third_party/mermaid-ascii) inherits a parser design
+that, unmodified, **turns any statement it does not understand into a node
+whose name is the whole line**. `mermaidFileToMap`'s per-line loop swallowed
+`parseString`'s error and called `parseNode(line)`, and `parseNode` fell back
+to "the whole line is the name" for anything without a trailing `[...]`. So a
+valid flowchart using a form upstream did not know — `A --- B`, `A ==> B`,
+`A -.-> B`, `A((Start))`, `direction LR`, `linkStyle`, `style`, `click` —
+drew a labelled box containing the literal source ("A --- B", "A((Start))",
+"direction LR") instead of erroring. That is the "half-parsed diagram" margin
+must never render, and it is invisible to the upstream CLI's smoke tests
+(a graph with one such box still "renders" and exits 0).
+
+The deltas that fix it for margin are D3 (strict parse — an unparseable
+statement fails the whole diagram) and D4 (grammar parity — shapes, the extra
+link forms and the skip statements above). Both live in the vendored
+`CHANGELOG.md`. The durable lesson: **a renderer whose parser cannot fail is
+unusable as a fallback source, because the fallback never triggers.** Any
+re-vendor must re-check that every real-world flowchart form either parses or
+fails the block — the CLI's green exit proves nothing.
+
+A second quirk, useful for anyone judging the diagrams: edge labels on a
+vertical run are drawn centered on the edge, so a vertical connector glyph can
+land *inside* the label ("over│here"). Upstream behaviour, flagged in the
+demo recipe, not yet a delta.

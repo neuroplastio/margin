@@ -281,3 +281,42 @@ full text is the right payload versus a digest, and whether the extra log
 growth (one copy of each comment body per event about it) is acceptable. A
 comment edited twice produces two events carrying two bodies; a listener that
 only wants notifications can ignore `text`.
+
+**D16 — The mermaid renderer is a vendored copy of
+`github.com/AlexanderGrooff/mermaid-ascii`, wired through a `replace`
+directive; in-tree extensions live inside the vendored copy as documented
+deltas.** Addresses the maintainer's 2026-08-10 mermaid-sequence-and-state
+feedback: vendor the Go project (MIT) for what it supports — flowchart/graph,
+sequence, ER — rather than maintaining a hand-rolled parser, and extend it
+in-tree for what it does not (state diagrams).
+
+- **Location and mechanics.** The snapshot lives at
+  `third_party/mermaid-ascii/` as its own module (upstream module path and
+  MIT `LICENSE` preserved), pinned at
+  `v0.0.0-20260807155423-b1b35f67d6a5` in the vendored `README.md`. The root
+  `go.mod` `replace`s the module to that directory, so imports are the
+  upstream import paths and dropping the `replace` later restores a plain
+  module dependency. A real Go `vendor/` directory (snapshotting every
+  dependency) was rejected: it would have vendored the whole module graph for
+  one library.
+- **Every local change is a numbered delta in the vendored
+  `CHANGELOG.md`** — D1 trimmed go.mod, D2 extracted `pkg/graph` from the
+  upstream CLI's `cmd` package, D3 made the graph parse strict, D4 brought
+  the graph grammar to parity with the hand-rolled renderer it replaced,
+  D5 stripped ANSI from the graph output, D6 tolerates `activate`/
+  `deactivate` in sequences. The changelog is the upstreaming surface: each
+  delta is written to be re-applied to a fresh upstream snapshot.
+- **Retirement of the hand-rolled renderer.** `internal/review/mermaid.go`
+  (the flowchart-only parser/layout from journal 2026-08-10.17) was **deleted
+  in the leg that vendored**; the file is now a thin dispatcher into the
+  vendored packages. Kept as a fallback was rejected: it would mean two
+  parsers to maintain and two shapes for the same diagram, and the fallback
+  contract (unparseable → the block's plain source, never a half-parsed
+  diagram) already covers every failure mode.
+- **Fallback contract, unchanged:** any error or panic inside the vendored
+  renderers degrades to the block's plain source lines. On-disk format is
+  untouched.
+- **Where state diagrams attach.** The next leg adds them inside the vendored
+  copy as `pkg/state`, following the deltas' package shape (Parse + Render +
+  `Keyword`), so the extension is upstreamable. Deltas carry the changelog
+  burden; `internal/review/mermaid.go` only grows a dispatch branch.

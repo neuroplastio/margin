@@ -5,214 +5,191 @@ import (
 	"testing"
 )
 
-// TestParseMermaidFlowchart covers the node and edge grammar the renderer
-// understands: shapes from their bracket family, the two label spellings, the
-// chained and `&`-joined link forms, and the plain `---` link.
-func TestParseMermaidFlowchart(t *testing.T) {
-	g, ok := parseMermaidFlowchart([]string{
-		"flowchart TD",
-		"A[Start] --> B{Decision}",
-		"B -->|Yes| C[Do it]",
-		"B -->|No| D[Skip it]",
-		"B -- try again --> C",
-		"A & B --> X[Shared]",
-		"X --- Y[Quiet]",
-		"Z",
-	})
-	if !ok {
-		t.Fatal("parseMermaidFlowchart rejected a valid flowchart")
-	}
-	if len(g.nodes) != 7 {
-		t.Fatalf("parsed %d nodes, want 7", len(g.nodes))
-	}
-	if a := g.nodes["A"]; a.text != "Start" || a.shape != "rectangle" {
-		t.Errorf("A = %+v, want text Start, rectangle", a)
-	}
-	if b := g.nodes["B"]; b.text != "Decision" || b.shape != "decision" {
-		t.Errorf("B = %+v, want text Decision, decision shape", b)
-	}
-	if c := g.nodes["C"]; c.text != "Do it" {
-		t.Errorf("C = %+v, want text Do it", c)
-	}
-	if z := g.nodes["Z"]; z.text != "Z" {
-		t.Errorf("bare Z = %+v, want text Z", z)
-	}
+// mermaid_test.go exercises the vendored mermaid renderer's dispatch
+// (internal/review/mermaid.go → third_party/mermaid-ascii): flowchart/graph,
+// sequence and ER diagrams render through the vendored packages, and anything
+// the vendored parser does not understand falls back to the block's plain
+// source lines.
 
-	if len(g.edges) != 7 {
-		t.Fatalf("parsed %d edges, want 7: %+v", len(g.edges), g.edges)
-	}
-	if e := g.edges[0]; e.from != "A" || e.to != "B" || e.arrow != true || e.label != "" {
-		t.Errorf("edge 0 = %+v, want A->B arrow", e)
-	}
-	if e := g.edges[1]; e.label != "Yes" || !e.arrow {
-		t.Errorf("edge 1 = %+v, want label Yes with arrowhead", e)
-	}
-	if e := g.edges[3]; e.from != "B" || e.to != "C" || e.label != "try again" || !e.arrow {
-		t.Errorf("edge 3 (between-label) = %+v", e)
-	}
-	if e := g.edges[4]; e.from != "A" || e.to != "X" {
-		t.Errorf("edge 4 (& join) = %+v", e)
-	}
-	if e := g.edges[6]; e.from != "X" || e.to != "Y" || e.arrow {
-		t.Errorf("edge 6 (plain ---) = %+v, want no arrowhead", e)
-	}
-}
-
-// TestParseMermaidFlowchartChains: `A --> B --> C` is two edges, not one link
-// whose label is a node.
-func TestParseMermaidFlowchartChains(t *testing.T) {
-	g, ok := parseMermaidFlowchart([]string{"graph LR", "A --> B --> C"})
-	if !ok {
-		t.Fatal("parseMermaidFlowchart rejected a chained flowchart")
-	}
-	if len(g.edges) != 2 {
-		t.Fatalf("parsed %d edges, want 2", len(g.edges))
-	}
-	if g.edges[0].to != "B" || g.edges[1].from != "B" {
-		t.Errorf("chained edges = %+v", g.edges)
-	}
-}
-
-// TestParseMermaidFlowchartSkipsBracketedDashes: a `---` inside a node's
-// label must not be read as a link token.
-func TestParseMermaidFlowchartSkipsBracketedDashes(t *testing.T) {
-	g, ok := parseMermaidFlowchart([]string{"flowchart TD", "A[1 --- 2] --> B"})
-	if !ok {
-		t.Fatal("parseMermaidFlowchart rejected a label with dashes")
-	}
-	if len(g.edges) != 1 || g.edges[0].from != "A" || g.edges[0].to != "B" {
-		t.Fatalf("edges = %+v, want the single A->B link", g.edges)
-	}
-	if a := g.nodes["A"]; a.text != "1 --- 2" {
-		t.Errorf("A text = %q, want the label verbatim", a.text)
-	}
-}
-
-// TestParseMermaidFlowchartIgnoresComments: `%%` runs to the end of the line.
-func TestParseMermaidFlowchartIgnoresComments(t *testing.T) {
-	g, ok := parseMermaidFlowchart([]string{"flowchart TD %% the header", "A --> B %% why B", "%% B --> C"})
-	if !ok {
-		t.Fatal("parseMermaidFlowchart rejected a commented flowchart")
-	}
-	if len(g.edges) != 1 {
-		t.Fatalf("parsed %d edges, want 1 (the commented edge is dropped)", len(g.edges))
-	}
-}
-
-// TestRenderMermaidChain: a straight chain renders as one vertical flow — the
-// child centred on the parent's spine, so there is no staircase of indents.
-func TestRenderMermaidChain(t *testing.T) {
-	out, ok := renderMermaid([]string{"flowchart TD", "A[Start] --> B[Step]"})
-	if !ok {
-		t.Fatal("renderMermaid failed on a chain")
-	}
-	got := strings.Join(out, "\n")
-	for _, want := range []string{"Start", "Step", "▼"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("rendered chain missing %q:\n%s", want, got)
-		}
-	}
-	// The child box starts at the same column as its parent: no staircase.
-	sx, _ := findLine(out, "Start")
-	stx, _ := findLine(out, "Step")
-	if sx != stx {
-		t.Errorf("chain not centred: parent text at col %d, child at col %d\n%s", sx, stx, got)
-	}
-}
-
-// TestRenderMermaidDecisionTree: branches carry their labels and land their
-// arrowheads on the branch target's centre.
-func TestRenderMermaidDecisionTree(t *testing.T) {
+// TestRenderMermaidFlowchart: a flowchart with shapes and the common link
+// forms renders as a diagram with the node labels, not the source.
+func TestRenderMermaidFlowchart(t *testing.T) {
 	out, ok := renderMermaid([]string{
 		"flowchart TD",
 		"A[Start] --> B{Decision}",
 		"B -->|Yes| C[Do it]",
 		"B -->|No| D[Skip it]",
+		"C --- E[Quiet]",
+		"D -.->|wander| F[Done]",
 	})
 	if !ok {
-		t.Fatal("renderMermaid failed on a decision tree")
+		t.Fatal("renderMermaid failed on a flowchart")
 	}
 	got := strings.Join(out, "\n")
-	for _, want := range []string{"Start", "Decision", "Do it", "Skip it", "◇", "Yes", "No", "▼", "├", "└"} {
+	for _, want := range []string{"Start", "Decision", "Do it", "Skip it", "Quiet", "Done", "Yes", "No", "wander"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("rendered tree missing %q:\n%s", want, got)
+			t.Errorf("rendered flowchart missing %q:\n%s", want, got)
 		}
 	}
-	// The two branches are at the same indentation, so they read as siblings.
-	dox, _ := findLine(out, "Do it")
-	skx, _ := findLine(out, "Skip it")
-	if dox != skx {
-		t.Errorf("branches misaligned: Do it at col %d, Skip it at col %d\n%s", dox, skx, got)
-	}
-}
-
-// TestRenderMermaidSharedNode: a node reached by two paths renders once, and
-// the second path draws a ↩ reference instead of a second box.
-func TestRenderMermaidSharedNode(t *testing.T) {
-	out, ok := renderMermaid([]string{
-		"flowchart TD",
-		"A --> B --> D",
-		"A --> C --> D",
-	})
-	if !ok {
-		t.Fatal("renderMermaid failed on a shared node")
-	}
-	got := strings.Join(out, "\n")
-	// "D" appears once as a box and once as a reference.
-	boxes := strings.Count(ansiRe.ReplaceAllString(got, ""), "│ D │")
-	if boxes != 1 {
-		t.Errorf("D boxed %d times, want 1:\n%s", boxes, got)
-	}
-	if !strings.Contains(got, "↩") {
-		t.Errorf("second path to D has no ↩ reference:\n%s", got)
-	}
-}
-
-// TestRenderMermaidCycleTerminates: a cycle must not recurse forever; the
-// back edge renders as a ↩ reference.
-func TestRenderMermaidCycleTerminates(t *testing.T) {
-	out, ok := renderMermaid([]string{
-		"flowchart TD",
-		"A --> B",
-		"B --> C",
-		"C --> B",
-	})
-	if !ok {
-		t.Fatal("renderMermaid failed on a cycle")
-	}
-	got := strings.Join(out, "\n")
-	for _, want := range []string{"A", "B", "C", "↩"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("rendered cycle missing %q:\n%s", want, got)
+	// The bracket families parse into labels, not into the ids: the source
+	// brackets and arrows must not leak to the screen.
+	for _, gone := range []string{"A[", "B{", "-->"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("flowchart source leaked into the render: %q\n%s", gone, got)
 		}
 	}
-	if strings.Count(ansiRe.ReplaceAllString(got, ""), "│ B │") != 1 {
-		t.Errorf("B boxed more than once under a cycle:\n%s", got)
+}
+
+// TestRenderMermaidFlowchartShapes: every bracket family parses into a node
+// whose id is the leading token and whose label is the bracket text, so an
+// edge to a shaped node matches by id.
+func TestRenderMermaidFlowchartShapes(t *testing.T) {
+	out, ok := renderMermaid([]string{
+		"graph TD",
+		"A((Start)) --> B[[Sub]]",
+		"B --> C([Rounded])",
+		"C --> D[(Database)]",
+	})
+	if !ok {
+		t.Fatal("renderMermaid failed on shaped nodes")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"Start", "Sub", "Rounded", "Database"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("shaped node label %q lost:\n%s", want, got)
+		}
+	}
+	// The id's bracket text must not read as part of the label ("Start", not
+	// "A((Start))").
+	for _, gone := range []string{"A((Start))", "B[[Sub]]", "-->"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("shape source leaked: %q\n%s", gone, got)
+		}
 	}
 }
 
-// TestRenderMermaidRejectsNonFlowchart: a sequence diagram is not a flowchart
-// the parser understands, so it must be reported as unsupported rather than
-// half-rendered.
-func TestRenderMermaidRejectsNonFlowchart(t *testing.T) {
+// TestRenderMermaidFlowchartLinkForms: the plain, thick and dotted links and
+// the `-- text -->` between-label spelling all parse into edges.
+func TestRenderMermaidFlowchartLinkForms(t *testing.T) {
+	out, ok := renderMermaid([]string{
+		"flowchart TD",
+		"A[One] --- B[Two]",
+		"B ==> C[Three]",
+		"C -.-> D[Four]",
+		"D -- over here --> E[Five]",
+		"A == heavy ==> F[Six]",
+	})
+	if !ok {
+		t.Fatal("renderMermaid failed on the extra link forms")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"One", "Two", "Three", "Four", "Five", "Six", "heavy"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("link-form render missing %q:\n%s", want, got)
+		}
+	}
+	// The between-label "over here" sits on the edge's vertical run, where the
+	// layout draws the spine glyph between the words ("over│here") — upstream's
+	// edge-label placement, judged in the demo recipe. Assert the words, not
+	// the contiguous phrase.
+	for _, want := range []string{"over", "here"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("link-form render missing between-label word %q:\n%s", want, got)
+		}
+	}
+	for _, gone := range []string{"A[One] --- B[Two]", "-->"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("link source leaked: %q\n%s", gone, got)
+		}
+	}
+}
+
+// TestRenderMermaidSequence: a sequence diagram renders its participants,
+// message labels and notes.
+func TestRenderMermaidSequence(t *testing.T) {
+	out, ok := renderMermaid([]string{
+		"sequenceDiagram",
+		"participant A as Alice",
+		"participant B as Bob",
+		"A->>B: Hello Bob",
+		"B-->>A: Hi Alice",
+		"Note over A,B: A note",
+	})
+	if !ok {
+		t.Fatal("renderMermaid failed on a sequence diagram")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"Alice", "Bob", "Hello Bob", "Hi Alice", "A note"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered sequence missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestRenderMermaidSequenceActivations: `activate`/`deactivate` lines (delta
+// D6 in the vendored copy) are tolerated so a diagram that uses activations
+// still renders; the bars themselves are not drawn.
+func TestRenderMermaidSequenceActivations(t *testing.T) {
+	out, ok := renderMermaid([]string{
+		"sequenceDiagram",
+		"A->>B: call",
+		"activate B",
+		"B-->>A: reply",
+		"deactivate B",
+	})
+	if !ok {
+		t.Fatal("renderMermaid failed on a sequence with activations")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"call", "reply"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered sequence missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestRenderMermaidER: an ER diagram renders its entities and relationships.
+func TestRenderMermaidER(t *testing.T) {
+	out, ok := renderMermaid([]string{
+		"erDiagram",
+		"CUSTOMER ||--o{ ORDER : places",
+	})
+	if !ok {
+		t.Fatal("renderMermaid failed on an ER diagram")
+	}
+	got := strings.Join(out, "\n")
+	for _, want := range []string{"CUSTOMER", "ORDER", "places"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rendered ER missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestRenderMermaidRejectsUnknownKinds: kinds the vendored library does not
+// support — state diagrams (a later leg) and class/gantt — fall back to plain
+// source rather than rendering anything.
+func TestRenderMermaidRejectsUnknownKinds(t *testing.T) {
 	for _, src := range [][]string{
-		{"sequenceDiagram", "A->>B: hello"},
+		{"stateDiagram-v2", "[*] --> Idle", "Idle --> [*]"},
 		{"classDiagram", "A <|-- B"},
 		{"gantt", "section One"},
 	} {
 		if _, ok := renderMermaid(src); ok {
-			t.Errorf("renderMermaid(%q) rendered a non-flowchart as a diagram", src[0])
+			t.Errorf("renderMermaid(%q) rendered an unsupported kind as a diagram", src[0])
 		}
 	}
 }
 
-// TestRenderMermaidFallsBackOnGarbage: a malformed statement makes the whole
-// block unsupported, so nothing wrong reaches the screen.
+// TestRenderMermaidFallsBackOnGarbage: a statement no vendored parser
+// understands makes the whole block unsupported, so nothing wrong reaches the
+// screen — the "never a half-parsed diagram" guarantee.
 func TestRenderMermaidFallsBackOnGarbage(t *testing.T) {
 	for _, src := range [][]string{
 		{"flowchart TD", "A[Start] --> ??? B"},
-		{"flowchart TD", "A -->"},  // dangling link
-		{"flowchart TD", "A -- B"}, // bare head with no arrow
+		{"flowchart TD", "A -->"},          // dangling link
+		{"flowchart TD", "A -- B"},         // bare head with no arrow
+		{"flowchart TD", "this is not @@"}, // garbage node line
+		{"sequenceDiagram", "A->>B: hi", "bogus line without an arrow"},
 		{"not a header", "A --> B"},
 	} {
 		if _, ok := renderMermaid(src); ok {
@@ -221,19 +198,21 @@ func TestRenderMermaidFallsBackOnGarbage(t *testing.T) {
 	}
 }
 
-// TestRenderMermaidLabelsNeverTruncate: a label longer than the connector run
-// gets its own row above the arrowhead, so a branch's wording is never lost.
-func TestRenderMermaidLabelsNeverTruncate(t *testing.T) {
-	out, ok := renderMermaid([]string{"flowchart TD", "A --> B{Choice}", "B -->|a label longer than the run| C"})
+// TestMermaidDiagramStyled: box-drawing glyphs carry the muted frame colour
+// and content text the bright colour, so a diagram reads against the prose
+// the way the hand-rolled renderer's did.
+func TestMermaidDiagramStyled(t *testing.T) {
+	out, ok := renderMermaid([]string{"flowchart TD", "A[Start] --> B[Step]"})
 	if !ok {
-		t.Fatal("renderMermaid failed on a long label")
+		t.Fatal("renderMermaid failed on a chain")
 	}
-	got := strings.Join(out, "\n")
-	if !strings.Contains(got, "a label longer than the run") {
-		t.Errorf("long label was lost:\n%s", got)
+	joined := strings.Join(out, "\n")
+	if !strings.Contains(joined, mermaidBorder.Render("│")) {
+		t.Errorf("no border run carries the frame style:\n%s", joined)
 	}
-	if !strings.Contains(got, "▼") {
-		t.Errorf("arrowhead lost to the label:\n%s", got)
+	// The node text run is " Start " (box-padded), not "Start".
+	if !strings.Contains(joined, mermaidText.Render(" Start ")) {
+		t.Errorf("node text does not carry the text style:\n%s", joined)
 	}
 }
 
@@ -255,14 +234,32 @@ func TestMermaidBlockRendersInModel(t *testing.T) {
 	}
 }
 
+// TestMermaidSequenceBlockRendersInModel: a sequence fence renders through the
+// model too.
+func TestMermaidSequenceBlockRendersInModel(t *testing.T) {
+	src := "# Title\n\n```mermaid\nsequenceDiagram\n    participant A as Alice\n    participant B as Bob\n    A->>B: Hello Bob\n```\n"
+	m := modelFromSource(t, src)
+	plain := strings.Join(m.render(), "\n")
+	for _, want := range []string{"Alice", "Bob", "Hello Bob"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("rendered document missing sequence %q", want)
+		}
+	}
+	for _, gone := range []string{"sequenceDiagram", "-->>"} {
+		if strings.Contains(plain, gone) {
+			t.Errorf("sequence source leaked to the screen: %q", gone)
+		}
+	}
+}
+
 // TestMermaidUnsupportedBlockFallsBackToPlainSource: a mermaid block the
 // renderer does not understand shows its source lines, not chroma colours and
 // not a diagram.
 func TestMermaidUnsupportedBlockFallsBackToPlainSource(t *testing.T) {
-	src := "# Title\n\n```mermaid\nsequenceDiagram\n    A->>B: hello\n```\n"
+	src := "# Title\n\n```mermaid\nstateDiagram-v2\n    [*] --> Idle\n    Idle --> [*]\n```\n"
 	m := modelFromSource(t, src)
 	plain := strings.Join(m.render(), "\n")
-	if !strings.Contains(plain, "sequenceDiagram") {
+	if !strings.Contains(plain, "stateDiagram-v2") {
 		t.Error("unsupported mermaid block did not fall back to its source")
 	}
 }
@@ -284,16 +281,4 @@ func TestMermaidRawModeKeepsSourceVerbatim(t *testing.T) {
 	if !found {
 		t.Error("raw mode lost the mermaid source line")
 	}
-}
-
-// findLine returns the visual column and row of the first line containing
-// needle, with styling stripped so multi-byte glyphs are counted as one column.
-func findLine(lines []string, needle string) (col, row int) {
-	for i, l := range lines {
-		plain := ansiRe.ReplaceAllString(l, "")
-		if j := strings.Index(plain, needle); j >= 0 {
-			return len([]rune(plain[:j])), i
-		}
-	}
-	return -1, -1
 }
