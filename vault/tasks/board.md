@@ -1,9 +1,17 @@
 # Board
 
-Last updated: 2026-08-10 (comments markdown formatting claimed)
+Last updated: 2026-08-10 (comments markdown formatting)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback feature) comments render markdown: each source line of a comment
+  body stays its own rendered line (a line break the reviewer pressed is a
+  break they meant — no more run-on paragraphs), a blank line is a paragraph
+  break, and **bold**/`code`/links render via the document's RENDER-06
+  inline styling; applied to posted bodies, unsaved edits, deleted bodies and
+  the new-comment draft preview alike, and the collapsed thread's gutter
+  summary strips the markup too; deliberately no fenced code blocks and no
+  composer-side hint — journal 2026-08-10.16
 - (feedback feature) the reviewer is told when the document changes or a new
   comment lands: the document file is watched (its directory, not the file —
   temp-rename editors survive, F23) and a change raises a persistent
@@ -195,11 +203,7 @@ Last updated: 2026-08-10 (comments markdown formatting claimed)
 
 ## In progress
 
-- (feedback feature) comments render markdown formatting — line breaks and
-  paragraph breaks preserved, inline markup (`**bold**`, `` `code` ``,
-  `[links](...)`) the way the document renders it — drains
-  `vault/feedback/2026-08-10-comments-markdown-formatting.md`. Claimed
-  2026-08-10 by the do-leg agent.
+*(none)*
 
 ## Backlog — M1
 
@@ -244,6 +248,19 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback feature)** comments render markdown formatting: a comment
+      body no longer collapses into a run-on paragraph — `wrapComment`
+      (review.go) keeps each source line its own rendered line, a blank line
+      becomes a paragraph break, and **bold**/`` `code` ``/`[links]` render
+      via `wrapInline`, the RENDER-06 treatment the document's paragraphs
+      already have; applied to posted bodies, unsaved-edit drafts, deleted
+      bodies and the new-comment draft preview, and the collapsed thread's
+      `summary` strips the markup too (`plainMarkdown`), so the gutter never
+      shows literal `**`. Chosen: line breaks + inline markup, no fenced
+      blocks, no composer-side hint. Drains
+      `vault/feedback/2026-08-10-comments-markdown-formatting.md`; the file
+      is deleted. `[felt]` — see journal 2026-08-10.16 — done 2026-08-10
 
 - [x] **(feedback feature)** visually notify the reviewer when the document
       changes on disk or a new comment lands. The document file is now

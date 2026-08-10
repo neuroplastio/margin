@@ -441,10 +441,10 @@ func (t *thread) pendingEdit() int {
 // line the reviewer can still expand to inspect with showDeleted on.
 func (t *thread) summary(showDeleted bool) string {
 	if d := t.draft(newCommentSlot); d != "" {
-		return "✎ draft · " + truncate(firstLine(d), 54)
+		return "✎ draft · " + truncate(plainMarkdown(firstLine(d)), 54)
 	}
 	if i := t.pendingEdit(); i >= 0 {
-		return "✎ editing · " + truncate(firstLine(t.draft(i)), 52)
+		return "✎ editing · " + truncate(plainMarkdown(firstLine(t.draft(i))), 52)
 	}
 	first := -1
 	visible := 0
@@ -465,7 +465,7 @@ func (t *thread) summary(showDeleted bool) string {
 	if c.deleted {
 		body = "[deleted]"
 	}
-	s := c.author + " · " + truncate(firstLine(body), 52)
+	s := c.author + " · " + truncate(plainMarkdown(firstLine(body)), 52)
 	if n := visible - 1; n > 0 {
 		s += fmt.Sprintf("  (+%d)", n)
 	}

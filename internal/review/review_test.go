@@ -1012,6 +1012,126 @@ func TestWrapInlineStripsMarkupAndWraps(t *testing.T) {
 	}
 }
 
+// TestPlainMarkdownStripsInlineMarkup pins plainMarkdown: an excerpt of a
+// comment's body must show its text, not its markup — the collapsed thread's
+// summary would otherwise read "**store**" instead of "store".
+func TestPlainMarkdownStripsInlineMarkup(t *testing.T) {
+	got := plainMarkdown("The **store** has `care` via [the runbook](https://x/).")
+	want := "The store has care via the runbook."
+	if got != want {
+		t.Errorf("plainMarkdown = %q, want %q", got, want)
+	}
+}
+
+// TestWrapCommentKeepsLineBreaksAndParagraphs pins the
+// comments-markdown-formatting shape at the wrapper level: each source line
+// stays its own rendered line, a blank source line becomes a blank rendered
+// line (a paragraph break), and a long line still wraps to the measure — a
+// comment must never collapse into one run-on paragraph again.
+func TestWrapCommentKeepsLineBreaksAndParagraphs(t *testing.T) {
+	out := wrapComment("one\ntwo\n\nthree four five six seven eight", 20, textStyle)
+	if len(out) != 5 {
+		t.Fatalf("wrapComment returned %d lines, want 5 (one, two, blank, wrapped paragraph): %v", len(out), out)
+	}
+	for i, want := range []string{"one", "two"} {
+		if got := ansiRe.ReplaceAllString(out[i], ""); got != want {
+			t.Errorf("line %d = %q, want %q", i, got, want)
+		}
+	}
+	if out[2] != "" {
+		t.Errorf("line 2 = %q, want a blank paragraph break", out[2])
+	}
+	if got := ansiRe.ReplaceAllString(strings.Join(out[3:], " "), ""); got != "three four five six seven eight" {
+		t.Errorf("paragraph 2 = %q, want every word kept across the wrap", got)
+	}
+	for _, l := range out[3:] {
+		if width := len(ansiRe.ReplaceAllString(l, "")); width > 20 {
+			t.Errorf("line %q is %d columns wide, wider than the measure 20", l, width)
+		}
+	}
+}
+
+// TestWrapCommentRendersInlineMarkup pins that a comment body's inline markup
+// reaches the screen styled, never as literal ** and ` characters — the same
+// RENDER-06 treatment the document's paragraphs already have.
+func TestWrapCommentRendersInlineMarkup(t *testing.T) {
+	out := wrapComment("The **store** needs `care` — see the [runbook](https://x/).", 40, textStyle)
+	joined := ansiRe.ReplaceAllString(strings.Join(out, " "), "")
+	for _, marker := range []string{"**", "`", "](", "https://x/"} {
+		if strings.Contains(joined, marker) {
+			t.Errorf("raw markup %q survived into a comment body: %q", marker, joined)
+		}
+	}
+	for _, word := range []string{"store", "care", "runbook"} {
+		if !strings.Contains(joined, word) {
+			t.Errorf("word %q went missing from a comment body: %q", word, joined)
+		}
+	}
+	if !ansiRe.MatchString(strings.Join(out, " ")) {
+		t.Errorf("comment body carries no ANSI styling, want bold/code/link colours")
+	}
+}
+
+// TestCollapsedSummaryStripsMarkup pins that a collapsed thread's one-line
+// excerpt shows a comment's text, not its raw markup — a comment that opens
+// with **bold** must not read "**bold**" in the gutter while the expanded
+// thread renders it styled.
+func TestCollapsedSummaryStripsMarkup(t *testing.T) {
+	th := &thread{
+		anchor: "^x",
+		posted: []comment{{author: "toly", body: "**Ship it** — no blockers.", at: time.Now()}},
+	}
+	got := th.summary(false)
+	if strings.Contains(got, "**") {
+		t.Errorf("collapsed summary %q carries raw bold markup", got)
+	}
+	if !strings.Contains(got, "Ship it") {
+		t.Errorf("collapsed summary %q lost the comment text", got)
+	}
+	th.setDraft(newCommentSlot, "See `code` in the draft")
+	got = th.summary(false)
+	if strings.Contains(got, "`") {
+		t.Errorf("collapsed draft summary %q carries raw code markup", got)
+	}
+	if !strings.Contains(got, "code in the draft") {
+		t.Errorf("collapsed draft summary %q lost the draft text", got)
+	}
+}
+
+// TestAppendCommentsRendersMarkdownAndKeepsLineBreaks pins the
+// comments-markdown-formatting change at the thread-rendering level: a
+// comment body with a paragraph break renders as two separated lines rather
+// than one run-on paragraph, and its **bold** / `code` markup reaches the
+// screen styled, not literally.
+func TestAppendCommentsRendersMarkdownAndKeepsLineBreaks(t *testing.T) {
+	m := seedModel()
+	m.subspans = make(map[cursor]span)
+	i := entryFor(t, m, convoAnchor)
+	thr := m.threads[convoAnchor]
+	thr.posted[0].body = "First **bold** line.\n\nSecond line with `code`."
+	w := 80
+
+	lines := m.appendComments(nil, i, thr, w, 0, 0)
+	if len(lines) < 4 {
+		t.Fatalf("appendComments returned %d lines, want at least 4 (head, paragraph 1, blank, paragraph 2): %q", len(lines), lines)
+	}
+	joined := ansiRe.ReplaceAllString(strings.Join(lines, " "), "")
+	for _, marker := range []string{"**", "`"} {
+		if strings.Contains(joined, marker) {
+			t.Errorf("raw markup %q survived into a comment body: %q", marker, joined)
+		}
+	}
+	if !strings.Contains(ansiRe.ReplaceAllString(lines[1], ""), "First bold line.") {
+		t.Errorf("paragraph 1 = %q, want \"First bold line.\" on its own line", lines[1])
+	}
+	if strings.TrimSpace(ansiRe.ReplaceAllString(lines[2], "")) != "" {
+		t.Errorf("line between paragraphs = %q, want a blank paragraph break", lines[2])
+	}
+	if !strings.Contains(ansiRe.ReplaceAllString(lines[3], ""), "Second line with") {
+		t.Errorf("paragraph 2 = %q, want \"Second line with code.\"", lines[3])
+	}
+}
+
 // TestHighlightCodeAppliesColourForARecognisedLanguage is the render-level
 // regression test for RENDER-02: a fenced code block whose language chroma
 // recognises must come back styled — some ANSI escape on at least one
@@ -2146,7 +2266,7 @@ func TestThreadCommentFocusHighlightsBodyText(t *testing.T) {
 	if !strings.HasPrefix(linesFocused[1], focusStyle.Render("▌ ")) {
 		t.Errorf("body text line %q does not start with focus bar", linesFocused[1])
 	}
-	if !strings.Contains(linesFocused[1], "Shouldn't be global") {
+	if !strings.Contains(ansiRe.ReplaceAllString(linesFocused[1], ""), "Shouldn't be global") {
 		t.Errorf("body text line %q does not contain comment text", linesFocused[1])
 	}
 

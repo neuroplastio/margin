@@ -2156,28 +2156,28 @@ func (m *model) appendComments(body []string, i int, t *thread, w, base, off int
 		}
 
 		if d := t.draft(j); d != "" {
-			for _, l := range wrap(d, w-6) {
-				if focused {
-					body = append(body, bodyPrefix+focusStyle.Render(l))
-				} else {
-					body = append(body, bodyPrefix+l)
-				}
+			base := lipgloss.Style{}
+			if focused {
+				base = focusStyle
+			}
+			for _, l := range wrapComment(d, w-6, base) {
+				body = append(body, bodyPrefix+l)
 			}
 		} else if c.deleted {
 			bodyText := c.body
 			if bodyText == "" {
 				bodyText = "[deleted]"
 			}
-			for _, l := range wrap(bodyText, w-6) {
-				body = append(body, bodyPrefix+dimStyle.Render(l))
+			for _, l := range wrapComment(bodyText, w-6, dimStyle) {
+				body = append(body, bodyPrefix+l)
 			}
 		} else {
-			for _, l := range wrap(c.body, w-6) {
-				if focused {
-					body = append(body, bodyPrefix+focusStyle.Render(l))
-				} else {
-					body = append(body, bodyPrefix+l)
-				}
+			base := lipgloss.Style{}
+			if focused {
+				base = focusStyle
+			}
+			for _, l := range wrapComment(c.body, w-6, base) {
+				body = append(body, bodyPrefix+l)
 			}
 		}
 
@@ -2285,7 +2285,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 			body = append(body, "")
 		}
 		body = append(body, "  "+draftStyle.Render("draft · unsubmitted"))
-		for _, l := range wrap(d, w-6) {
+		for _, l := range wrapComment(d, w-6, lipgloss.Style{}) {
 			body = append(body, "  "+l)
 		}
 	}
@@ -2659,6 +2659,43 @@ func wrapQuote(lines []string, w int, body lipgloss.Style) []string {
 		return []string{""}
 	}
 	return out
+}
+
+// wrapComment lays out a comment body as the reviewer's note rather than a
+// reflowed paragraph: each source line wraps to w through wrapInline — so
+// **bold**, `code` and [links](url) render the way they do in the document's
+// paragraphs (RENDER-06) — and a blank source line becomes a blank rendered
+// line, a paragraph break. It deliberately does NOT fold a multi-line body
+// into one paragraph the way collapse()+wrap() treat document prose: a
+// comment is typed in a textarea, so a line break the reviewer pressed is a
+// break they meant, and folding it into spaces is exactly the "multi-line
+// comment reads as one run-on paragraph" failure this replaces
+// (2026-08-10 comments-markdown-formatting feedback). body is the base style
+// plain runs build on (focusStyle while the comment is focused, dimStyle for
+// a deleted comment, empty otherwise).
+func wrapComment(s string, w int, body lipgloss.Style) []string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) == "" {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, wrapInline(line, w, body)...)
+	}
+	return out
+}
+
+// plainMarkdown strips RENDER-06's three inline forms — **bold**, `code`,
+// [text](url) — from a string, leaving the plain text behind. Used where a
+// comment's text appears as a plain excerpt (the collapsed thread's
+// summary), where the markup would otherwise reach the screen as literal **
+// and ` characters.
+func plainMarkdown(s string) string {
+	var sb strings.Builder
+	for _, r := range parseInline(s) {
+		sb.WriteString(r.text)
+	}
+	return sb.String()
 }
 
 // codeStyleName is the chroma style highlightCode renders with — a dark,
