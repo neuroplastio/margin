@@ -1749,6 +1749,20 @@ func (m *model) renderRaw() []string {
 	}
 	lines := make([]string, len(srcLines))
 
+	// codeHL holds, per entry index, the chroma-highlighted content lines of
+	// a fenced code block, so a source line inside a code block can borrow
+	// its syntax colours — raw mode is a verbatim view, but the colours are
+	// part of what the rendered view communicates (2026-08-10 raw-mode-colors
+	// feedback). The fence lines themselves stay plain source; only the code
+	// between them is styled. Computed once per render, shared by every line
+	// of the block.
+	codeHL := map[int][]string{}
+	for i, e := range m.entries {
+		if e.b.kind == blockCode && len(e.b.lines) > 0 {
+			codeHL[i] = highlightCode(e.b.lines, e.b.lang)
+		}
+	}
+
 	// owner maps a source line to the entry whose block covers it, or -1 for
 	// a line no block claims (a blank separator, say). Each entry's span is
 	// its source-line range, so hit-testing and focus-following scroll work
@@ -1786,6 +1800,15 @@ func (m *model) renderRaw() []string {
 			}
 		}
 		text := raw
+		if hl, ok := codeHL[ei]; ok {
+			// A code block's source line n maps to content line n - b.line:
+			// b.line is the fence-open line (1-based), so the first content
+			// line is 0-based b.line, the second b.line+1, and so on. The
+			// fence lines themselves fall outside hl's range and stay plain.
+			if k := li - m.entries[ei].b.line; k >= 0 && k < len(hl) {
+				text = hl[k]
+			}
+		}
 		if selected {
 			text = selLine(text)
 		}

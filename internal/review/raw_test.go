@@ -76,6 +76,53 @@ func TestRawRendersSourceVerbatim(t *testing.T) {
 	}
 }
 
+// TestRawCodeBlockKeepsSyntaxColors: the raw view stays verbatim, but the
+// source lines *inside* a fenced code block borrow chroma's syntax
+// highlighting — the colours are part of what the rendered view communicates
+// (2026-08-10 raw-mode-colors feedback), so switching to raw should not
+// throw them away. The fence lines themselves stay plain source, and a
+// paragraph line is untouched.
+func TestRawCodeBlockKeepsSyntaxColors(t *testing.T) {
+	src := "# Title\n\nParagraph.\n\n" + "```go\n" +
+		"func retry(n int) error {\n    return nil\n}\n" +
+		"```\n"
+	m := modelFromSource(t, src)
+	m.toggleRaw()
+
+	lines := m.render()
+	var fence, code, para string
+	for _, l := range lines {
+		plain := string([]rune(ansiRe.ReplaceAllString(l, ""))[gutterW:])
+		switch {
+		case strings.HasPrefix(plain, "```"):
+			fence = l
+		case strings.Contains(plain, "func retry"):
+			code = l
+		case strings.HasPrefix(plain, "Paragraph."):
+			para = l
+		}
+	}
+	if code == "" || fence == "" || para == "" {
+		t.Fatalf("render missing expected lines: code=%q fence=%q para=%q", code, fence, para)
+	}
+	// The code content line carries chroma's colours; the fences and a plain
+	// paragraph line do not.
+	if !strings.Contains(code, "\x1b[") {
+		t.Error("code line lost its syntax colours in raw mode")
+	}
+	if strings.Contains(fence, "\x1b[") {
+		t.Error("fence line picked up styling; fences are plain source")
+	}
+	if strings.Contains(para, "\x1b[") {
+		t.Error("paragraph line picked up styling; raw mode stays verbatim")
+	}
+	// And the visible text is still the source, colours notwithstanding.
+	plain := string([]rune(ansiRe.ReplaceAllString(code, ""))[gutterW:])
+	if plain != "func retry(n int) error {" {
+		t.Errorf("code line text = %q, want the verbatim source line", plain)
+	}
+}
+
 // TestRawFocusAndScrollSurviveTheSwitch: toggling away and back keeps focus on
 // the same block — by anchor, since the entry list shifts (threads drop out of
 // the raw view) — and the scroll anchor is reset so the viewport re-anchors to

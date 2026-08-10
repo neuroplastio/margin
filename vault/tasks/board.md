@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-08-10 (command palette key bindings — done)
+Last updated: 2026-08-10 (raw mode keeps code colours — done)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) raw mode keeps code syntax colours: `\` still shows the
+  source verbatim, but lines *inside* a code fence carry chroma's
+  highlighting instead of plain text; the ``` fence lines and every other
+  block type stay uncoloured, and an empty fence stays plain — journal
+  2026-08-10.5
 - (feedback fix) command palette shows key bindings: `:` now right-aligns each
   command's first registered binding on its row (`j` beside "Move focus down",
   `space` beside "Cycle", `l` for dive — first-written wins, so primary keys
@@ -172,6 +177,21 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** raw mode keeps code syntax colours: `\` still renders
+      the source verbatim, but a source line inside a fenced code block now
+      borrows chroma's syntax highlighting (`renderRaw` pre-computes
+      `highlightCode` per code entry and maps content lines by
+      `li - b.line`) instead of dumping plain text — the palette the rendered
+      view already communicates is not thrown away on the raw switch. The
+      ``` fence lines stay plain source, and an empty fence is skipped so its
+      closing ``` cannot map into a bogus highlight; paragraphs, headings and
+      lists remain byte-verbatim, because raw mode exists to show the exact
+      bytes and chroma is the one colour that *is* the content. `selLine` and
+      `applySearch` already handle ANSI lines, so selection and search work on
+      the highlighted lines unchanged. Drains
+      `vault/feedback/2026-08-10-raw-mode-colors.md`; the file is deleted.
+      `[felt]` — see journal 2026-08-10.5 — done 2026-08-10
 
 - [x] **(feedback fix)** command palette shows registered key binding: the
       palette (`:`) right-aligns each command's first registered key binding on
