@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (viewport width and horizontal scroll — done)
+Last updated: 2026-08-10 (command palette key bindings — claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -130,7 +130,10 @@ Last updated: 2026-08-10 (viewport width and horizontal scroll — done)
 
 ## In progress
 
-*(none)*
+- **(feedback fix)** command palette shows registered key binding: each palette
+      row displays the command's first registered key binding (per keymap
+      order), one per command; commands with several bindings show the first —
+      drains `vault/feedback/2026-08-10-command-palette-key-binding.md`
 
 ## Backlog — M1
 
