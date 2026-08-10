@@ -181,6 +181,7 @@ margin --version
 
 ```
 ./bin/margin testdata/sample.md    # a realistic document to try it against
+./bin/margin testdata/mermaid.md   # a document exercising every mermaid diagram kind
 ```
 
 ```
