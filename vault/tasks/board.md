@@ -303,7 +303,10 @@ tree, newest first, `enter` jumping to the thread's document and block).
 
 ## In progress
 
-*(none)*
+- [ ] **Review progress across the whole tree** — claimed by the 2026-08-11
+      tree-progress leg: marks carried per-document across switches, per-file
+      progress in the pane, a tree-wide roll-up in the footer.
+      *In progress, 2026-08-11.*
 
 ## Done
 
