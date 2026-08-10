@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (mermaid diagrams)
+Last updated: 2026-08-10 (hover-without-lmb claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -214,7 +214,11 @@ Last updated: 2026-08-10 (mermaid diagrams)
 
 ## In progress
 
-*(none)*
+- (feedback fix) hover works without a button held: the gutter hover `▌`
+  only lit while dragging because the view requested cell-motion mouse mode
+  (1002), so the terminal never reported bare pointer moves. Drains
+  `vault/feedback/2026-08-10-hover-without-lmb.md`. Claimed 2026-08-10 by the
+  do-leg agent.
 
 ## Backlog — M1
 
