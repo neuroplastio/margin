@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (raw mode horizontal scroll — done)
+Last updated: 2026-08-10 (Q-0003 raised — comment identity for the agent-polling wait command)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -175,7 +175,12 @@ document, regardless of the order the tree-view work itself lands in.
 
 ## Blocked
 
-*(nothing)*
+- **Q-0003** (comment identity for `margin comments wait --since`) — raised
+  2026-08-10. Blocks the interactive-agent-review feature in
+  `vault/feedback/2026-08-10-interactive-agent-review.md`: whether `--since`
+  names the comment's timestamp or a new id field is a thread-file format
+  decision (on-disk format, the expensive-to-unwind class). The feedback file
+  stays until the question is answered and the feature lands.
 
 Q-0001 and Q-0002 were answered 2026-08-07 and folded into
 `knowledge/decisions.md` as **D10** (tree review) and **D11** (thread
