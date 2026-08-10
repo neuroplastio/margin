@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (margin skill command: the agent skill document)
+Last updated: 2026-08-10 (event log lines carry the comment text)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -164,7 +164,12 @@ Last updated: 2026-08-10 (margin skill command: the agent skill document)
 
 ## In progress
 
-*(none)*
+- **(feedback fix)** event log lines carry the comment text: comment-level
+  events in `.margin/events.log` gain a `text` field holding the comment body,
+  so a listener (an agent in the loop) sees what was said without a second read
+  of the thread file or export. Thread-level events omit the field. Extends
+  D14's line shape as D15. Claimed by the do-leg agent 2026-08-10, addressing
+  `vault/feedback/2026-08-10-agent-loop-event-comment-text.md`.
 
 ## Backlog — M1
 
