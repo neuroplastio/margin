@@ -279,7 +279,9 @@ to open files — the first M3 tree-view item).
 
 ## In progress
 
-*(none)*
+- Cross-document link navigation — first slice of "Navigation between
+  documents, and a cross-document comment inbox": `ctrl+]` on a link naming
+  another markdown file in the tree opens it — claimed 2026-08-11
 
 ## Done
 
@@ -403,7 +405,8 @@ pane's first build landed 2026-08-11 (journal 2026-08-11.1); its appearance,
 position, toggle and focus are on `Needs a look:` until judged.
 
 - *(Review a directory, not just a file — landed, see Done 2026-08-11.)*
-- Navigation between documents, and a cross-document comment inbox
+- *(Cross-document link navigation — claimed, see In progress.)*
+- A cross-document comment inbox
 - Review progress across the whole tree
 
 ## Backlog — M3 (navigation)
