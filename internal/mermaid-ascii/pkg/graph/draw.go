@@ -191,51 +191,56 @@ func drawBox(n *node, g graph) *drawing {
 	from := drawingCoord{0, 0}
 	to := drawingCoord{w, h}
 	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
+	circle := n.shape == "circle"
 	log.Debug("Drawing box from ", from, " to ", to)
-	if !g.useAscii {
-		// Draw top border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][from.y] = "─" // Horizontal line
+	// A circle node (the state `[*]` start/end marker) draws its label as a
+	// bare glyph — no border at all — so it reads as a marker, not a box.
+	if !circle {
+		if !g.useAscii {
+			// Draw top border
+			for x := from.x + 1; x < to.x; x++ {
+				boxDrawing[x][from.y] = "─" // Horizontal line
+			}
+			// Draw bottom border
+			for x := from.x + 1; x < to.x; x++ {
+				boxDrawing[x][to.y] = "─" // Horizontal line
+			}
+			// Draw left border
+			for y := from.y + 1; y < to.y; y++ {
+				boxDrawing[from.x][y] = "│" // Vertical line
+			}
+			// Draw right border
+			for y := from.y + 1; y < to.y; y++ {
+				boxDrawing[to.x][y] = "│" // Vertical line
+			}
+			// Draw corners
+			boxDrawing[from.x][from.y] = "┌" // Top left corner
+			boxDrawing[to.x][from.y] = "┐"   // Top right corner
+			boxDrawing[from.x][to.y] = "└"   // Bottom left corner
+			boxDrawing[to.x][to.y] = "┘"     // Bottom right corner
+		} else {
+			// Draw top border
+			for x := from.x + 1; x < to.x; x++ {
+				boxDrawing[x][from.y] = "-" // Horizontal line
+			}
+			// Draw bottom border
+			for x := from.x + 1; x < to.x; x++ {
+				boxDrawing[x][to.y] = "-" // Horizontal line
+			}
+			// Draw left border
+			for y := from.y + 1; y < to.y; y++ {
+				boxDrawing[from.x][y] = "|" // Vertical line
+			}
+			// Draw right border
+			for y := from.y + 1; y < to.y; y++ {
+				boxDrawing[to.x][y] = "|" // Vertical line
+			}
+			// Draw corners
+			boxDrawing[from.x][from.y] = "+" // Top left corner
+			boxDrawing[to.x][from.y] = "+"   // Top right corner
+			boxDrawing[from.x][to.y] = "+"   // Bottom left corner
+			boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 		}
-		// Draw bottom border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][to.y] = "─" // Horizontal line
-		}
-		// Draw left border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[from.x][y] = "│" // Vertical line
-		}
-		// Draw right border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[to.x][y] = "│" // Vertical line
-		}
-		// Draw corners
-		boxDrawing[from.x][from.y] = "┌" // Top left corner
-		boxDrawing[to.x][from.y] = "┐"   // Top right corner
-		boxDrawing[from.x][to.y] = "└"   // Bottom left corner
-		boxDrawing[to.x][to.y] = "┘"     // Bottom right corner
-	} else {
-		// Draw top border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][from.y] = "-" // Horizontal line
-		}
-		// Draw bottom border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][to.y] = "-" // Horizontal line
-		}
-		// Draw left border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[from.x][y] = "|" // Vertical line
-		}
-		// Draw right border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[to.x][y] = "|" // Vertical line
-		}
-		// Draw corners
-		boxDrawing[from.x][from.y] = "+" // Top left corner
-		boxDrawing[to.x][from.y] = "+"   // Top right corner
-		boxDrawing[from.x][to.y] = "+"   // Bottom left corner
-		boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 	}
 	// Draw label lines inside the padded content area.
 	innerTop := from.y + 1
@@ -244,7 +249,18 @@ func drawBox(n *node, g graph) *drawing {
 	for lineIdx, line := range n.label.lines {
 		textY := contentTop + lineIdx*(graphLabelLineGap+1)
 		textWidth := runewidth.StringWidth(line)
-		textX := from.x + w/2 - CeilDiv(textWidth, 2) + 1
+		var textX int
+		if circle {
+			// A circle marker's glyph must sit on the spine column its edges
+			// route through — the center of the content column
+			// (columnWidth[grid.x] + columnWidth[grid.x+1]/2) — not on the
+			// center of the whole drawing, which is dragged right when the
+			// marker shares its columns with a wider neighbour.
+			spineX := g.columnWidth[n.gridCoord.x] + g.columnWidth[n.gridCoord.x+1]/2
+			textX = spineX - textWidth/2
+		} else {
+			textX = from.x + w/2 - CeilDiv(textWidth, 2) + 1
+		}
 		for _, r := range line {
 			runeWidth := Max(runewidth.RuneWidth(r), 1)
 			boxDrawing[textX][textY] = wrapTextInColor(string(r), n.styleClass.styles["color"], g.styleType)

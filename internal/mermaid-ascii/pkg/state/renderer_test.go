@@ -15,6 +15,9 @@ func render(t *testing.T, src string, useAscii bool) string {
 	}
 	cfg := diagram.DefaultConfig()
 	cfg.UseAscii = useAscii
+	cfg.BoxBorderPadding = 0
+	cfg.PaddingBetweenX = 3
+	cfg.PaddingBetweenY = 1
 	out, err := Render(d, cfg)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
@@ -31,17 +34,19 @@ func TestRenderChain(t *testing.T) {
 			t.Errorf("rendered state diagram missing %q:\n%s", want, out)
 		}
 	}
-	// Idle and Active each appear once — the chain shares boxes, it does not
-	// re-draw them.
-	if n := strings.Count(out, "│ Idle │"); n != 1 {
-		t.Errorf("Idle box drawn %d times, want 1:\n%s", n, out)
+	// Idle and Active each appear once — the graph lays one box per state.
+	if n := strings.Count(out, "Idle"); n != 1 {
+		t.Errorf("Idle drawn %d times, want 1:\n%s", n, out)
+	}
+	if n := strings.Count(out, "Active"); n != 1 {
+		t.Errorf("Active drawn %d times, want 1:\n%s", n, out)
 	}
 	if strings.Contains(out, "[*]") || strings.Contains(out, "-->") {
 		t.Errorf("state source leaked into the render:\n%s", out)
 	}
 }
 
-// TestRenderLabels: a transition label sits beside the arrow spine.
+// TestRenderLabels: a transition label sits beside the routed edge.
 func TestRenderLabels(t *testing.T) {
 	out := render(t, "stateDiagram-v2\nIdle --> Active: power on", false)
 	if !strings.Contains(out, "power on") {
@@ -57,8 +62,8 @@ func TestRenderDescription(t *testing.T) {
 	}
 }
 
-// TestRenderBranch: a branching source draws its box again for each branch,
-// so every destination is reachable.
+// TestRenderBranch: a branching source is one box with two routed arrows, not
+// a duplicated box and not a ↩ reference.
 func TestRenderBranch(t *testing.T) {
 	out := render(t, "stateDiagram-v2\nIdle --> Active\nIdle --> Off", false)
 	for _, want := range []string{"Idle", "Active", "Off"} {
@@ -66,12 +71,47 @@ func TestRenderBranch(t *testing.T) {
 			t.Errorf("branch render missing %q:\n%s", want, out)
 		}
 	}
-	if n := strings.Count(out, "│ Idle │"); n != 2 {
-		t.Errorf("Idle box drawn %d times, want 2 (one per branch):\n%s", n, out)
+	if n := strings.Count(out, "Idle"); n != 1 {
+		t.Errorf("Idle drawn %d times, want 1 (branches share the box):\n%s", n, out)
+	}
+	if strings.Contains(out, "↩") {
+		t.Errorf("branch used a ↩ reference instead of routing:\n%s", out)
 	}
 }
 
-// TestRenderNoTransitions: declared states with no transitions stack as boxes.
+// TestRenderRevisitedState: a state re-entered as a transition target routes
+// an arrow back to its box — the state appears once, no ↩ reference.
+func TestRenderRevisitedState(t *testing.T) {
+	out := render(t, "stateDiagram-v2\nA --> B\nB --> C\nB --> A", false)
+	for _, want := range []string{"A", "B", "C"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("revisit render missing %q:\n%s", want, out)
+		}
+	}
+	if n := strings.Count(out, "A"); n != 1 {
+		t.Errorf("A drawn %d times, want 1:\n%s", n, out)
+	}
+	if n := strings.Count(out, "B"); n != 1 {
+		t.Errorf("B drawn %d times, want 1:\n%s", n, out)
+	}
+	if strings.Contains(out, "↩") {
+		t.Errorf("revisit used a ↩ reference instead of routing:\n%s", out)
+	}
+}
+
+// TestRenderStartEndMarker: the `[*]` start/end marker draws as a circle node.
+func TestRenderStartEndMarker(t *testing.T) {
+	out := render(t, "stateDiagram-v2\n[*] --> A\nA --> [*]", false)
+	if !strings.Contains(out, "○") {
+		t.Errorf("start/end marker missing:\n%s", out)
+	}
+	if strings.Contains(out, "[*]") {
+		t.Errorf("marker source leaked:\n%s", out)
+	}
+}
+
+// TestRenderNoTransitions: declared states with no transitions render as
+// boxes.
 func TestRenderNoTransitions(t *testing.T) {
 	out := render(t, "stateDiagram-v2\nstate Alpha\nstate Beta", false)
 	for _, want := range []string{"Alpha", "Beta"} {
@@ -86,5 +126,13 @@ func TestRenderAscii(t *testing.T) {
 	out := render(t, "stateDiagram-v2\nIdle --> Active", true)
 	if !strings.Contains(out, "+") || strings.Contains(out, "┌") {
 		t.Errorf("ASCII glyph set not applied:\n%s", out)
+	}
+}
+
+// TestRenderAsciiMarker: the marker uses the ASCII circle glyph too.
+func TestRenderAsciiMarker(t *testing.T) {
+	out := render(t, "stateDiagram-v2\n[*] --> A", true)
+	if !strings.Contains(out, "o") {
+		t.Errorf("ASCII marker missing:\n%s", out)
 	}
 }

@@ -125,13 +125,11 @@ drawn** — that is the obvious next delta. Note in the demo recipe for
 
 Upstream has no state renderer, so this package is the in-tree extension the
 vendoring leg promised. `stateDiagram` and `stateDiagram-v2` parse into a
-state/transition model and render top-down on a single centred spine:
-`Parse` + `Render` + `Keyword` + `IsStateDiagram`, following D2's package
-shape. Each transition draws a `│ label` run and a `▼` head between its state
-boxes; `[*]` start/end markers draw as a `○`; consecutive transitions that
-share a state keep the box (a chain reads as one flow), while a branching
-source draws its box again per branch — the simple tradeoff for not routing
-edges. Declarations accept `state Name`, `state "Name"` and
+state/transition model: `Parse` + `Render` + `Keyword` + `IsStateDiagram`,
+following D2's package shape. Rendering itself is routed through the vendored
+graph engine (see D9) — each transition draws as a routed labelled edge, `[*]`
+start/end markers draw as circle nodes. Declarations accept `state Name`,
+`state "Name"` and
 `state "Long description" as Short` (a transition may then reference the state
 by either id or description). The parser is strict, so anything outside the
 subset — composite states (`state X { … }`), notes — fails the whole diagram
@@ -139,12 +137,49 @@ and the dispatcher falls back to plain source, the never-a-half-parsed
 contract. `direction` lines are skipped, not rejected. Upstreamable as a new
 library package.
 
+## D9 — state diagrams route through the graph engine
+
+The D7 state renderer drew boxes on a single centred spine and referenced a
+revisited state with a dim `↩ label` shortcut. That worked but never *drew*
+the edges; this delta replaces the spine renderer with a real routing: `Render`
+builds the state diagram as a `graph.NewDiagram` (each state a node, each
+transition a labelled edge) and renders through the vendored graph engine's
+layered layout and A* edge router. A branch, a re-entered state or a cycle now
+draws actual routed arrows back to the shared box. Two pieces of supporting
+plumbing:
+
+- `graph.NewDiagram(direction, nodes, edges)` — a programmatic builder (the
+  graph package previously only built its model from mermaid text), so a
+  caller with an already-parsed model can route through the engine without a
+  source round-trip.
+- Node shapes: `textNode`/`graphNodeSpec`/`node` carry a `shape` string parsed
+  from the bracket family (`(( ))` → circle), and a circle node draws its
+  label as a bare glyph — the state `[*]` start/end marker renders as `○`
+  (`o` under ASCII), not a stadium box. A circle reserves a symmetric 2x2
+  footprint (one content cell plus one cell of air each side) so its glyph
+  sits at the centre of the node's grid cells, its label is drawn on the spine
+  column its edges route through (not the centre of the shared drawing width),
+  and its outgoing edges skip the box-start junction — so the marker reads
+  `○ │ ▼`, the spine stays under the glyph, and an incoming back-edge's `◄`
+  lands on the glyph's row instead of pointing at the footprint's edge.
+- **State boxes force at least 1 column of horizontal padding, but no
+  vertical padding.** A routed edge enters and leaves a box through its
+  border, and the junction glyph overwrites the cell it lands on — so at the
+  flowchart's compact `BoxBorderPadding = 0` a label that fills its box loses
+  its edge character to the `├`/`┤` (observed: `Buildin├`). `state.Render`
+  bumps horizontal padding to 1 so a state label never touches the border its
+  edges route through; vertical padding stays 0 so a box is three rows tall,
+  not five. To make that split the config gains `BoxPaddingY` (graph
+  `diagram.Config`, default `-1` = inherit `BoxBorderPadding`; the
+  flowchart's compact config is unchanged).
+
 ## Known gaps (candidate future deltas)
 
-- **Graph node shapes render as rectangles.** D4 parses the shape families but
-  the layout draws every box the same; the `◇` decision marker and rounded
-  corners the previous renderer drew are gone. Felt: does the layered layout
-  make shape glyphs necessary?
+- **Graph node shapes render as rectangles** — except circles. D4 parses the
+  shape families; D9 added circle rendering (`(( ))` → rounded stadium) for the
+  state `[*]` markers, but the other families — decision `{}`, the `[[ ]]`
+  families — still draw as rectangles. Felt: does the layered layout make shape
+  glyphs necessary?
 - **Edge labels on a vertical run can be split by the spine glyph**
   (`over│here`). Upstream draws the label centered on the edge, and a vertical
   connector interrupts it. Felt.
@@ -153,5 +188,4 @@ library package.
 - **Sequence activations are skipped** (D6) — bars are not drawn.
 - **State diagrams cover the transition subset only** (D7): composite states
   (`state X { … }`) and notes (`note left of X: …`) are rejected, so a diagram
-  using them falls back to plain source; the layout draws a branch's source
-  box again per branch rather than routing edges.
+  using them falls back to plain source.

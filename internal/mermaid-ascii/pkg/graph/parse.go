@@ -49,6 +49,7 @@ type graphProperties struct {
 	nodeSpecs        map[string]graphNodeSpec
 	styleClasses     *map[string]styleClass
 	boxBorderPadding int
+	boxPaddingY      int
 	graphDirection   string
 	styleType        string
 	paddingX         int
@@ -62,12 +63,14 @@ type textNode struct {
 	label      graphLabel
 	hasLabel   bool
 	styleClass string
+	shape      string
 }
 
 type graphNodeSpec struct {
 	label           graphLabel
 	labelIsExplicit bool
 	styleClass      string
+	shape           string
 }
 
 type textEdge struct {
@@ -170,21 +173,22 @@ func parseNode(line string) textNode {
 var nodeIDRE = regexp.MustCompile(`^([A-Za-z0-9_]+)\s*(.*)$`)
 
 // nodeShapes are mermaid's node bracket families, longest openers first so
-// `[[` wins over `[` and `((` over `(`.
-var nodeShapes = []struct{ open, close_ string }{
-	{"[[", "]]"},
-	{"((", "))"},
-	{"{{", "}}"},
-	{"([", "])"},
-	{"[(", ")]"},
-	{">", "]"},
-	{"[/", "/]"},
-	{"[\\", "\\]"},
-	{"[/", "\\]"},
-	{"[\\", "/]"},
-	{"{", "}"},
-	{"[", "]"},
-	{"(", ")"},
+// `[[` wins over `[` and `((` over `(`. shape names the rendering family ("" =
+// rectangle, the default); only circle nodes draw differently.
+var nodeShapes = []struct{ open, close_, shape string }{
+	{"[[", "]]", ""},
+	{"((", "))", "circle"},
+	{"{{", "}}", ""},
+	{"([", "])", ""},
+	{"[(", ")]", ""},
+	{">", "]", ""},
+	{"[/", "/]", ""},
+	{"[\\", "\\]", ""},
+	{"[/", "\\]", ""},
+	{"[\\", "/]", ""},
+	{"{", "}", ""},
+	{"[", "]", ""},
+	{"(", ")", ""},
 }
 
 // parseNodeLine parses a node definition line: a bare id (`A`) or a shaped
@@ -217,7 +221,7 @@ func parseNodeLine(s string) (textNode, bool) {
 		if label == "" {
 			label = id
 		}
-		return textNode{name: id, label: newGraphLabel(label), hasLabel: true}, true
+		return textNode{name: id, label: newGraphLabel(label), hasLabel: true, shape: sh.shape}, true
 	}
 	return textNode{}, false
 }
@@ -261,6 +265,9 @@ func rememberNode(node textNode, nodeSpecs map[string]graphNodeSpec) {
 	}
 	if node.styleClass != "" {
 		spec.styleClass = node.styleClass
+	}
+	if node.shape != "" {
+		spec.shape = node.shape
 	}
 	nodeSpecs[node.name] = spec
 }
@@ -563,6 +570,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		nodeSpecs:        make(map[string]graphNodeSpec),
 		styleClasses:     &styleClasses,
 		boxBorderPadding: boxBorderPadding,
+		boxPaddingY:      -1,
 		graphDirection:   "",
 		styleType:        styleType,
 		paddingX:         paddingBetweenX,

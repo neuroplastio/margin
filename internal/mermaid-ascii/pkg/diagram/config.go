@@ -19,6 +19,13 @@ type Config struct {
 	// BoxBorderPadding is the padding between text and border in graph nodes
 	BoxBorderPadding int
 
+	// BoxPaddingY is the vertical padding between text and border in graph
+	// nodes. -1 (the default) means "same as BoxBorderPadding"; a separate
+	// knob exists because only horizontal padding protects a label from the
+	// junction glyph an edge draws on the border, and vertical padding is
+	// pure air.
+	BoxPaddingY int
+
 	// PaddingBetweenX is the horizontal space between nodes in graphs
 	PaddingBetweenX int
 
@@ -53,6 +60,7 @@ func DefaultConfig() *Config {
 		Verbose:    false,
 		// Graph defaults
 		BoxBorderPadding: 1,
+		BoxPaddingY:      -1,
 		PaddingBetweenX:  5,
 		PaddingBetweenY:  5,
 		GraphDirection:   "LR",
@@ -150,6 +158,9 @@ func (c *Config) Validate() error {
 	// Validate graph configuration
 	if c.BoxBorderPadding < 0 {
 		return &ConfigError{Field: "BoxBorderPadding", Value: c.BoxBorderPadding, Message: "must be non-negative"}
+	}
+	if c.BoxPaddingY < -1 {
+		return &ConfigError{Field: "BoxPaddingY", Value: c.BoxPaddingY, Message: "must be non-negative, or -1 to inherit BoxBorderPadding"}
 	}
 	if c.PaddingBetweenX < 0 {
 		return &ConfigError{Field: "PaddingBetweenX", Value: c.PaddingBetweenX, Message: "must be non-negative"}

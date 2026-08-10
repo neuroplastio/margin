@@ -39,6 +39,7 @@ type graph struct {
 	styleClasses     map[string]styleClass
 	styleType        string
 	boxBorderPadding int
+	boxPaddingY      int
 	graphDirection   string
 	paddingX         int
 	paddingY         int
@@ -87,7 +88,7 @@ func mkGraph(data *textGraphData, nodeSpecs map[string]graphNodeSpec) graph {
 		// Get or create parent node
 		parentNode, err := g.getNode(nodeName)
 		if err != nil {
-			parentNode = &node{name: nodeName, label: spec.label, index: index, styleClassName: spec.styleClass}
+			parentNode = &node{name: nodeName, label: spec.label, index: index, styleClassName: spec.styleClass, shape: spec.shape}
 			g.appendNode(parentNode)
 			index += 1
 		}
@@ -95,7 +96,7 @@ func mkGraph(data *textGraphData, nodeSpecs map[string]graphNodeSpec) graph {
 			childSpec := nodeSpecs[textEdge.child.name]
 			childNode, err := g.getNode(textEdge.child.name)
 			if err != nil {
-				childNode = &node{name: textEdge.child.name, label: childSpec.label, index: index, styleClassName: childSpec.styleClass}
+				childNode = &node{name: textEdge.child.name, label: childSpec.label, index: index, styleClassName: childSpec.styleClass, shape: childSpec.shape}
 				g.appendNode(childNode)
 				index += 1
 			}
@@ -116,6 +117,7 @@ func (g *graph) setStyleClasses(properties *graphProperties) {
 	g.styleClasses = *properties.styleClasses
 	g.styleType = properties.styleType
 	g.boxBorderPadding = properties.boxBorderPadding
+	g.boxPaddingY = properties.boxPaddingY
 	g.graphDirection = properties.graphDirection
 	g.paddingX = properties.paddingX
 	g.paddingY = properties.paddingY

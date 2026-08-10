@@ -14,6 +14,7 @@ type node struct {
 	index          int // Index of the node in the graph.nodes slice
 	styleClassName string
 	styleClass     styleClass
+	shape          string
 }
 
 func (n node) String() string {
@@ -39,8 +40,23 @@ func (g *graph) setColumnWidth(n *node) {
 	col1 := 1
 	col2 := 2*g.boxBorderPadding + n.label.width
 	col3 := 1
+	padY := g.boxPaddingY
+	if padY < 0 {
+		padY = g.boxBorderPadding
+	}
+	rowsToBePlaced := []int{1, n.label.contentHeight() + 2*padY, 1} // Border, padding + content, border
+	// A circle node (the state `[*]` marker) draws a bare glyph with no
+	// border. It reserves a symmetric 2x2 footprint — one cell of content
+	// plus one cell of air each side — so the glyph sits at the centre of the
+	// node's grid cells, and the edges that attach to all four sides of the
+	// footprint converge on the glyph rather than pointing at its edge.
+	if n.shape == "circle" {
+		col1, col3 = 1, 0
+		col2 = Max(n.label.width, 1)
+		rowsToBePlaced = []int{1, 1, 0}
+	}
+
 	colsToBePlaced := []int{col1, col2, col3}
-	rowsToBePlaced := []int{1, n.label.contentHeight() + 2*g.boxBorderPadding, 1} // Border, padding + content, border
 
 	for idx, col := range colsToBePlaced {
 		// Set new width for column if the size increased

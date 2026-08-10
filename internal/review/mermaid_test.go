@@ -262,8 +262,9 @@ func TestMermaidDiagramStyled(t *testing.T) {
 	if !strings.Contains(joined, mermaidBorder.Render("│")) {
 		t.Errorf("no border run carries the frame style:\n%s", joined)
 	}
-	// The node text run is " Start " (box-padded), not "Start".
-	if !strings.Contains(joined, mermaidText.Render(" Start ")) {
+	// The node text run is "Start" (no box padding — compact config),
+	// not "Start" wrapped in spaces.
+	if !strings.Contains(joined, mermaidText.Render("Start")) {
 		t.Errorf("node text does not carry the text style:\n%s", joined)
 	}
 }

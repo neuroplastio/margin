@@ -112,7 +112,7 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn, lineDirs := g.drawPath(e.path)
-	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
+	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0], e.from.shape)
 	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1])
 	if e.isBidirectional && len(linesDrawn) > 0 {
 		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite())
@@ -187,13 +187,17 @@ func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord, []direct
 	return d, linesDrawn, lineDirs
 }
 
-func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawing {
+// drawBoxStart draws the junction where an edge leaves its source box
+// (`┬`/`┤`/`├`/`┴` on the box's border). A circle source has no border for the
+// junction to sit on, so its edges get a blank canvas instead — the state
+// marker's spine reads `○ │ ▼`, not `○ ┬ ▼`.
+func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord, fromShape string) *drawing {
 	d := *(copyCanvas(g.drawing))
 	from := firstLine[0]
 	dir := determineDirection(genericCoord(path[0]), genericCoord(path[1]))
 	log.Debugf("Drawing box start at %v with direction %v for line %v", from, dir, path)
 
-	if g.useAscii {
+	if g.useAscii || fromShape == "circle" {
 		return &d
 	}
 

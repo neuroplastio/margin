@@ -36,10 +36,17 @@ var (
 
 // mermaidConfig is the shared rendering config. Graph direction comes from the
 // block's own header (flowchart LR stays LR); only the shared fields are set
-// here, and otherwise upstream's defaults hold (padding 5/5, border 1).
+// here. The graph paddings are tightened from upstream's 5/5/1 — a diagram
+// inside a review already carries the prose around it, so the extra blank
+// rows upstream's layout leaves between and inside boxes just waste the
+// screen (the compact values cut a 12-node flowchart from 65 to 27 lines);
+// sequence spacing keeps upstream's defaults, which read fine.
 func mermaidConfig() *diagram.Config {
 	cfg := diagram.DefaultConfig()
 	cfg.StyleType = "cli"
+	cfg.BoxBorderPadding = 0
+	cfg.PaddingBetweenX = 3
+	cfg.PaddingBetweenY = 1
 	return cfg
 }
 
