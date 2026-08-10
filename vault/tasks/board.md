@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (raw mode keeps code colours — done)
+Last updated: 2026-08-10 (raw mode horizontal scroll — in progress)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -141,7 +141,9 @@ Last updated: 2026-08-10 (raw mode keeps code colours — done)
 
 ## In progress
 
-*(none)*
+- (feedback feature) raw mode horizontal scroll: drains
+  `vault/feedback/2026-08-10-raw-mode-horizontal-scroll.md` — claimed 2026-08-10
+  by the /do-leg agent
 
 ## Backlog — M1
 
