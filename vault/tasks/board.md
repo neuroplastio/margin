@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-10 (review-change notification)
+Last updated: 2026-08-10 (comments markdown formatting claimed)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
@@ -195,7 +195,11 @@ Last updated: 2026-08-10 (review-change notification)
 
 ## In progress
 
-*(none)*
+- (feedback feature) comments render markdown formatting — line breaks and
+  paragraph breaks preserved, inline markup (`**bold**`, `` `code` ``,
+  `[links](...)`) the way the document renders it — drains
+  `vault/feedback/2026-08-10-comments-markdown-formatting.md`. Claimed
+  2026-08-10 by the do-leg agent.
 
 ## Backlog — M1
 
