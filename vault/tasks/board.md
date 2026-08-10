@@ -1,9 +1,15 @@
 # Board
 
-Last updated: 2026-08-10 (command palette key bindings — claimed)
+Last updated: 2026-08-10 (command palette key bindings — done)
 
 **Active milestone:** M2 — Persistence and the loop
 **Needs a look:**
+- (feedback fix) command palette shows key bindings: `:` now right-aligns each
+  command's first registered binding on its row (`j` beside "Move focus down",
+  `space` beside "Cycle", `l` for dive — first-written wins, so primary keys
+  show, never the long arrow names); the binding is skipped on staged value
+  rows; `keyBindings` is now the ordered slice that `keymap` is derived from —
+  journal 2026-08-10.4
 - (feedback feature) viewport width and horizontal scroll: `contentWidth()` is
   the terminal's width, not a fixed 76-column measure; wide blocks (code,
   tables, frontmatter) ride it too; tables keep natural column widths and
@@ -130,10 +136,7 @@ Last updated: 2026-08-10 (command palette key bindings — claimed)
 
 ## In progress
 
-- **(feedback fix)** command palette shows registered key binding: each palette
-      row displays the command's first registered key binding (per keymap
-      order), one per command; commands with several bindings show the first —
-      drains `vault/feedback/2026-08-10-command-palette-key-binding.md`
+*(none)*
 
 ## Backlog — M1
 
@@ -169,6 +172,21 @@ deleted. See those entries for the settled shape, and `interaction.md`'s "Not
 settled" section for what each still leaves open for a felt leg.
 
 ## Done
+
+- [x] **(feedback fix)** command palette shows registered key binding: the
+      palette (`:`) right-aligns each command's first registered key binding on
+      its row, dimmed like the description — `▌ move.down — Move focus down
+      …j` — so a reviewer sees the key without a second lookup. "First" is the
+      binding written first in the new ordered `keyBindings` slice
+      (`internal/review/command.go`), which is now the single source of truth:
+      `keymap`, the O(1) lookup `handleKey` uses, is derived from it at init,
+      so display order and dispatch can never disagree and "first" is not a
+      map-iteration accident (`j` for move.down, not `down`; `l` for dive, not
+      `right`/`enter`; `space` for mark.cycle, not the bare ` `). Staged value
+      rows (`mark`'s `reviewed`/`flagged`) show no binding — they are values,
+      not commands. Drains
+      `vault/feedback/2026-08-10-command-palette-key-binding.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-10.4 — done 2026-08-10
 
 - [x] **(feedback feature)** viewport width and horizontal scroll:
       `contentWidth()` is the terminal's width (minus gutter, 40-col floor)

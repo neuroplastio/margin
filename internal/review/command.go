@@ -554,41 +554,68 @@ func markTarget(m *model) string {
 	return sectionLabel(anchors)
 }
 
-// keymap is the one place a raw key string binds to a command id. Every key
-// margin recognises outside a live composer is here; handleKey has no
-// per-key logic beyond this lookup.
-var keymap = map[string]string{
-	"j": "move.down", "down": "move.down",
-	"k": "move.up", "up": "move.up",
-	"J": "move.scrollDown",
-	"K": "move.scrollUp",
-	"L": "move.hscrollRight",
-	"H": "move.hscrollLeft",
-	"l": "move.dive", "right": "move.dive", "enter": "move.dive",
-	"h": "move.surface", "left": "move.surface", "esc": "move.surface",
-	"ctrl+d": "move.halfPageDown",
-	"ctrl+u": "move.halfPageUp",
-	"ctrl+f": "move.pageDown", "pgdown": "move.pageDown",
-	"ctrl+b": "move.pageUp", "pgup": "move.pageUp",
-	"g":     "move.first", "home": "move.first",
-	"G":     "move.last", "end": "move.last",
-	"n":     "search.next",
-	"N":     "search.prev",
-	"c":     "comment.new",
-	"e":     "comment.edit",
-	"r":     "mark.reviewed",
-	"f":     "mark.flagged",
-	"space": "mark.cycle", " ": "mark.cycle",
-	"R": "thread.resolve",
-	"D": "thread.delete",
-	"T": "thread.showDeleted",
-	"V":  "selection.start",
-	"y":  "selection.yank",
-	"yr": "selection.yankRef",
-	"gy": "selection.yankRef",
-	"Y":  "review.export",
-	"m": "mark",
-	"s": "goto",
-	"\\": "view.raw",
-	"q": "app.quit", "ctrl+c": "app.quit",
+// keyBindings is the ordered list of raw key → command id bindings — the one
+// place a key binds to a verb. Every key margin recognises outside a live
+// composer is here; handleKey has no per-key logic beyond this lookup. Order
+// is meaningful: the palette shows a command's *first* binding
+// (firstBinding), so each command's primary key is written first.
+var keyBindings = []struct {
+	key string
+	id  string
+}{
+	{"j", "move.down"}, {"down", "move.down"},
+	{"k", "move.up"}, {"up", "move.up"},
+	{"J", "move.scrollDown"},
+	{"K", "move.scrollUp"},
+	{"L", "move.hscrollRight"},
+	{"H", "move.hscrollLeft"},
+	{"l", "move.dive"}, {"right", "move.dive"}, {"enter", "move.dive"},
+	{"h", "move.surface"}, {"left", "move.surface"}, {"esc", "move.surface"},
+	{"ctrl+d", "move.halfPageDown"},
+	{"ctrl+u", "move.halfPageUp"},
+	{"ctrl+f", "move.pageDown"}, {"pgdown", "move.pageDown"},
+	{"ctrl+b", "move.pageUp"}, {"pgup", "move.pageUp"},
+	{"g", "move.first"}, {"home", "move.first"},
+	{"G", "move.last"}, {"end", "move.last"},
+	{"n", "search.next"},
+	{"N", "search.prev"},
+	{"c", "comment.new"},
+	{"e", "comment.edit"},
+	{"r", "mark.reviewed"},
+	{"f", "mark.flagged"},
+	{"space", "mark.cycle"}, {" ", "mark.cycle"},
+	{"R", "thread.resolve"},
+	{"D", "thread.delete"},
+	{"T", "thread.showDeleted"},
+	{"V", "selection.start"},
+	{"y", "selection.yank"},
+	{"yr", "selection.yankRef"},
+	{"gy", "selection.yankRef"},
+	{"Y", "review.export"},
+	{"m", "mark"},
+	{"s", "goto"},
+	{"\\", "view.raw"},
+	{"q", "app.quit"}, {"ctrl+c", "app.quit"},
+}
+
+// keymap is keyBindings flattened to a map for O(1) lookup. Derived, never
+// edited by hand, so the slice's order and the map's contents cannot drift.
+var keymap = func() map[string]string {
+	m := make(map[string]string, len(keyBindings))
+	for _, b := range keyBindings {
+		m[b.key] = b.id
+	}
+	return m
+}()
+
+// firstBinding returns a command's first registered key in keyBindings order
+// — the binding the palette displays next to a command's id — or "" if the
+// command has no key (none today; TestEveryCommandIsReachableByAKey guards).
+func firstBinding(id string) string {
+	for _, b := range keyBindings {
+		if b.id == id {
+			return b.key
+		}
+	}
+	return ""
 }

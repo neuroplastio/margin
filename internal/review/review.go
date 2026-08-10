@@ -3107,7 +3107,13 @@ func (m *model) renderPalette(w int) string {
 			cursor = focusStyle.Render("▌ ")
 			style = textStyle
 		}
-		b.WriteString(cursor + style.Render(row.Command.ID) + dimStyle.Render(" — "+row.Title) + "\n")
+		label := cursor + style.Render(row.Command.ID) + dimStyle.Render(" — "+row.Title)
+		if binding := firstBinding(row.Command.ID); binding != "" && !row.IsValue {
+			gutter := 2
+			pad := max(w-lipgloss.Width(label)-lipgloss.Width(binding)-gutter, 1)
+			label += strings.Repeat(" ", pad) + dimStyle.Render(binding)
+		}
+		b.WriteString(label + "\n")
 	}
 	
 	b.WriteString(focusStyle.Render(":") + m.paletteQuery + focusStyle.Render("█"))

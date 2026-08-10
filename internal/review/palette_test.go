@@ -355,3 +355,91 @@ func TestRenderPaletteIncludesVisualSeparator(t *testing.T) {
 	}
 }
 
+// TestFirstBindingIsThePrimaryKey: a command's first binding is the one the
+// palette displays — the primary key written first in keyBindings, not an
+// arbitrary map-picked one. move.down binds both "j" and "down"; the palette
+// should advertise "j". mark.cycle binds "space" and a bare " "; "space" is
+// the displayable one and is written first.
+func TestFirstBindingIsThePrimaryKey(t *testing.T) {
+	cases := []struct{ id, want string }{
+		{"move.down", "j"},
+		{"move.up", "k"},
+		{"move.dive", "l"},
+		{"move.surface", "h"},
+		{"move.pageDown", "ctrl+f"},
+		{"move.pageUp", "ctrl+b"},
+		{"move.first", "g"},
+		{"move.last", "G"},
+		{"comment.new", "c"},
+		{"comment.edit", "e"},
+		{"mark.reviewed", "r"},
+		{"mark.flagged", "f"},
+		{"mark.cycle", "space"},
+		{"thread.resolve", "R"},
+		{"thread.delete", "D"},
+		{"thread.showDeleted", "T"},
+		{"selection.start", "V"},
+		{"selection.yank", "y"},
+		{"selection.yankRef", "yr"},
+		{"review.export", "Y"},
+		{"view.raw", "\\"},
+		{"app.quit", "q"},
+		{"move.hscrollRight", "L"},
+		{"move.hscrollLeft", "H"},
+		{"move.scrollDown", "J"},
+		{"move.scrollUp", "K"},
+		{"search.next", "n"},
+		{"search.prev", "N"},
+		{"mark", "m"},
+		{"goto", "s"},
+	}
+	for _, c := range cases {
+		if got := firstBinding(c.id); got != c.want {
+			t.Errorf("firstBinding(%q) = %q, want %q", c.id, got, c.want)
+		}
+	}
+}
+
+// TestRenderPaletteShowsKeyBindings pins the 2026-08-10
+// command-palette-key-binding feedback: each palette row carries the command's
+// first registered key binding, right-aligned on the row. The row for
+// move.down must end with "j" (its primary), not a bare description.
+func TestRenderPaletteShowsKeyBindings(t *testing.T) {
+	m := newTestModel(t)
+	out := m.renderPalette(80)
+	plain := ansiRe.ReplaceAllString(out, "")
+	for _, row := range strings.Split(plain, "\n") {
+		if strings.HasPrefix(row, "move.down") {
+			if !strings.HasSuffix(strings.TrimRight(row, " "), "j") {
+				t.Errorf("move.down row %q does not end with its binding 'j'", row)
+			}
+		}
+		if strings.HasPrefix(row, "app.quit") {
+			if !strings.HasSuffix(strings.TrimRight(row, " "), "q") {
+				t.Errorf("app.quit row %q does not end with its binding 'q'", row)
+			}
+		}
+	}
+}
+
+// TestRenderPaletteValueRowsCarryNoBinding: a staged command's value rows
+// (e.g. the "reviewed" / "flagged" values of mark) are values, not commands —
+// they get the parent command's title but no key binding of their own.
+func TestRenderPaletteValueRowsCarryNoBinding(t *testing.T) {
+	m := newTestModel(t)
+	m.handleKey(tea.KeyPressMsg(tea.Key{Code: 'm', Text: "m"}))
+	if !m.paletteOpen || m.paletteQuery != "mark " {
+		t.Fatalf("'m' opened palette with query %q, want staged %q", m.paletteQuery, "mark ")
+	}
+	out := m.renderPalette(80)
+	plain := ansiRe.ReplaceAllString(out, "")
+	for _, row := range strings.Split(plain, "\n") {
+		if strings.Contains(row, "reviewed") || strings.Contains(row, "flagged") {
+			if strings.HasSuffix(strings.TrimRight(row, " "), "reviewed") || strings.HasSuffix(strings.TrimRight(row, " "), "flagged") {
+				continue
+			}
+			t.Errorf("value row %q ends with something that is not the value itself", row)
+		}
+	}
+}
+
