@@ -262,7 +262,8 @@ milestone moves to M3, whose backlog is seeded below.)
 
 ## In progress
 
-*(none)*
+- Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`) —
+  in-document — claimed 2026-08-10
 
 ## Done
 
@@ -361,7 +362,8 @@ pane looks like, where it sits, and how it is toggled and focused is still felt
 Independent of the tree view (D10): these are about moving around one
 document, regardless of the order the tree-view work itself lands in.
 
-- Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`) — in-document
+- *(Link navigation between blocks, with a jumplist (`ctrl+o` / `ctrl+i`) —
+  in-document — claimed, see In progress.)*
 - *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
   earlier; see Done.)*
 
