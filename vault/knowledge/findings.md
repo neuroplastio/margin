@@ -546,3 +546,38 @@ A second quirk, useful for anyone judging the diagrams: edge labels on a
 vertical run are drawn centered on the edge, so a vertical connector glyph can
 land *inside* the label ("over│here"). Upstream behaviour, flagged in the
 demo recipe, not yet a delta.
+
+## F25 — bubbletea v2 runs Update and View for every message; the FPS cap only bounds flush
+
+`tea.WithFPS(120)` bounds how often the renderer **flushes** a frame, but the
+event loop still runs `model.Update(msg)` and `model.View()` synchronously for
+**every** message (`tea.go`: `model, cmd = model.Update(msg)` then
+`p.render(model)`, which calls `model.View()` — unconditionally, even if
+Update changed nothing). `View()` is the expensive half here: margin's builds
+the whole document layout. So any message that arrives faster than `View()`
+runs backs the input queue up, and everything else — keystrokes included —
+waits for it to drain.
+
+Mouse motion is the pathological source: with all-motion tracking (1003, the
+hover fix) a pointer sweep across the document delivers one `MouseMotionMsg`
+per cell, hundreds per second on a fast sweep, each costing a full render.
+That is the "hover is laggy / focus events get replayed" report
+(2026-08-11.7). The wheel, by contrast, is user-paced and clicks are discrete;
+motion is the only continuous flood.
+
+The fix lives **before** Update: `tea.WithFilter(func(Model, Msg) Msg)` runs
+in the event loop ahead of Update/View (same `tea.go`, `msg = p.filter(...)`),
+and returning nil drops the message entirely — no Update, no View, no render.
+margin's `motionThrottle` (internal/review/review.go) drops a motion report
+that arrives within one frame period (8.33ms at 120fps) of the last one
+processed, or that restates the cell the pointer already occupies. The
+tradeoff is structural: processing at most one motion per frame period means
+the hover can trail the pointer by up to one frame — the same bound every
+frame-rate capping scheme pays, and invisible in practice.
+
+The general lesson: **the FPS option is a floor on work the screen can show,
+not a throttle on work the event loop does.** High-rate input that only feeds
+the display (hover, cursor blink, a progress bar) must be coalesced at the
+message source; leaving it to "the renderer caps at 120fps" floods Update and
+View all the same. A filter keyed on message type is the hook bubbletea
+provides — there is no built-in per-message-type rate limit.

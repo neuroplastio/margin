@@ -47,6 +47,12 @@ const (
 	// tall-block-jk-incremental-scroll feedback). Matches the 3-line feel of
 	// J/K's incremental scroll and the default wheel tick.
 	tallWalkStep = 3
+	// motionFramePeriod is the motion-throttle window: one 120fps frame
+	// period, matching the WithFPS(120) runModel sets. A mouse motion report
+	// inside it is dropped (see motionThrottle) — the renderer can flush at
+	// most one frame per period, so motion processed faster than this is work
+	// the screen can never show.
+	motionFramePeriod = time.Second / 120
 )
 
 // damageMsg says the child wrote something, so the grid may have changed. It is
@@ -1925,6 +1931,46 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	return nil
 }
 
+// motionThrottle coalesces mouse motion reports so a pointer sweep cannot
+// flood the event loop. Bubble Tea runs Update and View for every message,
+// and the full document render View performs is the expensive half of the
+// input path — a sweep across the document delivers a report per cell and
+// can queue them faster than the loop drains them, so a keystroke waits
+// behind the backlog until it clears (the mouse-hover-lag feedback). The
+// renderer only flushes one frame per frame period, so motion processed
+// faster than that is wasted work: drop a report that arrives within one
+// period of the last one that reached the model, and drop one that restates
+// the cell the pointer already occupies. The cost — the hover can trail the
+// pointer by at most one frame — is the bound every frame-rate capping
+// scheme pays, and is far under what the eye resolves.
+type motionThrottle struct {
+	period time.Duration
+	now    func() time.Time
+	last   time.Time
+	lastX  int
+	lastY  int
+}
+
+// filter is the tea.WithFilter predicate. Non-motion messages pass through
+// unchanged; a redundant motion report is dropped by returning nil, so it
+// never reaches Update, View, or the renderer.
+func (t *motionThrottle) filter(msg tea.Msg) tea.Msg {
+	mm, ok := msg.(tea.MouseMotionMsg)
+	if !ok {
+		return msg
+	}
+	now := t.now()
+	if mm.X == t.lastX && mm.Y == t.lastY {
+		return nil
+	}
+	if !t.last.IsZero() && now.Sub(t.last) < t.period {
+		return nil
+	}
+	t.last = now
+	t.lastX, t.lastY = mm.X, mm.Y
+	return msg
+}
+
 // handleMotion sets hoveredEntry for the block under the pointer.
 func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
@@ -3683,7 +3729,16 @@ func runModel(m *model, opts RunOptions) error {
 	}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
-	progOpts := []tea.ProgramOption{tea.WithFPS(120)}
+	// Mouse motion is throttled to that same frame period: a pointer sweep
+	// delivers a motion report per cell, and every report costs a full document
+	// render (Update then View), so an unthrottled sweep backs the input queue
+	// up and keystrokes wait for it to drain. Reports the screen could never
+	// draw are dropped before they reach the model.
+	motion := &motionThrottle{period: motionFramePeriod, now: time.Now}
+	progOpts := []tea.ProgramOption{
+		tea.WithFPS(120),
+		tea.WithFilter(func(_ tea.Model, msg tea.Msg) tea.Msg { return motion.filter(msg) }),
+	}
 	if opts.Stdout {
 		// Bubble Tea defaults its output to stdout, which here is carrying the
 		// review — the pipe would fill with escape sequences and the interface

@@ -1,9 +1,18 @@
 # Board
 
-Last updated: 2026-08-11 (mouse hover lag claimed)
+Last updated: 2026-08-11 (mouse hover throttled)
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (mouse hover lag) hover is throttled to the renderer's frame period: a
+  motion report inside one 8.33ms frame window of the last one processed is
+  dropped, as is any report restating the cell the pointer already occupies,
+  so a pointer sweep no longer floods the event loop with a full document
+  render per cell and keystrokes no longer wait for the queue to drain —
+  whether the lag is gone and the hover still tracks the cursor smoothly,
+  whether the ≤1-frame trailing bound the throttle costs is acceptable, and
+  whether motion over an open composer and in a tree review still feels right
+  — journal 2026-08-11.7
 - (thread & large-comment navigation) `j`/`k` on a comment taller than the
   viewport scroll the viewport 3 lines at a time and never move focus — the
   same treatment a tall block gets, reading each comment's `m.subspans` span —
@@ -333,13 +342,30 @@ Last updated: 2026-08-11 (mouse hover lag claimed)
 
 ## In progress
 
-- (feedback fix) mouse hover is laggy: hovering over blocks quickly floods
-  the UI queue and focus events get replayed, forcing the user to wait for
-  the queue to drain. Drains
-  `vault/feedback/2026-08-11-mouse-hover-lag.md`. Claimed 2026-08-11 by the
-  do-leg agent.
+*(none)*
 
 ## Done
+
+- [x] **(feedback fix)** mouse hover throttled — a pointer sweep across the
+      document no longer floods the input queue. Bubble Tea runs `Update` and
+      `View` (margin's whole document layout) for *every* message, and the
+      120fps cap only bounds when a frame is flushed — so an unthrottled
+      motion flood queued full renders faster than the event loop drained
+      them, and keystrokes waited behind the backlog. A new `motionThrottle`
+      (`internal/review/review.go`) drops a `MouseMotionMsg` that arrives
+      within one frame period (8.33ms, matching `WithFPS(120)`) of the last
+      one processed, or that restates the cell the pointer already occupies;
+      it is wired into `runModel` via `tea.WithFilter`, which runs ahead of
+      Update/View and discards the message entirely when it returns nil.
+      Clicks, wheels and keys pass through untouched, so a click or scroll is
+      never delayed behind the hover queue. Chosen: frame-period throttling
+      at the message source over a "only when hoveredEntry changes" rule
+      (which still pays a full `View()` per event — bubbletea renders
+      unconditionally), a self-scaling frame-period window over a fixed
+      millisecond count, position-dedup over time-only, `tea.WithFilter` over
+      touching `handleMotion`. Drains
+      `vault/feedback/2026-08-11-mouse-hover-lag.md`; the file is deleted.
+      `[felt]` — see journal 2026-08-11.7 — done 2026-08-11
 
 - [x] **(feedback)** thread & large-comment navigation — `j`/`k` on a comment
       taller than the viewport scroll the viewport through it `tallWalkStep`
