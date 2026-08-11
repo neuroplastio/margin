@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-11 (tall comments scroll, they don't skip)
+Last updated: 2026-08-11 (mouse hover lag claimed)
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
@@ -333,7 +333,11 @@ Last updated: 2026-08-11 (tall comments scroll, they don't skip)
 
 ## In progress
 
-*(none)*
+- (feedback fix) mouse hover is laggy: hovering over blocks quickly floods
+  the UI queue and focus events get replayed, forcing the user to wait for
+  the queue to drain. Drains
+  `vault/feedback/2026-08-11-mouse-hover-lag.md`. Claimed 2026-08-11 by the
+  do-leg agent.
 
 ## Done
 
