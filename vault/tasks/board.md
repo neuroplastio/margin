@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-11 (M3 closed, M4 opened)
+Last updated: 2026-08-11 (Q-0004 raised — how the previous reviewed revision is recorded and located)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -617,7 +617,15 @@ moved without re-reading it.
 
 ## Blocked
 
-*(none)*
+- **Q-0004** (how a document's previous reviewed revision is recorded and
+  located) — raised 2026-08-11. Blocks M4's first item ("Diff a document
+  against the previous reviewed revision") and, through it, the two M4 items
+  that build on its baseline (rendering the diff as prose; carrying marks and
+  threads across a revision). Whether the baseline is a snapshot taken on load,
+  on session end, or on an explicit checkpoint — and where it lives on disk —
+  is an on-disk format decision under `.margin/`, the expensive-to-unwind
+  class; the board's own M4 note flags that this item expects a question or a
+  Dn before building.
 
 Q-0003 was answered 2026-08-10 and folded into `knowledge/decisions.md` as
 **D13** (the event log at `.margin/events.log`); the question file is deleted.
