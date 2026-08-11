@@ -1,8 +1,8 @@
 # Board
 
-Last updated: 2026-08-11 (mouse hover throttled)
+Last updated: 2026-08-11 (M3 closed, M4 opened)
 
-**Active milestone:** M3 — Reading at scale
+**Active milestone:** M4 — Round two
 **Needs a look:**
 - (mouse hover lag) hover is throttled to the renderer's frame period: a
   motion report inside one 8.33ms frame window of the last one processed is
@@ -580,15 +580,15 @@ asked for. Split per the feedback's own suggested ordering — see
 
 ## Backlog — M3 (tree view)
 
-The unit-of-review question is settled (D10): `margin` / `margin DIR/` open a
-tree of markdown files, `margin FILE.md` stays a single-document review. The
-pane's first build landed 2026-08-11 (journal 2026-08-11.1); its appearance,
-position, toggle and focus are on `Needs a look:` until judged.
+*Closed 2026-08-11 — the milestone's exit criterion was met (the two-step
+navigation story works end to end), so the milestone moved to M4. The felt
+parts of what landed are still on `Needs a look:` above; the unit-of-review
+question stayed settled as D10.*
 
 - *(Review a directory, not just a file — landed, see Done 2026-08-11.)*
 - *(Cross-document link navigation — landed, see Done 2026-08-11.)*
 - *(A cross-document comment inbox — landed, see Done 2026-08-11.)*
-- Review progress across the whole tree
+- *(Review progress across the whole tree — landed, see Done 2026-08-11.)*
 
 ## Backlog — M3 (navigation)
 
@@ -599,6 +599,21 @@ document, regardless of the order the tree-view work itself lands in.
   landed, see Done 2026-08-10.)*
 - *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
   earlier; see Done.)*
+
+## Backlog — M4 (round two)
+
+The differentiator, and the reason block ids exist. No felt decision is baked
+in here yet — each item needs its own leg, and the first one (how a previous
+revision is recorded and located) touches on-disk format, so expect a question
+or a Dn before building.
+
+- Diff a document against the previous reviewed revision
+- Render the diff as prose — a rewritten paragraph reads as a rewritten
+  paragraph, not as a wall of `-`/`+`
+- Carry marks and threads across a revision; show what changed under a mark
+
+**Exit:** an agent hands back round four of a plan and the reviewer can see what
+moved without re-reading it.
 
 ## Blocked
 

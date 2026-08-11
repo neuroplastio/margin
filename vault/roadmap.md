@@ -76,16 +76,20 @@ threads it considers resolved.
 
 ---
 
-## M3 — Reading at scale
+## M3 — Reading at scale ✅
 
-*Felt-heavy. Expect this to be the slow milestone.*
+*Status: done, 2026-08-11.*
+
+*Felt-heavy by design; its slower surface — the tree pane's look, the inbox,
+link-following and the progress readouts — is still on the board's `Needs a
+look:` list.*
 
 - [x] Review a directory, not just a file — `margin DIR/` / bare `margin`
       opens a tree of markdown files in a left pane (`tab` toggles focus,
       `j`/`k` move, `enter`/`l` opens the focused file, switching threads and
       marks to it); the pane's look/position/toggle/focus is felt, journal
       2026-08-11.1
-- [ ] Navigation between documents, and a cross-document comment inbox
+- [x] Navigation between documents, and a cross-document comment inbox
       *(both halves landed 2026-08-11: cross-document link following —
       `ctrl+]` on a link to another file in the tree opens it — journal
       2026-08-11.2, and the comment inbox — `i` lists every thread across the
@@ -112,6 +116,8 @@ still open.)*
 ---
 
 ## M4 — Round two
+
+*Status: current, 2026-08-11.*
 
 *The differentiator, and the reason block ids exist.*
 
