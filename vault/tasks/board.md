@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-11 (draft comments deletable with `D`)
+Last updated: 2026-08-11 (thread & large-comment navigation — claimed)
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
@@ -322,7 +322,12 @@ Last updated: 2026-08-11 (draft comments deletable with `D`)
 
 ## In progress
 
-*(none)*
+- (feedback) thread & large-comment navigation: `j`/`k` on a comment taller
+  than the viewport should scroll the viewport through it a few lines at a time
+  instead of moving focus to the next comment — the same tall-block treatment
+  blocks get — so a long thread does not spit you out of it mid-read. Drains
+  `vault/feedback/2026-08-11-thread-comment-navigation.md`. Claimed 2026-08-11
+  by the do-leg agent.
 
 ## Done
 
