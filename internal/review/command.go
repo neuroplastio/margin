@@ -637,6 +637,28 @@ func resolveTarget(m *model) string {
 	return "resolve"
 }
 
+// draftAtFocus returns the drafts target the focused thing names, or noDraft
+// when nothing unsubmitted is under focus. Precedence mirrors editTarget's:
+// the focused comment's own unsaved edit, else the new-comment draft when
+// focus sits on the thread row, else a pending edit on the thread row. The
+// caller — deleteFocused and deleteTarget — uses it so D and the palette
+// never disagree about what a draft-focused press will discard.
+func (m *model) draftAtFocus(t *thread) int {
+	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
+		if t.draft(m.at.comment) != "" {
+			return m.at.comment
+		}
+		return noDraft
+	}
+	if t.draft(newCommentSlot) != "" {
+		return newCommentSlot
+	}
+	if i := t.pendingEdit(); i >= 0 {
+		return i
+	}
+	return noDraft
+}
+
 // deleteTarget names what thread.delete is about to do. A draft is named as a
 // draft — mirroring editTarget's precedence — because D on a draft discards
 // the draft, not the comment or thread underneath it.
@@ -645,14 +667,14 @@ func deleteTarget(m *model) string {
 	if t == nil {
 		return ""
 	}
-	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
-		if t.draft(m.at.comment) != "" {
-			return "unsaved edit to comment by " + t.posted[m.at.comment].author
+	if target := m.draftAtFocus(t); target >= newCommentSlot {
+		if target == newCommentSlot {
+			return "draft"
 		}
-		return "comment by " + t.posted[m.at.comment].author
+		return "unsaved edit to comment by " + t.posted[target].author
 	}
-	if t.draft(newCommentSlot) != "" {
-		return "draft"
+	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
+		return "comment by " + t.posted[m.at.comment].author
 	}
 	return "thread"
 }

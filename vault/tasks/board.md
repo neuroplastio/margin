@@ -1,9 +1,18 @@
 # Board
 
-Last updated: 2026-08-11 (draft comments deletable with D — claimed)
+Last updated: 2026-08-11 (draft comments deletable with `D`)
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (draft comments deletable) `D` on a draft discards the draft instead of
+  tombstoning what is underneath: an unsaved edit reverts the comment to its
+  posted text, a half-written new comment is discarded (a thread that held
+  nothing but the draft is dropped, focus back on the block), and a posted
+  thread keeps its comments; the palette names the draft
+  (`draft` / `unsaved edit to comment by …`) — whether discarding (vs
+  tombstoning, vs prompting) is the wanted reading of "when a comment is a
+  draft, `D` should delete it", and whether dropping a draft-only thread is
+  right — journal 2026-08-11.5
 - (tree review progress) each pane row carries a right-aligned `reviewed/total`
   slot — green when the whole file is reviewed, orange with a trailing `!`
   when any block is flagged, dim when partially reviewed, blank for files
@@ -313,14 +322,25 @@ Last updated: 2026-08-11 (draft comments deletable with D — claimed)
 
 ## In progress
 
-- (feedback) draft comments deletable with `D`: when the focused thing is a
-  draft, `D` discards the draft instead of tombstoning the comment or thread
-  underneath — an unsaved edit reverts to the posted text, a half-written new
-  comment is dropped (a thread that held nothing but the draft is dropped too).
-  Drains `vault/feedback/2026-08-11-draft-comments-deletable.md`. Claimed
-  2026-08-11 by the do-leg agent.
+*(none)*
 
 ## Done
+
+- [x] **(feedback)** draft comments deletable with `D` — `D` on a draft
+      discards the draft instead of tombstoning the comment or thread
+      underneath: an unsaved edit of a posted comment reverts it to its posted
+      text, a half-written new comment is discarded (a thread that held
+      nothing but the draft is dropped and focus returns to the block, the
+      same empty-thread rule `dismiss` uses), and a draft discard writes
+      neither the thread file nor the event log — a draft is not committed
+      review state. `draftAtFocus` (command.go) names the target for both the
+      delete and the palette title with `editTarget`'s precedence, so `D` and
+      `: thread.delete` never disagree. Chosen: discard over tombstone
+      ("delete the draft" reads as the draft going away; tombstoning a comment
+      to discard an edit throws away committed text), `editTarget`'s
+      precedence, no prompt, no event. Drains
+      `vault/feedback/2026-08-11-draft-comments-deletable.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-11.5 — done 2026-08-11
 
 - [x] **Review progress across the whole tree** — a directory review now has a
       tree-wide progress readout. Marks are carried per-document across

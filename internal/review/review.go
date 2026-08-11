@@ -979,31 +979,26 @@ func (m *model) deleteFocused() tea.Cmd {
 	}
 	t := m.threads[anchor]
 
-	// An unsaved edit of a posted comment: discard the draft, keep the
-	// comment at its posted text. Tombstoning the comment would throw away
-	// what was already committed.
-	if m.at.comment >= 0 && m.at.comment < len(t.posted) && t.draft(m.at.comment) != "" {
-		t.setDraft(m.at.comment, "")
-		_ = clearDraft(t.anchor, m.at.comment)
-		m.status = "edit discarded"
-		return nil
-	}
-	// A half-written new comment: discard the draft. A thread that held only
-	// the draft now holds nothing worth a row — drop it and put focus back on
-	// the block, the same empty-thread rule dismiss applies.
-	if m.at.comment == commentNone && t.draft(newCommentSlot) != "" {
-		t.setDraft(newCommentSlot, "")
-		_ = clearDraft(t.anchor, newCommentSlot)
-		m.status = "draft discarded"
-		if len(t.posted) == 0 && len(t.drafts) == 0 && !t.resolved {
-			for i, e := range m.entries {
-				if e.b.anchor == t.anchor && e.thread == nil {
-					m.at = cursor{entry: i, comment: commentNone}
-					break
+	if target := m.draftAtFocus(t); target >= newCommentSlot {
+		t.setDraft(target, "")
+		_ = clearDraft(t.anchor, target)
+		if target == newCommentSlot {
+			m.status = "draft discarded"
+			// A thread that held only the draft now holds nothing worth a
+			// row — drop it and put focus back on the block, the same
+			// empty-thread rule dismiss applies.
+			if len(t.posted) == 0 && len(t.drafts) == 0 && !t.resolved {
+				for i, e := range m.entries {
+					if e.b.anchor == t.anchor && e.thread == nil {
+						m.at = cursor{entry: i, comment: commentNone}
+						break
+					}
 				}
+				delete(m.threads, t.anchor)
+				m.rebuild()
 			}
-			delete(m.threads, t.anchor)
-			m.rebuild()
+		} else {
+			m.status = "edit discarded"
 		}
 		return nil
 	}

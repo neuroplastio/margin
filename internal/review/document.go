@@ -286,6 +286,10 @@ func rollUp(marks []reviewMark) (mark reviewMark, partial bool) {
 // half-finished edit are the same code path.
 const newCommentSlot = -1
 
+// noDraft is draftAtFocus's "nothing unsubmitted under focus" sentinel: less
+// than any real drafts target (newCommentSlot is -1, comment indices >= 0).
+const noDraft = -2
+
 // thread hangs off an anchor. drafts holds unsubmitted text per target: the
 // new-comment slot, or the index of the posted comment being edited.
 type thread struct {

@@ -66,6 +66,7 @@ detectably orphaned rather than silently misplaced.
 | `space` | Cycle the mark: unmarked → reviewed → flagged |
 | `r` / `f` | Set reviewed / flagged directly |
 | `R` | Resolve / unresolve the focused thread |
+| `D` | Delete the focused comment or thread (toggle; deleted comments keep their text and `D` restores) — or, on a draft, discard the draft text |
 | `ctrl+r` | Reload the document after it changed on disk (a `● file changed` notice appears in the footer) |
 | `Y` | Copy the whole review to the clipboard |
 | `tab` | Toggle focus between the document and the file-tree pane (directory reviews) |
