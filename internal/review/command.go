@@ -637,14 +637,22 @@ func resolveTarget(m *model) string {
 	return "resolve"
 }
 
-// deleteTarget names what thread.delete is about to do.
+// deleteTarget names what thread.delete is about to do. A draft is named as a
+// draft — mirroring editTarget's precedence — because D on a draft discards
+// the draft, not the comment or thread underneath it.
 func deleteTarget(m *model) string {
 	t := m.threads[m.anchorAt()]
 	if t == nil {
 		return ""
 	}
 	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
+		if t.draft(m.at.comment) != "" {
+			return "unsaved edit to comment by " + t.posted[m.at.comment].author
+		}
 		return "comment by " + t.posted[m.at.comment].author
+	}
+	if t.draft(newCommentSlot) != "" {
+		return "draft"
 	}
 	return "thread"
 }

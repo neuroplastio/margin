@@ -1,8 +1,6 @@
 # Board
 
-Last updated: 2026-08-11 (tree review progress landed: marks carried
-per-document across switches, each pane row showing its file's `reviewed/total`,
-and the footer rolling the whole tree up).
+Last updated: 2026-08-11 (draft comments deletable with D — claimed)
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
@@ -315,7 +313,12 @@ and the footer rolling the whole tree up).
 
 ## In progress
 
-*(none)*
+- (feedback) draft comments deletable with `D`: when the focused thing is a
+  draft, `D` discards the draft instead of tombstoning the comment or thread
+  underneath — an unsaved edit reverts to the posted text, a half-written new
+  comment is dropped (a thread that held nothing but the draft is dropped too).
+  Drains `vault/feedback/2026-08-11-draft-comments-deletable.md`. Claimed
+  2026-08-11 by the do-leg agent.
 
 ## Done
 

@@ -965,12 +965,48 @@ func (m *model) toggleResolved() {
 // deleteFocused tombstones the focused comment (if expanded) or the whole
 // thread, asking for a second press to confirm since an agent reply already
 // in the thread makes deletion less obviously the reviewer's alone to do.
+//
+// A draft is deleted as a draft first: the focused text is unsubmitted, so D
+// discards it rather than tombstoning the comment or thread underneath
+// (feedback 2026-08-11) — an edit draft reverts the comment to its posted
+// text, and a new-comment draft is discarded, dropping a thread that held
+// nothing but the draft. Neither writes to the thread file or the event log:
+// a draft is not committed review state.
 func (m *model) deleteFocused() tea.Cmd {
 	anchor := m.anchorAt()
 	if anchor == "" || m.threads[anchor] == nil {
 		return nil
 	}
 	t := m.threads[anchor]
+
+	// An unsaved edit of a posted comment: discard the draft, keep the
+	// comment at its posted text. Tombstoning the comment would throw away
+	// what was already committed.
+	if m.at.comment >= 0 && m.at.comment < len(t.posted) && t.draft(m.at.comment) != "" {
+		t.setDraft(m.at.comment, "")
+		_ = clearDraft(t.anchor, m.at.comment)
+		m.status = "edit discarded"
+		return nil
+	}
+	// A half-written new comment: discard the draft. A thread that held only
+	// the draft now holds nothing worth a row — drop it and put focus back on
+	// the block, the same empty-thread rule dismiss applies.
+	if m.at.comment == commentNone && t.draft(newCommentSlot) != "" {
+		t.setDraft(newCommentSlot, "")
+		_ = clearDraft(t.anchor, newCommentSlot)
+		m.status = "draft discarded"
+		if len(t.posted) == 0 && len(t.drafts) == 0 && !t.resolved {
+			for i, e := range m.entries {
+				if e.b.anchor == t.anchor && e.thread == nil {
+					m.at = cursor{entry: i, comment: commentNone}
+					break
+				}
+			}
+			delete(m.threads, t.anchor)
+			m.rebuild()
+		}
+		return nil
+	}
 
 	evKind, evIdx := eventThreadDeleted, -1
 	if m.at.comment >= 0 && m.at.comment < len(t.posted) {
