@@ -531,6 +531,10 @@ func (m *model) moveFocus(d int) {
 	if len(m.entries) == 0 {
 		return
 	}
+	// The reading area's height; the "taller than the viewport" tests at every
+	// walk level — the line dive aside, which is a fine-grained walk by design
+	// — read it, so it is computed once.
+	viewport := max(m.h-footerRows, 1)
 	// Dived into a multi-line block's lines: j/k walk its source lines, and
 	// flow back out at the ends like the thread dive — down past the last
 	// line lands on the next entry, up past the first surfaces back onto the
@@ -575,7 +579,51 @@ func (m *model) moveFocus(d int) {
 				p = 0
 			}
 			if np := p + d; np >= 0 && np < len(vis) {
+				// A comment taller than the viewport is one focus stop but too
+				// long to read in a screen, so the plain dive would leap from
+				// its head straight to the next comment — or, at the thread's
+				// ends, out of the thread — in one press (the 2026-08-11
+				// thread-and-large-comment-navigation feedback). While focus
+				// sits on such a comment, j/k scroll the viewport through it
+				// tallWalkStep lines at a time instead of moving on, exactly
+				// the treatment the block walk gives a tall block; only once
+				// the viewport reaches the comment's far edge does the next
+				// press move focus to the next comment. Visual mode keeps the
+				// plain comment-to-comment walk: entering it lifts focus off
+				// comments, so this branch can never fire mid-selection, and
+				// the guard just keeps the two walks' shapes parallel.
+				if !m.visual {
+					if f, ok := m.subspans[m.at]; ok && f.end-f.start+1 > viewport {
+						if d > 0 {
+							if m.scroll < f.end-viewport+1 {
+								m.scroll = min(f.end-viewport+1, m.scroll+tallWalkStep)
+								m.scrollAnchor = m.at
+								return
+							}
+						} else if m.scroll > f.start {
+							m.scroll = max(f.start, m.scroll-tallWalkStep)
+							m.scrollAnchor = m.at
+							return
+						}
+					}
+				}
 				m.at.comment = vis[np]
+				// Landing on a tall comment opens at the edge the walk is
+				// entering from — its top when walking down, its bottom when
+				// walking up — and pins it with scrollAnchor so the next
+				// render's clampScroll keeps the walked offset instead of
+				// re-deriving it (which would drop into the middle or pin the
+				// tail).
+				if !m.visual {
+					if g, ok := m.subspans[m.at]; ok && g.end-g.start+1 > viewport {
+						if d > 0 {
+							m.scroll = g.start
+						} else {
+							m.scroll = max(0, g.end-viewport+1)
+						}
+						m.scrollAnchor = m.at
+					}
+				}
 				return
 			}
 			if d > 0 {
@@ -621,7 +669,6 @@ func (m *model) moveFocus(d int) {
 		j = len(m.entries) - 1
 	}
 	if !m.visual && m.at.entry >= 0 && m.at.entry < len(m.spans) {
-		viewport := max(m.h-footerRows, 1)
 		f := m.spans[m.at.entry]
 		if f.end-f.start+1 > viewport {
 			if d > 0 {
@@ -771,6 +818,16 @@ func (m *model) dive() {
 	for i, e := range m.entries {
 		if e.thread == t {
 			m.at = cursor{entry: i, comment: vis[0]}
+			// A dive onto a first comment taller than the viewport opens it
+			// at its head, not its tail: the block walk's entering-edge rule
+			// (2026-08-10.22) applies to a dive too, and the next render's
+			// clampScroll would otherwise bottom-align the huge comment and
+			// show its ending first. scrollAnchor pins the offset so
+			// clampScroll keeps it.
+			if f, ok := m.subspans[m.at]; ok && f.end-f.start+1 > max(m.h-footerRows, 1) {
+				m.scroll = f.start
+				m.scrollAnchor = m.at
+			}
 			return
 		}
 	}

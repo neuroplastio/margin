@@ -1,9 +1,20 @@
 # Board
 
-Last updated: 2026-08-11 (thread & large-comment navigation — claimed)
+Last updated: 2026-08-11 (tall comments scroll, they don't skip)
 
 **Active milestone:** M3 — Reading at scale
 **Needs a look:**
+- (thread & large-comment navigation) `j`/`k` on a comment taller than the
+  viewport scroll the viewport 3 lines at a time and never move focus — the
+  same treatment a tall block gets, reading each comment's `m.subspans` span —
+  moving on only at the comment's far edge, so a long thread is no longer
+  accidentally left mid-read; landing on a tall comment opens at the entering
+  edge (head walking down, bottom walking up), `dive()` opens a tall first
+  comment at its head (not the tail `clampScroll` would pin), and the dive's
+  flow-out at the ends is unchanged but now fires only after the edge comment
+  has been read — whether 3 lines is the right step for a very long comment,
+  whether the entering-edge landing is right, and whether leave-only-at-the-edge
+  is the wanted reading of the jarring-exit complaint — journal 2026-08-11.6
 - (draft comments deletable) `D` on a draft discards the draft instead of
   tombstoning what is underneath: an unsaved edit reverts the comment to its
   posted text, a half-written new comment is discarded (a thread that held
@@ -322,14 +333,31 @@ Last updated: 2026-08-11 (thread & large-comment navigation — claimed)
 
 ## In progress
 
-- (feedback) thread & large-comment navigation: `j`/`k` on a comment taller
-  than the viewport should scroll the viewport through it a few lines at a time
-  instead of moving focus to the next comment — the same tall-block treatment
-  blocks get — so a long thread does not spit you out of it mid-read. Drains
-  `vault/feedback/2026-08-11-thread-comment-navigation.md`. Claimed 2026-08-11
-  by the do-leg agent.
+*(none)*
 
 ## Done
+
+- [x] **(feedback)** thread & large-comment navigation — `j`/`k` on a comment
+      taller than the viewport scroll the viewport through it `tallWalkStep`
+      lines at a time instead of moving focus to the next comment, the same
+      treatment a tall block gets (2026-08-10.22). The dive walk in `moveFocus`
+      reads each comment's span from `m.subspans` (the render pass already
+      registers it — F5's one-pass rule), so a large comment is one stop you
+      scroll through: `j`/`k` move the viewport 3 lines a press and keep focus,
+      only moving on at the comment's far edge — its last row at the viewport
+      bottom walking down, its head at the top walking up. Landing on a tall
+      comment opens at the edge the walk enters from (head down, bottom up),
+      with `scrollAnchor` pinned so `clampScroll` keeps the walked offset, and
+      `dive()` opens a thread whose first comment is tall at its head rather
+      than the tail `clampScroll` would pin. The dive's flow-out at the ends is
+      unchanged — a thread never traps — but it now fires only after the edge
+      comment has been read, so leaving a thread happens by finishing it, not
+      by one accidental press. Chosen: reusing `m.subspans` over a new
+      per-comment layout pass, the block walk's exact 3-line step and
+      entering-edge landing, keeping the flow-out at the ends over trapping,
+      a `!m.visual` guard as belt-and-braces. Drains
+      `vault/feedback/2026-08-11-thread-comment-navigation.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-11.6 — done 2026-08-11
 
 - [x] **(feedback)** draft comments deletable with `D` — `D` on a draft
       discards the draft instead of tombstoning the comment or thread
