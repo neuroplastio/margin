@@ -193,6 +193,13 @@ Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 go install github.com/neuroplastio/margin/cmd/margin@latest
 ```
 
+Every push to `main` also builds the artifacts for Linux and macOS (amd64 +
+arm64) and uploads them to the run's **Artifacts** list: `margin_<sha>_<os>_<arch>.tar.gz`
+per platform plus `checksums.txt`. The archive is just the binary, the README
+and the LICENSE — grab the one for your platform, verify it against
+`checksums.txt` with `sha256sum -c`, and run `./margin`. This is for machines
+without a Go toolchain; the version is the short commit sha (`margin --version`).
+
 ## Build
 
 ```

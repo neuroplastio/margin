@@ -1,0 +1,65 @@
+# Release artifacts for every push to main (feedback 2026-08-11-goreleaser-ci).
+# The main point is artifacts you can download, and the version is the short
+# commit sha — no semver tags, no GitHub release objects. `goreleaser release
+# --snapshot --clean` builds Linux/macOS amd64/arm64 archives and raw binaries
+# plus checksums into `dist/` and publishes nothing, and upload-artifact makes
+# them downloadable from the workflow run's artifact list.
+#
+# `check` runs before the build because they catch different things: a snapshot
+# happily succeeds on deprecated options, and deprecated options are how config
+# rots into artifacts that break.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Pinned exactly, and load-bearing: .goreleaser.yml tracks the current v2
+  # schema and an older goreleaser refuses to parse it at all (v2.5.1 cannot).
+  GORELEASER_VERSION: v2.17.1
+
+jobs:
+  snapshot:
+    name: goreleaser snapshot
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-snapshot-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # goreleaser reads the git log for the snapshot version metadata.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          # Single source of truth for the Go floor: the go.mod directive.
+          go-version-file: go.mod
+          check-latest: true
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: ${{ env.GORELEASER_VERSION }}
+          args: check
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: ${{ env.GORELEASER_VERSION }}
+          args: release --snapshot --clean
+
+      # The whole point: the run's artifacts are the deliverable. Archives +
+      # checksums only — each tar.gz already holds the binary, LICENSE and
+      # README, so uploading the bare-binary build output too would double the
+      # upload for no new bits.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: margin-${{ github.sha }}
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+          retention-days: 7
+          if-no-files-found: error

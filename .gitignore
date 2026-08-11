@@ -1,6 +1,9 @@
 /bin/
 /margin
 
+# goreleaser output, produced by `goreleaser release --snapshot`.
+/dist/
+
 # Thread store, written wherever a document is reviewed. Committing it would
 # mean committing review state; the documents carry their block ids already.
 .margin/

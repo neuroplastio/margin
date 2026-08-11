@@ -1,0 +1,57 @@
+# goreleaser config for margin — Linux + macOS (amd64/arm64) only: the
+# composer is a real nvim child (creack/pty), so the binary is platform-paired
+# with a terminal that has nvim; CGO is off and the build is a single static
+# Go binary.
+#
+# This config exists for the **snapshot** pipeline only (`.github/workflows/
+# release.yml`, every push to main): build the artifacts, version them by the
+# short commit sha, and make them downloadable from the workflow run. There is
+# deliberately no tag-based release — no semver tags exist in this repo and
+# none are planned (feedback 2026-08-11-goreleaser-ci). goreleaser's `--snapshot`
+# builds into `dist/` and publishes nothing, which is exactly the shape wanted:
+# no tag validation, no release objects, no tokens.
+version: 2
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: margin
+    main: ./cmd/margin
+    binary: margin
+    env:
+      - CGO_ENABLED=0
+    # main.version is the only stamped var (see the Makefile, which uses
+    # git describe for local builds); here it must be set from the template so
+    # a downloaded artifact reports its own sha instead of the "dev" placeholder.
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: release
+    ids:
+      - margin
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+  - id: binaries
+    ids:
+      - margin
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - binary
+
+checksum:
+  name_template: 'checksums.txt'
+
+# The whole point: the version is the short commit sha, not a semver tag.
+snapshot:
+  version_template: "{{ .ShortCommit }}"

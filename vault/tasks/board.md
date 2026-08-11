@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-11 (Q-0004 raised — how the previous reviewed revision is recorded and located)
+Last updated: 2026-08-11 (goreleaser pipeline landed — downloadable artifacts on every push to main)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -345,6 +345,22 @@ Last updated: 2026-08-11 (Q-0004 raised — how the previous reviewed revision i
 *(none)*
 
 ## Done
+
+- [x] **(feedback)** goreleaser pipeline for pushes into `main` — a
+      `.goreleaser.yml` (linux/darwin amd64/arm64, `CGO_ENABLED=0`, stamps
+      `main.version` from the template) and a `.github/workflows/release.yml`
+      that runs `goreleaser check` then `goreleaser release --snapshot
+      --clean` on every push to `main` and uploads the archives + checksums to
+      the run's Artifacts. The version is the short commit sha
+      (`snapshot.version_template: "{{ .ShortCommit }}"`), not a semver tag —
+      there are no tags and none are planned; snapshot mode builds into `dist/`
+      and publishes nothing, which is exactly the wanted shape. Modeled on
+      kubecom's setup (same v2.17.1 pin, same `check`-then-snapshot order,
+      same archives + checksums upload — the bare-binary archive is kept for a
+      future tag release but not uploaded, kubecom's own "double the upload for
+      no new bits" judgment). Drains
+      `vault/feedback/2026-08-11-goreleaser-ci.md`; the file is deleted.
+      `[mech]` — see journal 2026-08-11.9 — done 2026-08-11
 
 - [x] **(feedback fix)** mouse hover throttled — a pointer sweep across the
       document no longer floods the input queue. Bubble Tea runs `Update` and
