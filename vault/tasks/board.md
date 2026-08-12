@@ -342,7 +342,9 @@ Last updated: 2026-08-11 (goreleaser pipeline landed — downloadable artifacts 
 
 ## In progress
 
-*(none)*
+- **(feedback)** mark and comment individual lines when diving inside a block —
+  `vault/feedback/2026-08-11-dive-line-mark-comment.md` — claimed 2026-08-12
+  (leg, draining the feedback)
 
 ## Done
 
