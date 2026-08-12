@@ -2417,8 +2417,11 @@ func (m *model) renderRaw() []string {
 	// scrollCodeLine clipping the rendered view applies to a code block or
 	// table — once any line overflows the measure, every line clips at it, so
 	// a line's length does not jump when the offset moves off 0. The gutter
-	// stays fixed on the left, focus bar and mark rule included.
-	scroll := m.rawH > 0 || hasOverflow(srcLines, w)
+	// stays fixed on the left, focus bar and mark rule included. Overflow is
+	// measured on tabs-expanded lines: a tab renders at the next tab stop, so
+	// its width is the expanded width, and a code line that highlights
+	// expands (highlightCode) while it is clipped.
+	scroll := m.rawH > 0 || hasOverflow(expandLines(srcLines, codeTabWidth), w)
 
 	// codeHL holds, per entry index, the chroma-highlighted content lines of
 	// a fenced code block, so a source line inside a code block can borrow
@@ -2641,7 +2644,10 @@ func (m *model) render() []string {
 						out = md
 						preStyled = true
 					} else {
-						out = e.b.lines
+						// A mermaid fence the renderer cannot parse falls back
+						// to its plain source lines — tabs expanded like any
+						// other code (2026-08-12 code-block-tabs feedback).
+						out = expandLines(e.b.lines, codeTabWidth)
 					}
 				} else {
 					out = highlightCode(e.b.lines, e.b.lang)
@@ -3376,20 +3382,92 @@ func plainMarkdown(s string) string {
 // meant for a dedicated editor pane.
 const codeStyleName = "monokai"
 
+// codeTabWidth is the width margin expands a tab to when rendering. The
+// terminal margin draws into would otherwise resolve a literal tab against
+// its own *absolute* screen tab stops — the default every 8 columns — so a
+// tab past the gutter lands wherever those stops happen to be, independent
+// of how the gutter shifted the line, and a width calculation that counts a
+// tab as one rune under-measures the line by up to seven columns. Expanding
+// to spaces at 8 (the terminal and vim default, and chroma's own HTML
+// TabWidth) makes what is on screen match what the width maths measured.
+// Recorded, not configurable — see journal 2026-08-12.4.
+const codeTabWidth = 8
+
+// expandTabsLine replaces each tab in s with the spaces a terminal would move
+// through to reach the next tab stop, measured from the line's own start: a
+// tab at column c advances to the next multiple of tabWidth. A newline resets
+// the column, so a multi-line string expands as if each line began at column
+// 0. ANSI escapes are skipped while counting columns (and copied verbatim),
+// so the function is safe on an already-styled line too.
+func expandTabsLine(s string, tabWidth int) string {
+	if !strings.ContainsRune(s, '\t') {
+		return s
+	}
+	var b strings.Builder
+	col := 0
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' {
+			j := i + 1
+			if j < len(s) && s[j] == '[' {
+				j++
+				for j < len(s) && !(s[j] >= 'a' && s[j] <= 'z') && !(s[j] >= 'A' && s[j] <= 'Z') {
+					j++
+				}
+				if j < len(s) {
+					j++
+				}
+			}
+			b.WriteString(s[i:j])
+			i = j
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case r == '\t':
+			pad := tabWidth - col%tabWidth
+			b.WriteString(strings.Repeat(" ", pad))
+			col += pad
+		case r == '\n':
+			b.WriteRune(r)
+			col = 0
+		default:
+			b.WriteRune(r)
+			col++
+		}
+		i += size
+	}
+	return b.String()
+}
+
+// expandLines maps expandTabsLine over a slice of source lines — the per-line
+// convenience for a code block's content or a raw view's source lines.
+func expandLines(lines []string, tabWidth int) []string {
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = expandTabsLine(l, tabWidth)
+	}
+	return out
+}
+
 // highlightCode runs a fenced code block's content through chroma, returning
 // one already-ANSI-styled line per input line — render()'s preStyled path,
-// the same one wrapInline uses for RENDER-06's inline markup. lang is the
-// fence's info string; chroma falls back to a lexer it guesses from the
-// content, and finally to an unhighlighted passthrough, so an unrecognised
-// or absent language degrades to plain text rather than an error on screen.
+// the same one wrapInline uses for RENDER-06's inline markup. Tabs are
+// expanded to spaces (codeTabWidth) before highlighting, because chroma's tty
+// formatter passes a literal tab through untouched and the terminal would
+// then resolve it against absolute screen stops, mis-rendering the
+// indentation and breaking every width measurement. lang is the fence's info
+// string; chroma falls back to a lexer it guesses from the content, and
+// finally to an unhighlighted passthrough, so an unrecognised or absent
+// language degrades to plain text rather than an error on screen.
 func highlightCode(lines []string, lang string) []string {
 	if len(lines) == 0 {
 		return []string{""}
 	}
-	src := strings.Join(lines, "\n")
+	src := expandTabsLine(strings.Join(lines, "\n"), codeTabWidth)
 	var buf bytes.Buffer
 	if err := quick.Highlight(&buf, src, lang, "terminal256", codeStyleName); err != nil {
-		return lines
+		return expandLines(lines, codeTabWidth)
 	}
 	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
 }
@@ -3423,7 +3501,7 @@ func (m *model) scrollBlock(delta int) {
 			if md, ok := renderMermaid(e.b.lines); ok {
 				lines = md
 			} else {
-				lines = e.b.lines
+				lines = expandLines(e.b.lines, codeTabWidth)
 			}
 		} else {
 			lines = highlightCode(e.b.lines, e.b.lang)
@@ -3495,7 +3573,10 @@ func (m *model) scrollRaw(delta int) {
 	srcLines := strings.Split(src, "\n")
 	maxLen := 0
 	for _, l := range srcLines {
-		if lw := visualWidth(l); lw > maxLen {
+		// Tabs measure at their expanded width — a tab renders at the next
+		// 8-column stop, so maxScroll must span it or the line's tail would
+		// never be reachable (2026-08-12 code-block-tabs feedback).
+		if lw := visualWidth(expandTabsLine(l, codeTabWidth)); lw > maxLen {
 			maxLen = lw
 		}
 	}

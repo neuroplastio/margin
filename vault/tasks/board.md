@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-12 (threads view + comment hop)
+Last updated: 2026-08-12 (code block tabs expand to spaces)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -376,6 +376,23 @@ Last updated: 2026-08-12 (threads view + comment hop)
 *(none)*
 
 ## Done
+
+- [x] **(feedback fix)** code block tabs render as spaces, not terminal tab
+      stops — a fenced block's literal `\t` reached the terminal untouched
+      (chroma's tty formatter has no tab option, unlike its HTML `TabWidth`),
+      and the terminal resolved it against *absolute* screen tab stops, so a
+      tab-indented block misaligned past the gutter and every width
+      calculation counted a tab as one rune against up-to-eight rendered
+      columns. New `expandTabsLine` (ANSI-aware, column resets at a newline,
+      advance to the next multiple of `codeTabWidth` = 8 — the terminal and
+      vim default) is fed into `highlightCode` before chroma tokenises, into
+      the mermaid-fallback plain path in `render()` and `scrollBlock()`, and
+      into raw mode's `hasOverflow`/`scrollRaw` measurements, so the rendered
+      text and the width maths finally agree. Chosen: 8-wide expansion (the
+      platform default, so the fix is deterministic, not a new preference)
+      over a `--tab-width` flag. Drains
+      `vault/feedback/2026-08-12-code-block-tabs-render.md`; the file is
+      deleted. `[mech]` — see journal 2026-08-12.4 — done 2026-08-12
 
 - [x] **(feedback)** a "threads" view and next/previous comment hopping — `i`
       now opens the threads view in single-document reviews too: the current

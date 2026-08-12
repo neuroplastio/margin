@@ -1166,7 +1166,9 @@ func TestAppendCommentsRendersMarkdownAndKeepsLineBreaks(t *testing.T) {
 // regression test for RENDER-02: a fenced code block whose language chroma
 // recognises must come back styled — some ANSI escape on at least one
 // line — while every source line's own text (words, indentation) survives
-// untouched underneath the colour.
+// untouched underneath the colour. Tabs are expanded to spaces first
+// (2026-08-12 code-block-tabs feedback), so the de-styled output is the
+// source with each tab at its 8-column stop, not the raw tab byte.
 func TestHighlightCodeAppliesColourForARecognisedLanguage(t *testing.T) {
 	lines := []string{"func retry(n int) error {", "\treturn nil", "}"}
 	out := highlightCode(lines, "go")
@@ -1182,10 +1184,58 @@ func TestHighlightCodeAppliesColourForARecognisedLanguage(t *testing.T) {
 	if !styled {
 		t.Errorf("no line carries an ANSI escape for a recognised language: %q", out)
 	}
+	want := []string{"func retry(n int) error {", "        return nil", "}"}
 	for i, l := range out {
 		plain := ansiRe.ReplaceAllString(l, "")
-		if plain != lines[i] {
-			t.Errorf("line %d = %q once de-styled, want the source line %q byte-for-byte", i, plain, lines[i])
+		if plain != want[i] {
+			t.Errorf("line %d = %q once de-styled, want %q (source with tabs expanded)", i, plain, want[i])
+		}
+	}
+}
+
+// TestHighlightCodeExpandsTabs pins the code-block-tabs fix: a tab inside a
+// fenced block must render as spaces to the next 8-column stop, not as a
+// literal tab the terminal resolves against absolute screen stops. The width
+// of the expanded line is what the width maths see, so visualWidth of the
+// de-styled output matches the column the terminal will draw the text at.
+func TestHighlightCodeExpandsTabs(t *testing.T) {
+	lines := []string{"\tx", "\t\t\ty", "a\tb"}
+	out := highlightCode(lines, "go")
+	want := []string{
+		strings.Repeat(" ", 8) + "x",
+		strings.Repeat(" ", 24) + "y",
+		"a" + strings.Repeat(" ", 7) + "b",
+	}
+	for i, l := range out {
+		plain := ansiRe.ReplaceAllString(l, "")
+		if plain != want[i] {
+			t.Errorf("line %d = %q once de-styled, want %q", i, plain, want[i])
+		}
+		if strings.ContainsRune(plain, '\t') {
+			t.Errorf("line %d still carries a tab: %q", i, plain)
+		}
+	}
+}
+
+// TestExpandTabsLine pins the expansion rule itself: a tab advances to the
+// next multiple of tabWidth from the line's own start, and the column resets
+// at a newline. ANSI escapes are skipped while counting, so an already-styled
+// line expands the same way a plain one does.
+func TestExpandTabsLine(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"no tabs", "no tabs"},
+		{"\tx", strings.Repeat(" ", 8) + "x"},
+		{"x\t\ty", "x" + strings.Repeat(" ", 15) + "y"},
+		{"a\tb\n\tc", "a" + strings.Repeat(" ", 7) + "b\n" + strings.Repeat(" ", 8) + "c"},
+		{"\x1b[31m\tx\x1b[0m", "\x1b[31m" + strings.Repeat(" ", 8) + "x\x1b[0m"},
+	}
+	for _, c := range cases {
+		if got := expandTabsLine(c.in, 8); got != c.want {
+			t.Errorf("expandTabsLine(%q, 8) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }
@@ -1206,6 +1256,37 @@ func TestHighlightCodeDegradesForAnUnknownLanguage(t *testing.T) {
 		if plain != lines[i] {
 			t.Errorf("line %d = %q once de-styled, want the source line %q byte-for-byte", i, plain, lines[i])
 		}
+	}
+}
+
+// TestRenderCodeBlockExpandsTabs is the end-to-end half of the
+// code-block-tabs fix: a document whose fenced Go block is tab-indented must
+// render with spaces (a tab at its 8-column stop), never a literal tab — a
+// literal tab would be resolved by the terminal against absolute screen
+// stops, so the indentation would misalign past the gutter, and margin's own
+// width maths would under-measure the line. The gutter carries the tab-free
+// line; its de-styled width is the expanded width, matching the columns the
+// terminal will actually draw.
+func TestRenderCodeBlockExpandsTabs(t *testing.T) {
+	src := "```go\nfunc f() {\n\tx := 1\n\t\treturn x\n}\n```\n"
+	m := newModelAt("sample.md", parseDoc([]byte(src)), nil)
+	m.w, m.h = 40, 60
+	lines := m.render()
+	content := []string{"func f() {", strings.Repeat(" ", 8) + "x := 1", strings.Repeat(" ", 16) + "return x", "}"}
+	found := 0
+	for _, l := range lines {
+		plain := ansiRe.ReplaceAllString(l, "")
+		if strings.ContainsRune(plain, '\t') {
+			t.Errorf("rendered line still carries a literal tab: %q", plain)
+		}
+		for _, want := range content {
+			if strings.Contains(plain, want) {
+				found++
+			}
+		}
+	}
+	if found != len(content) {
+		t.Errorf("rendered code block contains %d of %d expected lines (some tab content was lost)", found, len(content))
 	}
 }
 

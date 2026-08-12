@@ -606,3 +606,25 @@ untouched; there is no `<S-CR>` mapping to write because the child never
 sees the key. `interaction.md`'s "ctrl+\ and ctrl+enter are the only keys
 the host takes" needs widening to include shift+enter, and that line is
 bounding until the maintainer judges the newline behaviour.
+
+## F27 — chroma's tty formatter passes a literal tab through; margin must expand it itself
+
+`quick.Highlight(..., "terminal256", ...)` does not expand tabs (unlike the
+HTML formatter's `TabWidth`, its tty formatter has no tab option and copies a
+`\t` into the styled output verbatim). Sending that to the terminal is the
+trap: the terminal resolves a tab against its *absolute* screen tab stops
+(every 8 columns by default), so the indentation lands wherever the stops
+happen to be relative to the gutter, and — because the gutter shifts every
+code line — a "correctly" tab-indented block renders with a leading offset
+that does not match the source. Worse, `visualWidth` counts a tab as one
+rune while the terminal renders it as up-to-eight columns, so overflow
+detection and horizontal-scroll bounds under-measure tab-heavy lines.
+
+The fix is to expand tabs to spaces before anything measures or emits them
+(2026-08-12.4): `expandTabsLine` (skip ANSI while counting, reset the column
+at a newline, advance to the next multiple of 8) fed into `highlightCode`
+before chroma tokenises, into the mermaid-fallback plain path, and into raw
+mode's overflow/scroll measurement. Expanding is also the only faithful
+option for a terminal renderer: a literal tab *cannot* be shown as itself, so
+the choice is between resolved stops and expanded spaces, and only the latter
+is deterministic and measurable.
