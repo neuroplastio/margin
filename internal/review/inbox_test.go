@@ -234,18 +234,18 @@ func TestInboxOpenReportsDocNotInTree(t *testing.T) {
 	}
 }
 
-func TestInboxSingleDocumentHasNoCommand(t *testing.T) {
+func TestInboxSingleDocumentNeedsAStore(t *testing.T) {
 	m := seedModel()
 	cmd, ok := commandByID("inbox.toggle")
 	if !ok {
 		t.Fatal("inbox.toggle is not registered")
 	}
 	if cmd.Applicable(m) {
-		t.Error("inbox.toggle is applicable in a single-document review")
+		t.Error("inbox.toggle is applicable on a model with no store (no review root)")
 	}
 	cmd.Run(m, "")
 	if m.inbox {
-		t.Error("inbox.toggle opened the inbox with no tree")
+		t.Error("inbox.toggle opened the threads view with no store")
 	}
 }
 
@@ -285,11 +285,154 @@ func TestViewComposesPaneAndInboxColumns(t *testing.T) {
 	m.w, m.h = 100, 20
 	m.toggleInbox()
 	out := m.View().Content
-	// The tree pane still renders beside the inbox, and the inbox shows a
+	// The tree pane still renders beside the threads view, and the view shows a
 	// thread row and the footer hint.
-	for _, want := range []string{"README.md", "docs/", "inbox — 3 thread(s)", "oldest"} {
+	for _, want := range []string{"README.md", "docs/", "threads — 3 thread(s)", "oldest"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("inbox view does not contain %q:\n%s", want, out)
 		}
+	}
+}
+
+// TestSingleDocumentThreadsView: a single-document review (store set, no tree)
+// now has the threads view too — it lists the current document's threads,
+// newest first, orphans included. The document name is dropped from the rows
+// (every row is the same document), and an orphaned thread is marked.
+func TestSingleDocumentThreadsView(t *testing.T) {
+	m := newTestModel(t)
+	m.store = &threadStore{root: t.TempDir(), docPath: "document.md"}
+	// An orphan: a thread whose block is not in the document.
+	m.threads["^gone"] = &thread{
+		anchor: "^gone",
+		quote:  "vanished block",
+		posted: []comment{{author: "you", body: "the block this was on is gone", at: time.Now()}},
+	}
+	reattach(m.doc, m.threads)
+
+	cmd, ok := commandByID("inbox.toggle")
+	if !ok {
+		t.Fatal("inbox.toggle is not registered")
+	}
+	if !cmd.Applicable(m) {
+		t.Fatal("inbox.toggle is not applicable in a single-document review with a store")
+	}
+	cmd.Run(m, "")
+	if !m.inbox {
+		t.Fatal("inbox.toggle did not open the threads view")
+	}
+	if len(m.inboxItems) != 4 {
+		t.Fatalf("threads view has %d items, want 4 (3 seeded + the orphan)", len(m.inboxItems))
+	}
+	// The orphan is present, newest first, and its doc is the current one.
+	if !m.inboxItems[0].thread.orphaned {
+		t.Fatalf("first item's thread is not orphaned: %+v", m.inboxItems[0].thread)
+	}
+	if m.inboxItems[0].doc != "document.md" {
+		t.Errorf("orphan's doc = %q, want document.md", m.inboxItems[0].doc)
+	}
+
+	m.w, m.h = 100, 30
+	rows := m.renderInbox(10)
+	if !strings.Contains(rows[0], "[block gone]") {
+		t.Errorf("orphaned row does not say [block gone]:\n%q", rows[0])
+	}
+	if strings.Contains(rows[1], "document.md  ") {
+		t.Errorf("single-doc row repeats the document name:\n%q", rows[1])
+	}
+}
+
+// TestSingleDocumentThreadsViewOpen: entering an attached thread in a
+// single-document threads view lands on the block; entering an orphaned one
+// reports the block is gone without pretending to open it.
+func TestSingleDocumentThreadsViewOpen(t *testing.T) {
+	m := newTestModel(t)
+	m.store = &threadStore{root: t.TempDir(), docPath: "document.md"}
+	m.threads["^gone"] = &thread{
+		anchor: "^gone",
+		quote:  "vanished block",
+		posted: []comment{{author: "you", body: "the block this was on is gone", at: time.Now()}},
+	}
+	reattach(m.doc, m.threads)
+
+	m.toggleInbox()
+	// Find the rows: the orphan sorts newest first (index 0); the convo thread
+	// is in there too.
+	var orphan, convo int
+	for i, it := range m.inboxItems {
+		if it.anchor == "^gone" {
+			orphan = i
+		}
+		if it.anchor == convoAnchor {
+			convo = i
+		}
+	}
+	m.openInboxItem(orphan)
+	if !strings.Contains(m.status, "block is gone") {
+		t.Errorf("opening the orphan status = %q, want the block-gone report", m.status)
+	}
+	m.toggleInbox()
+	m.openInboxItem(convo)
+	if got := m.entries[m.at.entry].b.anchor; got != convoAnchor {
+		t.Errorf("landed on %q, want %q", got, convoAnchor)
+	}
+}
+
+// TestCommentHop: `]`/`[` hop focus to the next/previous thread in the
+// document, recording each landing in the jumplist and reporting at the ends.
+func TestCommentHop(t *testing.T) {
+	m := newTestModel(t)
+	m.w, m.h = 100, 60
+	m.at = cursor{entry: 0, comment: commentNone}
+
+	cmd, ok := commandByID("comment.next")
+	if !ok {
+		t.Fatal("comment.next is not registered")
+	}
+	cmd.Run(m, "")
+	if m.entries[m.at.entry].thread == nil {
+		t.Fatalf("] landed on a non-thread entry %d", m.at.entry)
+	}
+	first := m.at.entry
+
+	cmd.Run(m, "")
+	if m.at.entry <= first {
+		t.Errorf("second ] did not advance: %d -> %d", first, m.at.entry)
+	}
+
+	// The hop is recorded in the jumplist: ctrl+o returns to where it started.
+	if len(m.jumps) < 3 {
+		t.Errorf("jumplist has %d entries, want the two hops recorded", len(m.jumps))
+	}
+
+	// Reaching the end reports instead of wrapping.
+	m.at = cursor{entry: len(m.entries) - 1, comment: commentNone}
+	before := m.status
+	cmd.Run(m, "")
+	if m.status == before || !strings.Contains(m.status, "no more comments") {
+		t.Errorf("hop past the end status = %q, want the no-more report", m.status)
+	}
+
+	prev, ok := commandByID("comment.prev")
+	if !ok {
+		t.Fatal("comment.prev is not registered")
+	}
+	prev.Run(m, "")
+	if m.entries[m.at.entry].thread == nil {
+		t.Fatalf("[ landed on a non-thread entry %d", m.at.entry)
+	}
+}
+
+// TestCommentHopKeysRouteThroughTheRegistry: ] and [ resolve to comment.next
+// and comment.prev.
+func TestCommentHopKeysRouteThroughTheRegistry(t *testing.T) {
+	if id := keymap["]"]; id != "comment.next" {
+		t.Errorf("keymap[\"]\"] = %q, want comment.next", id)
+	}
+	if id := keymap["["]; id != "comment.prev" {
+		t.Errorf("keymap[\"[\"] = %q, want comment.prev", id)
+	}
+	// The palette shows the binding.
+	if got := firstBinding("comment.next"); got != "]" {
+		t.Errorf("firstBinding(comment.next) = %q, want ]", got)
 	}
 }

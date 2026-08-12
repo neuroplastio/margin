@@ -472,19 +472,44 @@ var commands = []command{
 		Run:         func(m *model, val string) tea.Cmd { return m.exportToClipboard() },
 	},
 	{
-		// inbox.toggle swaps the document column for the cross-document
-		// comment inbox (inbox.go): every thread across the tree's documents,
-		// newest first, `enter` jumping to the thread's block. `i` is the
-		// binding — unbound before, and reading as "inbox". Tree reviews only:
-		// a single-document review has no other documents to aggregate (D10),
-		// so Applicable is false and `i` stays unbound there.
+		// inbox.toggle swaps the document column for the threads view
+		// (inbox.go): every thread under review, newest first, `enter`
+		// jumping to the thread's block. In a tree review that is every
+		// thread across the tree's documents; in a single-document review it
+		// is the current document's threads, orphans included (a thread
+		// whose block is gone is listed `[block gone]`, never dropped). `i`
+		// is the binding — unbound before this feedback, and reading as
+		// "inbox"/"threads". Needs a real review root to have anything to
+		// list, so Applicable is store != nil — a seeded or ephemeral model
+		// has no threads on disk.
 		ID:          "inbox.toggle",
-		Description: "Show the cross-document comment inbox",
-		Applicable:  func(m *model) bool { return m.tree != nil },
+		Description: "Show the threads view",
+		Applicable:  func(m *model) bool { return m.store != nil },
 		Run: func(m *model, val string) tea.Cmd {
 			m.toggleInbox()
 			return nil
 		},
+	},
+	{
+		// comment.next/comment.prev hop focus to the next/previous thread in
+		// the document — the "next/previous comment" half of the threads-view
+		// feedback. A thread is one focus stop however long it renders
+		// (journal 2026-08-09.18), so the hop walks the entry list for the
+		// next/prev thread row and lands on it, centred, recorded in the
+		// jumplist so ctrl+o walks back. At the document's ends it reports
+		// rather than wraps. `]` and `[` are the bindings: the bracket pair
+		// reads as "move forward/backward through comments", they were
+		// unbound, and they are on the home row next to the j/k walk.
+		ID:          "comment.next",
+		Description: "Jump to the next comment",
+		Applicable:  func(m *model) bool { return true },
+		Run:         func(m *model, val string) tea.Cmd { m.stepComment(1); return nil },
+	},
+	{
+		ID:          "comment.prev",
+		Description: "Jump to the previous comment",
+		Applicable:  func(m *model) bool { return true },
+		Run:         func(m *model, val string) tea.Cmd { m.stepComment(-1); return nil },
 	},
 	{
 		// view.raw toggles between the rendered document and the raw markdown
@@ -737,6 +762,8 @@ var keyBindings = []struct {
 	{"s", "goto"},
 	{"\\", "view.raw"},
 	{"i", "inbox.toggle"},
+	{"]", "comment.next"},
+	{"[", "comment.prev"},
 	{"tab", "tree.focus"},
 	{"ctrl+r", "doc.reload"},
 	{"q", "app.quit"}, {"ctrl+c", "app.quit"},

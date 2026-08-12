@@ -3032,7 +3032,7 @@ func (m *model) View() tea.View {
 		b.WriteString(searchBox)
 	} else if m.inbox {
 		b.WriteString(dimStyle.Render(fmt.Sprintf(
-			"inbox — %d thread(s) · j/k move · enter open · esc close   ", len(m.inboxItems))))
+			"threads — %d thread(s) · j/k move · enter open · esc close   ", len(m.inboxItems))))
 		if m.status != "" {
 			b.WriteString(dimStyle.Render(m.status))
 		}

@@ -1,17 +1,18 @@
-// The cross-document comment inbox: in a tree review (D10), `i` swaps the
-// document column for a list of every thread across the tree's documents,
-// newest activity first, and `enter` on a row opens that thread's document
-// and lands on the block it is anchored to. It is the comment-inbox half of
-// M3's "navigation between documents, and a cross-document comment inbox";
-// the navigation half is `ctrl+]` link following (jump.go).
+// The threads view: `i` swaps the document column for a list of the threads
+// under review — every thread across the tree's documents in a tree review
+// (D10), newest activity first, and the current document's own threads in a
+// single-document review — and `enter` on a row jumps to the block it is
+// anchored to. It is the threads-view half of the 2026-08-12 threads-view
+// feedback: a way to discover threads that are easy to lose in a long
+// document, including the ones that can no longer be attached — a thread
+// whose block vanished from its document is listed and reported, not dropped.
 //
-// The inbox is a reading surface, not a new persistence: it reads the same
-// thread files under .margin/threads/ everything else reads and writes
-// nothing. It is scoped to tree reviews — a single-document review has no
-// other documents to aggregate, so `i` is unbound there (D10). Threads whose
-// document is no longer in the tree still appear, reported rather than
-// silently dropped — the tree-level form of the orphaned-thread rule a
-// single document already follows.
+// The view is a reading surface, not a new persistence: it reads the same
+// thread files (or, in a single-document review, the already-loaded
+// m.threads) everything else reads and writes nothing. Threads whose document
+// is no longer in the tree still appear, reported rather than silently
+// dropped — the tree-level form of the orphaned-thread rule a single
+// document already follows.
 package review
 
 import (
@@ -92,23 +93,50 @@ func loadInbox(root string, tree []treeEntry) ([]inboxItem, error) {
 	return items, nil
 }
 
-// toggleInbox opens or closes the inbox view. Opening rebuilds the item list
-// from disk, so a comment posted in another document since the last visit
-// shows up, and clears the session's other surfaces — raw, search and the
-// palette are different views and the inbox takes their column.
+// docThreadItems builds the threads-view rows for a single-document review:
+// one row per thread on the current document, newest activity first, straight
+// from the already-loaded m.threads (which reattach has already told apart
+// into attached and orphaned). A tree review uses loadInbox instead — it has
+// more than one document to aggregate, so it reads the thread files from
+// disk. A single-document review has exactly one document, and m.threads *is*
+// that document's threads, so re-reading the same files would be redundant
+// work that misses nothing.
+func (m *model) docThreadItems() []inboxItem {
+	items := make([]inboxItem, 0, len(m.threads))
+	for anchor, t := range m.threads {
+		items = append(items, inboxItem{doc: m.store.docPath, anchor: anchor, thread: t, inTree: true})
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].last().After(items[j].last())
+	})
+	return items
+}
+
+// toggleInbox opens or closes the threads view. Opening rebuilds the item
+// list — from disk in a tree review (so a comment posted in another document
+// since the last visit shows up), from the already-loaded m.threads in a
+// single-document review — and clears the session's other surfaces — raw,
+// search and the palette are different views and the threads view takes
+// their column.
 func (m *model) toggleInbox() {
 	if m.inbox {
 		m.inbox = false
 		m.status = ""
 		return
 	}
-	if m.tree == nil || m.store == nil {
+	if m.store == nil {
 		return
 	}
-	items, err := loadInbox(m.store.root, m.tree)
-	if err != nil {
-		m.status = "inbox: " + err.Error()
-		return
+	var items []inboxItem
+	if m.tree != nil {
+		var err error
+		items, err = loadInbox(m.store.root, m.tree)
+		if err != nil {
+			m.status = "inbox: " + err.Error()
+			return
+		}
+	} else {
+		items = m.docThreadItems()
 	}
 	m.inboxItems = items
 	m.inboxAt = 0
@@ -155,12 +183,69 @@ func (m *model) handleInboxKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// openInboxItem jumps to the thread at row i: it opens the thread's document
-// exactly as a pane open would (openTreeFile — the same re-pointing, the same
-// session reset), then lands focus on the block the thread is anchored to,
-// centred, with the landing recorded in the jumplist so ctrl+o walks back.
-// A thread whose document is no longer in the tree, or whose block has
-// vanished from that document, is reported rather than silently dropped.
+// stepComment moves focus to the next (d=1) or previous (d=-1) thread in the
+// document — the "next/previous comment" hop of the threads-view feedback. A
+// thread is one focus stop however long it renders (journal 2026-08-09.18),
+// so the walk is over m.entries' thread rows, skipping the one focus
+// currently sits on. The landing is a jump: recorded in the jumplist (so
+// ctrl+o returns to where the hop started) and centred like a search match.
+// At the document's ends it reports rather than wraps — a hop past the last
+// comment should say so, not silently restart at the first. A raw view has no
+// thread rows (rebuild excludes them), so the hop reports "none".
+func (m *model) stepComment(d int) {
+	if m.raw {
+		m.status = "no comments in raw view"
+		return
+	}
+	start := m.at.entry
+	i := start + d
+	for i >= 0 && i < len(m.entries) {
+		if m.entries[i].thread != nil {
+			m.pushJump(cursor{entry: i, comment: commentNone})
+			m.jumpToEntry(i)
+			m.status = fmt.Sprintf("comment %d/%d · %s", commentOrdinal(i, m.entries), len(threadRows(m.entries)), m.entries[i].thread.summary(false))
+			return
+		}
+		i += d
+	}
+	if d > 0 {
+		m.status = "no more comments below"
+	} else {
+		m.status = "no more comments above"
+	}
+}
+
+// threadRows returns the entry indices that carry a thread row.
+func threadRows(entries []entry) []int {
+	var out []int
+	for i, e := range entries {
+		if e.thread != nil {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+// commentOrdinal reports which thread row (1-based) entry i is, in document
+// order — the "3 of 7" half of the hop's status line.
+func commentOrdinal(i int, entries []entry) int {
+	n := 0
+	for j := 0; j <= i; j++ {
+		if entries[j].thread != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// openInboxItem jumps to the thread at row i: in a tree review it opens the
+// thread's document exactly as a pane open would (openTreeFile — the same
+// re-pointing, the same session reset), then lands focus on the block the
+// thread is anchored to, centred, with the landing recorded in the jumplist
+// so ctrl+o walks back. In a single-document review the document is already
+// open, so the landing is all there is. A thread whose document is no longer
+// in the tree, or whose block has vanished from that document, is reported
+// rather than silently dropped.
 func (m *model) openInboxItem(i int) {
 	if i < 0 || i >= len(m.inboxItems) {
 		return
@@ -171,20 +256,24 @@ func (m *model) openInboxItem(i int) {
 		m.status = fmt.Sprintf("thread %s's document %s is not in this tree", item.anchor, item.doc)
 		return
 	}
-	row := -1
-	for j, e := range m.tree {
-		if !e.isDir && e.rel == item.doc {
-			row = j
-			break
+	// A single-document review has no tree to switch within — the document is
+	// already the one under review, so there is nothing to open or re-point.
+	if m.tree != nil {
+		row := -1
+		for j, e := range m.tree {
+			if !e.isDir && e.rel == item.doc {
+				row = j
+				break
+			}
 		}
-	}
-	if row < 0 {
-		m.status = fmt.Sprintf("thread %s's document %s is not in this tree", item.anchor, item.doc)
-		return
-	}
-	// A thread on the document already under review jumps without switching.
-	if item.doc != m.store.docPath {
-		m.openTreeFile(row)
+		if row < 0 {
+			m.status = fmt.Sprintf("thread %s's document %s is not in this tree", item.anchor, item.doc)
+			return
+		}
+		// A thread on the document already under review jumps without switching.
+		if item.doc != m.store.docPath {
+			m.openTreeFile(row)
+		}
 	}
 	// Land on the thread's block, centred like a search or link jump. A
 	// thread whose block vanished from its document is surfaced, not dropped:
@@ -194,11 +283,11 @@ func (m *model) openInboxItem(i int) {
 		if e.b.anchor == item.anchor {
 			m.pushJump(cursor{entry: j, comment: commentNone})
 			m.jumpToEntry(j)
-			m.status = fmt.Sprintf("inbox: %s · %s", item.doc, item.thread.summary(false))
+			m.status = fmt.Sprintf("threads: %s · %s", item.doc, item.thread.summary(false))
 			return
 		}
 	}
-	m.status = fmt.Sprintf("inbox: %s — the thread's block is gone", item.doc)
+	m.status = fmt.Sprintf("threads: %s — the thread's block is gone", item.doc)
 }
 
 // renderInbox returns the inbox's rows for one viewport, each padded so the
@@ -230,7 +319,14 @@ func (m *model) renderInbox(viewport int) []string {
 			break
 		}
 		item := m.inboxItems[idx]
-		txt := item.doc + "  " + item.thread.summary(false)
+		txt := item.thread.summary(false)
+		// In a tree review each row names its document — the threads span the
+		// tree, so a row without its home is unplaceable. In a single-document
+		// review every row is the same document, so the name would be a
+		// wall of identical noise; the summary alone says which thread it is.
+		if m.tree != nil {
+			txt = item.doc + "  " + txt
+		}
 		style := textStyle
 		if item.thread.resolved {
 			style = dimStyle
@@ -245,6 +341,8 @@ func (m *model) renderInbox(viewport int) []string {
 		}
 		if !item.inTree {
 			txt += "  [doc not in tree]"
+		} else if item.thread.orphaned {
+			txt += "  [block gone]"
 		}
 		txt = truncate(txt, max(0, w-gutterW-4))
 		rows[i] = strings.Repeat(" ", gutterW) + marker + resolved + style.Render(txt)

@@ -1,9 +1,18 @@
 # Board
 
-Last updated: 2026-08-12 (shift+enter is a line break, not a draft exit)
+Last updated: 2026-08-12 (threads view + comment hop)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (threads view & comment hop) `i` now opens the threads view in
+  single-document reviews too: the current document's threads, newest first,
+  with a thread whose block has vanished marked `[block gone]` and reported on
+  enter instead of dropped; `]`/`[` hop focus to the next/previous thread in
+  the document, centred and jumplist-recorded, reporting at the ends — whether
+  the list is the right surface for a single document, whether `[block gone]`
+  is the right marker (should the orphan's full text be reachable?), whether
+  `]`/`[` are the right hop keys and not-wrapping is right, and whether
+  dropping the doc name from single-doc rows is right — journal 2026-08-12.3
 - (composer shift+enter) `shift+enter` inside the composer inserts a line
   break instead of exiting keeping a draft — the host intercepts
   `{Code: KeyEnter, Mod: ModShift}` and forwards the same `\r` a bare enter
@@ -364,12 +373,26 @@ Last updated: 2026-08-12 (shift+enter is a line break, not a draft exit)
 
 ## In progress
 
-- **(feedback)** a "threads" view where the user can discover threads even if
-  they can't be attached to the block anymore, plus next/previous comment
-  actions and bindings — `vault/feedback/2026-08-12-threads-view.md` —
-  claimed 2026-08-12 (leg, draining the feedback)
+*(none)*
 
 ## Done
+
+- [x] **(feedback)** a "threads" view and next/previous comment hopping — `i`
+      now opens the threads view in single-document reviews too: the current
+      document's threads (newest first) from the already-loaded `m.threads`
+      (`docThreadItems`), with a thread whose block has vanished marked
+      `[block gone]` and reported on enter instead of dropped — the "even if
+      they can't be attached to the block anymore" half of the feedback. In a
+      tree review `i` stays the cross-document list (`loadInbox`), unchanged.
+      `inbox.toggle`'s Applicable moved from `m.tree != nil` to `m.store !=
+      nil`; single-doc rows drop the redundant doc name. `]`/`[` (`comment.next`
+      / `comment.prev`) hop focus to the next/previous thread row in the
+      document, centred, recorded in the jumplist, reporting rather than
+      wrapping at the ends; the footer reads `threads — N thread(s)`. Chosen:
+      `]`/`[` over `[c`/`]c` and over `n`/`N` (taken by search). Drains
+      `vault/feedback/2026-08-12-threads-view.md`; the file is deleted.
+      `[felt]` — see journal 2026-08-12.3 — done 2026-08-12
+
 
 - [x] **(feedback)** `shift+enter` in the composer is a line break, not an
       exit — `sendKey` intercepts `{Code: KeyEnter, Mod: ModShift}` and
