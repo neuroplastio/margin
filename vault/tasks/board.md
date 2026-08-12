@@ -1,9 +1,21 @@
 # Board
 
-Last updated: 2026-08-11 (goreleaser pipeline landed — downloadable artifacts on every push to main)
+Last updated: 2026-08-12 (line-level review marks inside a block dive)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (dive line marks) `space`/`r`/`f` inside a block dive now mark the focused
+  source line, not the whole block — a diveable block's (table, raw) review
+  state IS the roll-up of its lines, so each marked line renders its own
+  gutter rule (a partly-worked table shows exactly the rows that are done),
+  block-level marking sets every line, a partial table reads `·` in its
+  heading's roll-up and counts neither way in progress, a flagged line flags
+  the block, raw mode and the export follow, and line marks survive a tree
+  switch — whether per-source-line marking is the right unit, whether a
+  partly-marked table reads clearly at a glance, whether "marking the whole
+  block = a mark per line" is right vs a separate block state, and whether
+  the tree pane treating a partial table as not-yet-reviewed is acceptable —
+  journal 2026-08-12.1
 - (mouse hover lag) hover is throttled to the renderer's frame period: a
   motion report inside one 8.33ms frame window of the last one processed is
   dropped, as is any report restating the cell the pointer already occupies,
@@ -342,11 +354,24 @@ Last updated: 2026-08-11 (goreleaser pipeline landed — downloadable artifacts 
 
 ## In progress
 
-- **(feedback)** mark and comment individual lines when diving inside a block —
-  `vault/feedback/2026-08-11-dive-line-mark-comment.md` — claimed 2026-08-12
-  (leg, draining the feedback)
+*(none)*
 
 ## Done
+
+- [x] **(feedback)** mark and comment individual lines when diving inside a
+      block — `space`/`r`/`f` on a dived source line mark that line only
+      (`lineMarks`, session-only, keyed `anchor:line`), a diveable block's
+      review state is the roll-up of its lines (block-level marking sets every
+      line, a flagged line flags the block, partial reads `·` in a heading),
+      each marked line renders its own gutter rule in both views, progress
+      (`reviewProgress`, tree pane slots, tree footer) and the export read the
+      roll-up, and line marks survive a tree switch (`lineMarkCache`). The
+      `c`-on-a-line comment half already existed (`L<n>` draft prefix); the
+      missing marking half is what this adds. Chosen: lines-authoritative
+      over a parallel block+line state (no invisible residue), `:` in the
+      line-key (never in an anchor). Drains
+      `vault/feedback/2026-08-11-dive-line-mark-comment.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-12.1 — done 2026-08-12
 
 - [x] **(feedback)** goreleaser pipeline for pushes into `main` — a
       `.goreleaser.yml` (linux/darwin amd64/arm64, `CGO_ENABLED=0`, stamps

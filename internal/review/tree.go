@@ -169,6 +169,7 @@ func newTreeModel(dir string) (*model, error) {
 	// already loaded; the rest parse once, defensively skipping any file that
 	// will not open (it contributes nothing to progress, which is honest).
 	m.markCache = map[string]map[string]reviewMark{}
+	m.lineMarkCache = map[string]map[string]reviewMark{}
 	m.markTotals = map[string]int{}
 	m.markTotals[rel] = markableTotal(doc)
 	for _, e := range tree {
@@ -273,17 +274,29 @@ func (m *model) openTreeFile(i int) {
 		m.watcher = watcher
 	}
 	m.path = abs
+	// Tree progress is session state keyed per document: the outgoing
+	// document's marks go into the cache and the incoming document's come back
+	// out — a switch is a move between reviews, not a discard of them. The
+	// cache holds the rolled-up effective marks (line marks folded into their
+	// block), and the raw line marks ride alongside so a diveable block's
+	// lines survive the round trip intact. Saved before m.doc is swapped —
+	// effectiveMarks reads the outgoing document's blocks — and restored after
+	// the swap, so the incoming document's own state is what lands.
+	if m.markCache != nil {
+		m.markCache[m.store.docPath] = m.effectiveMarks()
+		m.lineMarkCache[m.store.docPath] = m.lineMarks
+	}
 	m.doc = doc
 	m.src = src
 	m.threads = threads
-	// Tree progress is session state keyed per document: the outgoing
-	// document's marks go into the cache and the incoming document's come back
-	// out — a switch is a move between reviews, not a discard of them.
 	if m.markCache != nil {
-		m.markCache[m.store.docPath] = m.marks
 		m.marks = m.markCache[e.rel]
 		if m.marks == nil {
 			m.marks = map[string]reviewMark{}
+		}
+		m.lineMarks = m.lineMarkCache[e.rel]
+		if m.lineMarks == nil {
+			m.lineMarks = map[string]reviewMark{}
 		}
 	}
 	m.store.docPath = e.rel

@@ -129,6 +129,16 @@ type model struct {
 	marks   map[string]reviewMark
 	entries []entry
 
+	// lineMarks holds review marks on individual source lines of a diveable
+	// block (table, raw) — the 2026-08-11 "mark individual lines when diving"
+	// feedback. Keyed `anchor:line` (lineMarkKey); ":" cannot appear in an
+	// anchor, which are hex. A diveable block's review state IS the roll-up of
+	// its line marks — the block mark is never consulted for it, the same way
+	// a heading never carries a mark of its own — so marking the whole block
+	// sets every line and reading it back rolls them up. Session-only, like
+	// marks (nothing persists either, D5).
+	lineMarks map[string]reviewMark
+
 	// tree mode (D10): a directory review keeps the list of markdown files in
 	// a left pane (`margin` / `margin DIR/`). tree is nil for a
 	// single-document review (`margin FILE.md`), which renders exactly as it
@@ -154,6 +164,10 @@ type model struct {
 	// aggregate.
 	markCache  map[string]map[string]reviewMark
 	markTotals map[string]int
+
+	// lineMarkCache is markCache's counterpart for lineMarks, so a diveable
+	// block's line marks survive a switch like its block's marks do.
+	lineMarkCache map[string]map[string]reviewMark
 
 	// inbox is the cross-document comment inbox view (inbox.go): `i` in a tree
 	// review swaps the document column for the tree's threads, newest first.
@@ -360,9 +374,10 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	reattach(doc, threads)
 	m := &model{
 		path: path, doc: doc, threads: threads,
-		marks:        map[string]reviewMark{},
-		codeScroll:   map[string]int{},
-		at:           cursor{entry: 0, comment: commentNone},
+		marks:      map[string]reviewMark{},
+		lineMarks:  map[string]reviewMark{},
+		codeScroll: map[string]int{},
+		at:         cursor{entry: 0, comment: commentNone},
 		hoveredEntry: -1,
 		scrollAnchor: cursor{entry: -1, comment: commentNone},
 		paneTop:      -1,
@@ -953,32 +968,184 @@ func (m *model) sectionAnchors(i int) []string {
 	return out
 }
 
+// lineMarkKey names one line's mark in lineMarks: the block's anchor and the
+// 1-based source line. Anchors are hex (possibly with a `#N` disambiguation),
+// so ":" can never appear in one — the key cannot collide with another
+// block's.
+func lineMarkKey(anchor string, line int) string {
+	return fmt.Sprintf("%s:%d", anchor, line)
+}
+
+// lineMarksFor returns the line marks covering source lines [lo, hi] of the
+// block anchored at a, one entry per line in order — unmarked lines read
+// markNone, so rollUp over the result sees the block's partiality the same
+// way a heading's paragraph marks do.
+func (m *model) lineMarksFor(a string, lo, hi int) []reviewMark {
+	var out []reviewMark
+	if a == "" || m.lineMarks == nil {
+		return out
+	}
+	for ln := lo; ln <= hi; ln++ {
+		out = append(out, m.lineMarks[lineMarkKey(a, ln)])
+	}
+	return out
+}
+
+// hasLineMarks reports whether any line in [lo, hi] of the block anchored at
+// a carries a mark — the "are the lines authoritative at all" check, distinct
+// from lineMarksFor which always spans the whole range.
+func (m *model) hasLineMarks(a string, lo, hi int) bool {
+	if a == "" || m.lineMarks == nil {
+		return false
+	}
+	for ln := lo; ln <= hi; ln++ {
+		if _, ok := m.lineMarks[lineMarkKey(a, ln)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// blockMark is a diveable block's effective review state: the roll-up of its
+// line marks — none, when no line carries one — because a table or raw
+// block's lines are authoritative about it, exactly the way a heading's
+// paragraphs are. Non-diveable blocks read their plain block mark.
+func (m *model) blockMark(b block) (reviewMark, bool) {
+	if b.diveable() {
+		if !m.hasLineMarks(b.anchor, b.line, b.endLine) {
+			return markNone, false
+		}
+		return rollUp(m.lineMarksFor(b.anchor, b.line, b.endLine))
+	}
+	return m.marks[b.anchor], false
+}
+
+// blockByAnchor finds the block carrying anchor a, or ok=false when the
+// anchor is gone (a stale mark, say). The block is what tells the mark code
+// whether an anchor belongs to a diveable block — and thus whether a mark
+// lives on its lines or on the block itself.
+func (m *model) blockByAnchor(a string) (block, bool) {
+	for _, b := range m.doc {
+		if b.anchor == a {
+			return b, true
+		}
+	}
+	return block{}, false
+}
+
 func (m *model) marksFor(anchors []string) []reviewMark {
 	out := make([]reviewMark, 0, len(anchors))
 	for _, a := range anchors {
+		mk := m.marks[a]
+		if b, ok := m.blockByAnchor(a); ok && b.diveable() {
+			mk, _ = rollUp(m.lineMarksFor(b.anchor, b.line, b.endLine))
+		}
+		out = append(out, mk)
+	}
+	return out
+}
+
+// sectionMarks lays the marks governing entry i flat: each paragraph's own
+// mark, and each diveable block's lines expanded in its place — so rollUp
+// over the result sees a section's real partiality (a half-worked table in an
+// otherwise done section keeps the section partial) instead of a collapse of
+// each block to its roll-up. The same "the parts are authoritative" shape a
+// heading's section takes with its paragraphs.
+func (m *model) sectionMarks(i int) []reviewMark {
+	anchors := m.sectionAnchors(i)
+	if len(anchors) == 0 {
+		return nil
+	}
+	var out []reviewMark
+	for _, a := range anchors {
+		if b, ok := m.blockByAnchor(a); ok && b.diveable() {
+			out = append(out, m.lineMarksFor(b.anchor, b.line, b.endLine)...)
+			continue
+		}
 		out = append(out, m.marks[a])
+	}
+	return out
+}
+
+// setMarks writes want onto every anchor: a plain block mark, or — for a
+// diveable block — every one of its lines, since the lines are what such a
+// block's review state is made of. markNone deletes instead of storing.
+func (m *model) setMarks(anchors []string, want reviewMark) {
+	for _, a := range anchors {
+		if b, ok := m.blockByAnchor(a); ok && b.diveable() {
+			for ln := b.line; ln <= b.endLine; ln++ {
+				key := lineMarkKey(a, ln)
+				if want == markNone {
+					delete(m.lineMarks, key)
+				} else {
+					m.lineMarks[key] = want
+				}
+			}
+			continue
+		}
+		if want == markNone {
+			delete(m.marks, a)
+		} else {
+			m.marks[a] = want
+		}
+	}
+}
+
+// effectiveMarks folds every diveable block's line marks into a flat
+// anchor→mark map — a block reads as the roll-up of its lines, markNone
+// dropping the entry — for the readers that only know marks flat: tree
+// progress, the export, and the session cache.
+func (m *model) effectiveMarks() map[string]reviewMark {
+	out := make(map[string]reviewMark, len(m.marks))
+	for a, mk := range m.marks {
+		out[a] = mk
+	}
+	for _, b := range m.doc {
+		if !b.diveable() {
+			continue
+		}
+		if !m.hasLineMarks(b.anchor, b.line, b.endLine) {
+			continue
+		}
+		mk, partial := rollUp(m.lineMarksFor(b.anchor, b.line, b.endLine))
+		// A flagged block always reads flagged in the flat roll-up — "needs
+		// attention" dominates. A partial block is folded nowhere: it is not
+		// done, and the flat map has no way to say "some", so the pane and
+		// footer read it as not-yet-reviewed (the raw line marks, carried in
+		// lineMarkCache, are what preserve the actual state).
+		switch {
+		case mk == markFlag:
+			out[b.anchor] = markFlag
+		case !partial && mk == markOK:
+			out[b.anchor] = markOK
+		case !partial && mk == markNone:
+			delete(out, b.anchor)
+		}
 	}
 	return out
 }
 
 // toggleMark applies want to the focused block, or to the whole section when
 // the focus is a heading. Re-pressing the same mark clears it, so one key both
-// sets and unsets.
+// sets and unsets. Dived into a block's lines, it acts on the focused line
+// instead (toggleLineMark): inside a dive the line is the unit of review.
 func (m *model) toggleMark(want reviewMark) {
+	if m.at.line != 0 {
+		m.toggleLineMark(want)
+		return
+	}
 	anchors := m.sectionAnchors(m.at.entry)
 	if len(anchors) == 0 {
 		m.status = "nothing to mark here"
 		return
 	}
-	current, partial := rollUp(m.marksFor(anchors))
+	current, partial := rollUp(m.sectionMarks(m.at.entry))
 	clearing := current == want && !partial
 
-	for _, a := range anchors {
-		if clearing {
-			delete(m.marks, a)
-		} else {
-			m.marks[a] = want
-		}
+	if clearing {
+		m.setMarks(anchors, markNone)
+	} else {
+		m.setMarks(anchors, want)
 	}
 
 	what := sectionLabel(anchors)
@@ -1116,14 +1283,19 @@ func sectionLabel(anchors []string) string {
 
 // cycleMark steps the focused block — or the whole section, on a heading —
 // around unmarked → reviewed → flagged. One key for the common case of moving
-// down a document deciding about each block in turn.
+// down a document deciding about each block in turn. Dived into a block's
+// lines, it steps the focused line instead (cycleLineMark).
 func (m *model) cycleMark() {
+	if m.at.line != 0 {
+		m.cycleLineMark()
+		return
+	}
 	anchors := m.sectionAnchors(m.at.entry)
 	if len(anchors) == 0 {
 		m.status = "nothing to mark here"
 		return
 	}
-	current, partial := rollUp(m.marksFor(anchors))
+	current, partial := rollUp(m.sectionMarks(m.at.entry))
 	// A partially marked section resolves to its roll-up first, so one press
 	// makes it consistent rather than jumping somewhere unexpected.
 	want := current.next()
@@ -1131,13 +1303,7 @@ func (m *model) cycleMark() {
 		want = current
 	}
 
-	for _, a := range anchors {
-		if want == markNone {
-			delete(m.marks, a)
-		} else {
-			m.marks[a] = want
-		}
-	}
+	m.setMarks(anchors, want)
 
 	what := sectionLabel(anchors)
 	switch want {
@@ -1147,6 +1313,57 @@ func (m *model) cycleMark() {
 		m.status = "flagged · " + what
 	default:
 		m.status = "cleared · " + what
+	}
+}
+
+// cycleLineMark steps the review mark of the source line the dive is standing
+// on around unmarked → reviewed → flagged — the line-level analogue of
+// cycleMark. Inside a dive the line under focus is the unit of review, not
+// its block (the 2026-08-11 dive-line-mark-comment feedback); the line's mark
+// lives in lineMarks, so a table's lines can be marked independently and the
+// block reads as their roll-up.
+func (m *model) cycleLineMark() {
+	a := m.anchorAt()
+	if a == "" {
+		m.status = "nothing to mark here"
+		return
+	}
+	key := lineMarkKey(a, m.at.line)
+	want := m.lineMarks[key].next()
+	if want == markNone {
+		delete(m.lineMarks, key)
+	} else {
+		m.lineMarks[key] = want
+	}
+	switch want {
+	case markOK:
+		m.status = fmt.Sprintf("reviewed · line %d", m.at.line)
+	case markFlag:
+		m.status = fmt.Sprintf("flagged · line %d", m.at.line)
+	default:
+		m.status = fmt.Sprintf("cleared · line %d", m.at.line)
+	}
+}
+
+// toggleLineMark sets — or, re-pressing the same mark, clears — the focused
+// line's mark inside a dive. The r/f analogue of cycleLineMark.
+func (m *model) toggleLineMark(want reviewMark) {
+	a := m.anchorAt()
+	if a == "" {
+		m.status = "nothing to mark here"
+		return
+	}
+	key := lineMarkKey(a, m.at.line)
+	if m.lineMarks[key] == want {
+		delete(m.lineMarks, key)
+		m.status = fmt.Sprintf("cleared · line %d", m.at.line)
+		return
+	}
+	m.lineMarks[key] = want
+	if want == markOK {
+		m.status = fmt.Sprintf("reviewed · line %d", m.at.line)
+	} else {
+		m.status = fmt.Sprintf("flagged · line %d", m.at.line)
 	}
 }
 
@@ -1286,7 +1503,7 @@ func (m *model) yankRef() tea.Cmd {
 
 // exportToClipboard renders the review and puts it on the clipboard.
 func (m *model) exportToClipboard() tea.Cmd {
-	out := exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved, m.ephemeral)
+	out := exportReview(m.path, m.doc, m.threads, m.effectiveMarks(), m.includeResolved, m.ephemeral)
 
 	via, err := copyToClipboard(out)
 	switch {
@@ -1311,24 +1528,25 @@ func (m *model) reviewProgress() (done, flagged, total int) {
 			continue
 		}
 		total++
-		switch m.marks[b.anchor] {
-		case markOK:
-			done++
-		case markFlag:
+		mk, partial := m.blockMark(b)
+		switch {
+		case mk == markFlag:
 			flagged++
+		case mk == markOK && !partial:
+			done++
 		}
 	}
 	return
 }
 
 // marksForDoc returns the session marks for the document at rel — the live
-// m.marks when rel is the document under review (marks mutate there before a
-// switch saves them into markCache), else the cache. The tree pane and the
-// tree-wide footer roll-up both read through here so neither can show a stale
-// snapshot of the document that is open right now.
+// effective marks when rel is the document under review (marks mutate there
+// before a switch saves them into markCache), else the cache. The tree pane
+// and the tree-wide footer roll-up both read through here so neither can show
+// a stale snapshot of the document that is open right now.
 func (m *model) marksForDoc(rel string) map[string]reviewMark {
 	if m.store != nil && rel == m.store.docPath {
-		return m.marks
+		return m.effectiveMarks()
 	}
 	if m.markCache == nil {
 		return nil
@@ -2252,9 +2470,22 @@ func (m *model) renderRaw() []string {
 		var partial bool
 		if ei >= 0 {
 			if m.entries[ei].b.kind == blockHeading {
-				mark, partial = rollUp(m.marksFor(m.sectionAnchors(ei)))
+				mark, partial = rollUp(m.sectionMarks(ei))
 			} else {
-				mark = m.marks[m.entries[ei].b.anchor]
+				b := m.entries[ei].b
+				mark = m.marks[b.anchor]
+				// A diveable block's mark rides its lines in raw mode too: a
+				// source line with its own mark shows it, a line without one
+				// inside a line-marked block reads as unmarked, and only a
+				// block with no line marks at all falls back to its block
+				// mark.
+				if b.diveable() {
+					if mk, ok := m.lineMarks[lineMarkKey(b.anchor, li+1)]; ok {
+						mark = mk
+					} else if m.hasLineMarks(b.anchor, b.line, b.endLine) {
+						mark = markNone
+					}
+				}
 			}
 		}
 		text := raw
@@ -2344,7 +2575,7 @@ func (m *model) render() []string {
 
 		switch {
 		case e.b.kind == blockHeading:
-			mark, partial := rollUp(m.marksFor(m.sectionAnchors(i)))
+			mark, partial := rollUp(m.sectionMarks(i))
 			text := headingStyle(e.b.level).Render(e.b.text)
 			if selected {
 				text = selLine(text)
@@ -2354,9 +2585,9 @@ func (m *model) render() []string {
 					text, "")
 
 		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable, e.b.kind == blockFrontmatter:
-			mark := m.marks[e.b.anchor]
+			mark, markPartial := m.blockMark(e.b)
 			body := textStyle
-			if mark == markOK {
+			if mark == markOK && !markPartial {
 				// Reviewed prose recedes so unreviewed text is what draws the eye.
 				body = reviewedTxt
 			}
@@ -2458,7 +2689,7 @@ func (m *model) render() []string {
 				preStyled = true
 			default:
 				out = e.b.lines
-				if mark != markOK {
+				if mark != markOK || markPartial {
 					body = rawStyle
 				}
 			}
@@ -2483,8 +2714,23 @@ func (m *model) render() []string {
 					text = selLine(text)
 				}
 				rowFocused := focused && m.at.comment == commentNone && (m.at.line == 0 || row == focusedRow)
+				// A diveable block's rows each read their own source line's
+				// mark, so a table the reviewer has partly worked through
+				// shows exactly the rows that are done — the rule rides a
+				// line, not the whole block. An unmarked line inside a
+				// line-marked block reads as unmarked; only when no line
+				// carries a mark at all does the row fall back to the
+				// block's (roll-up) state.
+				rowMark := mark
+				if e.b.kind == blockTable || e.b.kind == blockRaw {
+					if mk, ok := m.lineMarks[lineMarkKey(e.b.anchor, e.b.line+row)]; ok {
+						rowMark = mk
+					} else if m.hasLineMarks(e.b.anchor, e.b.line, e.b.endLine) {
+						rowMark = markNone
+					}
+				}
 				lines = append(lines,
-					m.gutter(rowFocused, hovered, selected, mark, false)+text)
+					m.gutter(rowFocused, hovered, selected, rowMark, false)+text)
 			}
 			// A blockListItem gets its trailing blank line only once, after
 			// the list's last item, so a six-item list still reads as one
@@ -3772,7 +4018,7 @@ func runModel(m *model, opts RunOptions) error {
 	reportLatency(m.samples)
 
 	if opts.Stdout {
-		fmt.Print(exportReview(m.path, m.doc, m.threads, m.marks, m.includeResolved, m.ephemeral))
+		fmt.Print(exportReview(m.path, m.doc, m.threads, m.effectiveMarks(), m.includeResolved, m.ephemeral))
 		return nil
 	}
 

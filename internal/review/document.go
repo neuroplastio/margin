@@ -185,6 +185,15 @@ func (b block) markable() bool {
 	return b.kind == blockPara || b.kind == blockRaw || b.kind == blockList || b.kind == blockQuote || b.kind == blockListItem || b.kind == blockCode || b.kind == blockTable
 }
 
+// diveable reports whether a block can be dived into line by line (the
+// 2026-08-09 multi-line-blocks dive): a table or a raw block, where every
+// source line renders as its own row. Everything else either re-wraps its
+// source (a paragraph, a quote — a "line" there has no row of its own) or has
+// l/h busy elsewhere (a code block's horizontal scroll).
+func (b block) diveable() bool {
+	return b.kind == blockTable || b.kind == blockRaw
+}
+
 // markableTotal counts the blocks a review mark can land on — the denominator
 // of a document's progress. Headings are excluded (they roll up, they do not
 // hold marks), matching reviewProgress's per-block accounting.
