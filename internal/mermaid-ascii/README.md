@@ -34,9 +34,11 @@ go test ./internal/mermaid-ascii/...
 - `pkg/sequence` — sequence diagram parser/renderer (upstream + delta D6).
 - `pkg/er` — ER diagram parser/renderer (upstream + delta D2's `Keyword` export).
 - `pkg/graph` — the flowchart/graph renderer, extracted from the upstream
-  `cmd/` package (delta D2) and extended (deltas D3–D5).
+  `cmd/` package (delta D2) and extended (deltas D3–D5, D10).
 - `pkg/state` — state diagrams, margin's in-tree extension (delta D7).
 - `pkg/log` — a no-op stand-in for the upstream `logrus` dependency (delta D8).
+- `pkg/graph/subgraph_test.go` — the banded-placement regression tests (delta
+  D10): subgraph frames are disjoint and contain their nodes.
 - `testdata/` — the golden fixtures the `pkg/er` and `pkg/sequence` tests read
   (`er`, `er-ascii`, `sequence`, `sequence-ascii`).
 - `LICENSE` — upstream's MIT license, untouched.

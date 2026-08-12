@@ -335,3 +335,58 @@ func TestMermaidRawModeKeepsSourceVerbatim(t *testing.T) {
 		t.Error("raw mode lost the mermaid source line")
 	}
 }
+
+// TestMermaidSubgraphReproRenders: the maintainer's three-subgraph flowchart
+// reproduction (vault/feedback/2026-08-12-mermaid-layout.md) renders as a
+// diagram — the banded placement (delta D10) must not fall back to plain
+// source — and every subgraph title survives.
+func TestMermaidSubgraphReproRenders(t *testing.T) {
+	src := strings.TrimPrefix(`flowchart TB
+  subgraph a ["Node A · every 60s"]
+    set[("item set<br/>added at item creation<br/>removed at item:end / item:failed")]
+    set --> post["POST /api/v1/items/sync<br/>{id, ids}"]
+    kill["item.finish"] --> bye["END both paths → item:end"]
+    bye --> fin["/api/v1/items/end → row written, row deleted"]
+  end
+
+  subgraph b ["Node B"]
+    post --> renew["live = now + 120s<br/>for every named id"]
+    renew --> ans{"done?"}
+    ans -->|no| reply["reply"]
+    ans -->|yes| ext["Extend"]
+    ext --> v{"verdict"}
+    v -->|"accepted · session gone · error"| reply
+    v -->|"insufficient balance"| cut["add to drop list"]
+    cut --> reply
+  end
+
+  reply -.->|"drop list"| kill
+  renew -.-> readers["every reader asks live > now()<br/>limit · list · detail"]
+
+  subgraph c ["Node C · every 60s · every instance"]
+    r0(["pass"]) --> r1{"a sync arrived<br/>within 120s?"}
+    r1 -->|no| r2["skip this window"]
+    r1 -->|yes| r3["claim live <= now<br/>stamping state"]
+    r3 --> r4{"record<br/>already exists?"}
+    r4 -->|yes| r5["delete row · recorded"]
+    r4 -->|no| r6["write row with time"]
+    r6 --> r5
+  end
+`, "\n")
+	out, ok := renderMermaid(strings.Split(src, "\n"))
+	if !ok {
+		t.Fatal("renderMermaid failed on the subgraph reproduction")
+	}
+	got := strings.Join(out, "\n")
+	plain := ansiRe.ReplaceAllString(got, "")
+	for _, want := range []string{"Node A · every 60s", "Node B", "Node C · every 60s · every instance"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("subgraph title %q missing:\n%s", want, plain)
+		}
+	}
+	for _, gone := range []string{"subgraph", "flowchart"} {
+		if strings.Contains(plain, gone) {
+			t.Errorf("subgraph source leaked into the render: %q", gone)
+		}
+	}
+}

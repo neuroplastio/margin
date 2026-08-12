@@ -1,9 +1,18 @@
 # Board
 
-Last updated: 2026-08-12 (code block tabs expand to spaces)
+Last updated: 2026-08-12 (mermaid subgraph layout bands)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (mermaid subgraph layout) subgraph diagrams now render each root subgraph
+  in its own band of the grid — the maintainer's three-subgraph reproduction
+  draws as three disjoint frames with every node inside its own frame, and
+  graphs without subgraphs render byte-identically (delta D10 in the vendored
+  graph package) — whether the three bands read as one diagram or as three
+  boxes taped together, whether the ~180-column width is tolerable with H/L
+  scroll or the bands should stack vertically instead, and whether the one
+  cross-band edge label (`drop list`) still straddling a frame border is
+  acceptable or worse than no label — journal 2026-08-12.5
 - (threads view & comment hop) `i` now opens the threads view in
   single-document reviews too: the current document's threads, newest first,
   with a thread whose block has vanished marked `[block gone]` and reported on
@@ -376,6 +385,25 @@ Last updated: 2026-08-12 (code block tabs expand to spaces)
 *(none)*
 
 ## Done
+
+- [x] **(feedback)** mermaid subgraph layout no longer falls apart: a
+      flowchart with subgraphs now places each root subgraph's nodes in its
+      own contiguous band of the grid (delta D10 in the vendored
+      `pkg/graph`), so the maintainer's reproduction — ~40 nodes, mixed
+      shapes, dotted cross-subgraph edges — draws as three disjoint frames
+      with every node inside its own frame, instead of frames crashing into
+      each other, a node on a frame border and an edge label splitting across
+      a frame line. `placeNodesByBand` levels nodes exactly as the flat path
+      does, but each unit (a root subgraph's nodes, nested included, or all
+      external nodes) keeps its own per-level slot counter; bands are laid out
+      end to end with a gap cell of `paddingX`/`paddingY` between them and
+      node footprints are reserved so edge routing avoids boxes. Graphs
+      without subgraphs keep the unchanged flat placement, byte-identical.
+      Chosen: banded placement over upstream's `ensureSubgraphSpacing`
+      (redraws boxes, never moves nodes) and over falling back to plain
+      source. Drains
+      `vault/feedback/2026-08-12-mermaid-layout.md`; the file is deleted.
+      `[felt]` — see journal 2026-08-12.5 — done 2026-08-12
 
 - [x] **(feedback fix)** code block tabs render as spaces, not terminal tab
       stops — a fenced block's literal `\t` reached the terminal untouched

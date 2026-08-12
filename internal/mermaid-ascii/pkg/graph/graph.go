@@ -180,7 +180,24 @@ func (g *graph) setSubgraphs(textSubgraphs []*textSubgraph) {
 	log.Debugf("Set %d subgraphs", len(g.subgraphs))
 }
 
+// createMapping assigns every node a grid coordinate, then converts the grid
+// to drawing coordinates and computes edge paths. A graph with subgraphs uses
+// the banded placement (delta D10) so a subgraph's nodes cluster in their own
+// band of the grid and two subgraph frames can never overlap; a graph without
+// subgraphs uses upstream's plain level-based placement, untouched.
 func (g *graph) createMapping() {
+	if len(g.subgraphs) > 0 {
+		g.placeNodesByBand()
+	} else {
+		g.placeNodesByLevel()
+	}
+	g.finishMapping()
+}
+
+// placeNodesByLevel is upstream's placement: every node's grid coordinate is
+// driven by its level in the graph — roots at level 0, each child four grid
+// cells further along the flow axis — with one shared slot counter per level.
+func (g *graph) placeNodesByLevel() {
 	// Set mapping coord for every node in the graph.
 	// Keyed by level so it grows with the graph instead of assuming a fixed
 	// number of levels; a missing key reads as the zero value.
@@ -291,7 +308,11 @@ func (g *graph) createMapping() {
 			highestPositionPerLevel[childLevel] = highestPosition + 4
 		}
 	}
+}
 
+// finishMapping converts the grid to drawing coordinates and routes the
+// edges; it is shared by the flat and banded placements.
+func (g *graph) finishMapping() {
 	for _, n := range g.nodes {
 		g.setColumnWidth(n)
 	}
@@ -317,6 +338,170 @@ func (g *graph) createMapping() {
 
 	// Offset everything if subgraphs have negative coordinates
 	g.offsetDrawingForSubgraphs()
+}
+
+// bandPlacement records where the first band-relative pass put a node.
+type bandPlacement struct {
+	level int
+	slot  int
+}
+
+// graphUnit is a group of nodes that share one contiguous band of grid cells
+// in the banded placement: everything beneath a root-level subgraph (nested
+// subgraphs included), or every node outside any subgraph as one trailing
+// unit.
+type graphUnit struct {
+	bandStart int
+	maxSlot   int
+	nextSlot  map[int]int
+}
+
+// placeNodesByBand is the delta D10 placement for graphs with subgraphs.
+// Nodes are levelled exactly as the flat path levels them, but each unit's
+// slots come from its own per-level counter, so a subgraph's nodes cluster in
+// a band of its own and two subgraph frames can never overlap.
+func (g *graph) placeNodesByBand() {
+	units, unitOf := g.assignUnits()
+
+	// First pass: levels and band-relative slots. The walk is the flat path's
+	// own (roots at level 0, children four cells further along the flow axis),
+	// so a diagram's levels do not depend on how it is grouped.
+	slots := map[*node]bandPlacement{}
+	place := func(n *node, level int) {
+		u := unitOf[n]
+		s := u.nextSlot[level]
+		u.nextSlot[level] = s + 4
+		u.maxSlot = Max(u.maxSlot, s)
+		slots[n] = bandPlacement{level: level, slot: s}
+	}
+	for _, n := range g.rootNodes() {
+		place(n, 0)
+	}
+	for _, n := range g.nodes {
+		base := slots[n].level + 4
+		for _, child := range g.getChildren(n) {
+			if _, done := slots[child]; done {
+				continue
+			}
+			place(child, base)
+		}
+	}
+
+	// Second pass: lay the bands out end to end, one gap cell between them,
+	// then write the final grid coords.
+	cursor := 0
+	for _, u := range units {
+		u.bandStart = cursor
+		cursor += u.maxSlot + 3 + 1 // 3-cell node footprint + one gap cell
+	}
+	axis := func(level, slot int) gridCoord {
+		if g.graphDirection == "LR" {
+			return gridCoord{x: level, y: slot}
+		}
+		return gridCoord{x: slot, y: level}
+	}
+	for _, n := range g.nodes {
+		p := slots[n]
+		c := axis(p.level, unitOf[n].bandStart+p.slot)
+		g.nodes[n.index].gridCoord = &c
+	}
+
+	// Reserve every node's 3x3 footprint in the grid, as the flat path's
+	// reserveSpotInGrid does, so edge routing still avoids the boxes.
+	for _, n := range g.nodes {
+		c := *n.gridCoord
+		for dx := 0; dx < 3; dx++ {
+			for dy := 0; dy < 3; dy++ {
+				g.grid[gridCoord{x: c.x + dx, y: c.y + dy}] = n
+			}
+		}
+	}
+
+	// The gap cell between two bands carries real drawing width so two boxes
+	// can never touch; the pathfinder only widens cells an edge actually
+	// crosses, so set it here explicitly.
+	for _, u := range units {
+		if g.graphDirection == "LR" {
+			g.rowHeight[u.bandStart+u.maxSlot+3] = g.paddingY
+		} else {
+			g.columnWidth[u.bandStart+u.maxSlot+3] = g.paddingX
+		}
+	}
+}
+
+// rootNodes returns the graph's root nodes in the flat path's own detection
+// order: a node is a root unless an earlier-processed node or edge named it.
+func (g *graph) rootNodes() []*node {
+	nodesFound := make(map[string]bool)
+	rootNodes := []*node{}
+	for _, n := range g.nodes {
+		if _, ok := nodesFound[n.name]; !ok {
+			rootNodes = append(rootNodes, n)
+		}
+		nodesFound[n.name] = true
+		for _, child := range g.getChildren(n) {
+			nodesFound[child.name] = true
+		}
+	}
+	return rootNodes
+}
+
+// assignUnits partitions the graph's nodes into band units: one per root-level
+// subgraph (in source order), plus a single unit for nodes outside any
+// subgraph when there are any.
+func (g *graph) assignUnits() ([]*graphUnit, map[*node]*graphUnit) {
+	// Every node maps to its deepest containing subgraph (the parser adds a
+	// node to every subgraph on the stack, so later entries are deeper).
+	containing := map[*node]*subgraph{}
+	for _, sg := range g.subgraphs {
+		for _, n := range sg.nodes {
+			containing[n] = sg
+		}
+	}
+	top := func(sg *subgraph) *subgraph {
+		for sg.parent != nil {
+			sg = sg.parent
+		}
+		return sg
+	}
+
+	roots := []*subgraph{}
+	seen := map[*subgraph]bool{}
+	for _, sg := range g.subgraphs {
+		if len(sg.nodes) == 0 {
+			continue
+		}
+		r := top(sg)
+		if !seen[r] {
+			seen[r] = true
+			roots = append(roots, r)
+		}
+	}
+
+	units := make([]*graphUnit, 0, len(roots)+1)
+	unitByRoot := map[*subgraph]*graphUnit{}
+	for _, r := range roots {
+		u := &graphUnit{nextSlot: map[int]int{}}
+		units = append(units, u)
+		unitByRoot[r] = u
+	}
+	unitOf := map[*node]*graphUnit{}
+	for n, sg := range containing {
+		unitOf[n] = unitByRoot[top(sg)]
+	}
+
+	external := &graphUnit{nextSlot: map[int]int{}}
+	hasExternal := false
+	for _, n := range g.nodes {
+		if unitOf[n] == nil {
+			unitOf[n] = external
+			hasExternal = true
+		}
+	}
+	if hasExternal {
+		units = append(units, external)
+	}
+	return units, unitOf
 }
 
 func (g *graph) calculateSubgraphBoundingBoxes() {

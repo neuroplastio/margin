@@ -17,6 +17,38 @@ works — a nested module wired via `replace` breaks it, because the replaced
 go.mod would be interpreted differently as a dependency. D1's upstreamable
 intent (split the library out of the CLI module) is unchanged.
 
+## D10 — subgraph-band placement: a subgraph's nodes share one grid band
+
+Upstream's layered placement is level-driven and **subgraph-agnostic**: every
+node's grid coordinate comes from its graph level (roots at level 0, children
+four rows down) against one shared per-level slot counter, and a subgraph's
+frame is then just a bounding box drawn around whatever grid cells its nodes
+happened to land in. With a few dozen nodes across several subgraphs the boxes
+interleave — two frames crash into each other, a node renders on its own
+subgraph's border, an edge label splits across a frame line. Reproduced by the
+maintainer's `flowchart TB` with three subgraphs (see
+`internal/review/mermaid_test.go`, `TestMermaidSubgraphReproBoxesDoNotOverlap`).
+
+The fix is in `createMapping`: when the graph has subgraphs, the layout is
+**banded** before the shared drawing pass runs:
+
+- Every node is assigned to a unit — everything beneath one root-level
+  subgraph (nested subgraphs included), or all nodes outside any subgraph as a
+  single trailing unit.
+- Nodes are still levelled by the same root-then-children walk, but each unit
+  keeps its **own per-level slot counter**, so a unit's nodes cluster in a
+  contiguous band of grid slots instead of scattering across the whole row.
+- Bands are sized to each unit's widest level and laid out end to end with a
+  gap slot between them, so two subgraph frames are always disjoint.
+- Node footprints are reserved in the grid as the plain path does, so edge
+  routing still avoids boxes.
+
+The flat path (`len(g.subgraphs) == 0`) is untouched — every existing
+flowchart, sequence and state diagram renders byte-identically. The banded
+path also skips upstream's LR external/subgraph root separation (dead there
+anyway, since each subgraph now owns its band); LR just mirrors the bands
+along the other axis. Upstreamable as "place subgraph nodes as groups".
+
 ## D8 — dependencies stripped to runewidth; moved under `internal/`
 
 The fork now sits at `internal/mermaid-ascii/` (it lived at
