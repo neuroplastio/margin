@@ -115,10 +115,8 @@ func typeText(c *composer, s string) {
 
 func waitExit(t *testing.T, c *composer, timeout time.Duration) error {
 	t.Helper()
-	done := make(chan error, 1)
-	go func() { done <- c.cmd.Wait() }()
 	select {
-	case err := <-done:
+	case err := <-c.wait():
 		return err
 	case <-time.After(timeout):
 		t.Fatalf("editor did not exit; screen was:\n%s", plainScreen(c.em))

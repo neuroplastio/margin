@@ -581,3 +581,28 @@ the display (hover, cursor blink, a progress bar) must be coalesced at the
 message source; leaving it to "the renderer caps at 120fps" floods Update and
 View all the same. A filter keyed on message type is the hook bubbletea
 provides — there is no built-in per-message-type rate limit.
+
+## F26 — shift+enter does not survive the trip to nvim; fold it onto a newline at the host
+
+The feedback that shift+enter "exits the nvim editor, keeping the draft"
+(2026-08-12) looked like a nvim mapping bug but is a decode trap. The host
+sees the key as `{Code: KeyEnter, Mod: ModShift}` (only when the terminal
+reports the modifier, mirroring F16's ctrl+enter), and forwarding it went
+through `encodeModifiedKey`'s CSI-u branch — `\x1b[13;2u`. Whether that byte
+stream exits or is dropped depends entirely on the child:
+
+- nvim 0.12.4 (probed on this machine, journal 2026-08-12.2) silently drops
+  an unbound `<S-CR>` in insert mode — no newline, no exit, nothing. The
+  keystroke simply vanishes, which is a bug in its own right.
+- The maintainer's nvim turned it into the draft exit. The sequence starts
+  with a lone ESC; nvim processes CSI-u only when a mapping names the key
+  (the same meta-key catch F19 documents), so unbound the ESC stands alone —
+  and in normal mode ESC is *the* mapped draft-exit.
+
+The fix is host-side and is the same shape as ctrl+enter (F16): intercept
+before forwarding, fold shift+enter onto the plain `\r` a bare enter gets.
+A single CR is unambiguous to every nvim. The composer's own mappings were
+untouched; there is no `<S-CR>` mapping to write because the child never
+sees the key. `interaction.md`'s "ctrl+\ and ctrl+enter are the only keys
+the host takes" needs widening to include shift+enter, and that line is
+bounding until the maintainer judges the newline behaviour.

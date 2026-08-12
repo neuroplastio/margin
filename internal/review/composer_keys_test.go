@@ -60,8 +60,9 @@ func TestSendKeyEmitsBytes(t *testing.T) {
 		{"backspace", tea.Key{Code: uv.KeyBackspace}, "\x7f"},
 		{"enter", tea.Key{Code: uv.KeyEnter}, "\r"},
 
-		// The host's one intercept.
+		// The host's intercepts: ctrl+enter submits, shift+enter is a line break.
 		{"ctrl+enter submits", tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl}, "\x1b:MarginSubmit\r"},
+		{"shift+enter is a newline", tea.Key{Code: uv.KeyEnter, Mod: uv.ModShift}, "\r"},
 
 		// ctrl-only aliases keep the legacy control bytes vt encodes, so
 		// ctrl+m stays CR and ctrl+[ stays ESC.
@@ -73,7 +74,6 @@ func TestSendKeyEmitsBytes(t *testing.T) {
 		// nothing for.
 		{"ctrl+backspace", tea.Key{Code: uv.KeyBackspace, Mod: uv.ModCtrl}, "\x1b[127;5u"},
 		{"shift+backspace", tea.Key{Code: uv.KeyBackspace, Mod: uv.ModShift}, "\x1b[127;2u"},
-		{"shift+enter", tea.Key{Code: uv.KeyEnter, Mod: uv.ModShift}, "\x1b[13;2u"},
 		{"ctrl+shift+a", tea.Key{Code: 'a', Mod: uv.ModCtrl | uv.ModShift}, "\x1b[97;6u"},
 		{"ctrl+tab", tea.Key{Code: uv.KeyTab, Mod: uv.ModCtrl}, "\x1b[9;5u"},
 		{"ctrl+1", tea.Key{Code: '1', Mod: uv.ModCtrl}, "\x1b[49;5u"},
@@ -120,6 +120,52 @@ func waitForScreenWithout(t *testing.T, c *composer, want, unwanted string, time
 		time.Sleep(20 * time.Millisecond)
 	}
 	return screen
+}
+
+// TestShiftEnterInsertsLineBreak is the end-to-end regression for the feedback
+// that shift+enter "exits the nvim editor, keeping the draft comment". The key
+// now folds onto a plain newline at the host (composer.go's intercept), so it
+// must land as a line break in the body and never dismiss the composer.
+func TestShiftEnterInsertsLineBreak(t *testing.T) {
+	requireNvim(t)
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+
+	// The emulator starts at row 1; a newline pushes the cursor to row 2, so
+	// this proves the key produced a real break rather than being dropped.
+	typeText(m.comp, "hello")
+	if s := waitForScreen(t, m.comp.em, "hello", 3*time.Second); !strings.Contains(s, "hello") {
+		t.Fatalf("seed text never landed; screen was:\n%s", s)
+	}
+
+	typeKeys(m.comp, tea.Key{Code: uv.KeyEnter, Mod: uv.ModShift})
+	typeText(m.comp, "world")
+	waitForScreen(t, m.comp.em, "world", 3*time.Second)
+
+	if got := waitExitPoll(m.comp, 300*time.Millisecond); got != outcomeNoExit {
+		t.Fatalf("shift+enter dismissed the composer (outcome %v); the key must be a line break, not an exit", got)
+	}
+
+	typeKeys(m.comp, keyCtrlS)
+	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeSubmit {
+		t.Fatalf("ctrl+s gave outcome %v, want submit", got)
+	}
+	if body := m.comp.body(); body != "hello\nworld" {
+		t.Fatalf("body = %q, want %q", body, "hello\nworld")
+	}
+}
+
+// waitExitPoll reports outcomeNoExit if the child is still running after the
+// timeout, so a test can assert that a key did NOT dismiss the composer. It
+// shares the composer's cached Wait (composer.wait) with waitExit, so calling
+// both is safe.
+func waitExitPoll(c *composer, timeout time.Duration) outcome {
+	select {
+	case err := <-c.wait():
+		return outcomeFromExit(err)
+	case <-time.After(timeout):
+		return outcomeNoExit
+	}
 }
 
 // deleteWordBeforeCursor types "hello world", sends key, and demands the

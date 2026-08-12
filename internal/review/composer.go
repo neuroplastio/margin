@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
@@ -27,6 +28,7 @@ const (
 	outcomeSubmit  outcome = iota // exit 0  — apply the text
 	outcomeDraft                  // exit 2  — keep it unsubmitted
 	outcomeDiscard                // exit 1  — throw it away
+	outcomeNoExit                 // child still running (poll only, never from outcomeFromExit)
 )
 
 func (o outcome) String() string {
@@ -235,6 +237,11 @@ type composer struct {
 	ptmx *os.File
 	cmd  *exec.Cmd
 
+	// waitOnce/exitCh cache the child's exit so a poll and a wait never call
+	// cmd.Wait twice — the second call errors "already called".
+	waitOnce sync.Once
+	exitCh   chan error
+
 	anchor string
 	target int // newCommentSlot, or the index of the posted comment being edited
 	path   string
@@ -360,6 +367,17 @@ func (c *composer) resize(w, h int) {
 	_ = pty.Setsize(c.ptmx, &pty.Winsize{Rows: uint16(h), Cols: uint16(w)})
 }
 
+// wait returns the child's exit error exactly once, starting the wait on first
+// use. The result is cached so a poll and a blocking wait share one Wait call.
+func (c *composer) wait() <-chan error {
+	c.waitOnce.Do(func() {
+		c.exitCh = make(chan error, 1)
+		go func() { c.exitCh <- c.cmd.Wait() }()
+	})
+	return c.exitCh
+}
+
+// close kills the child and clears its temp dir.
 func (c *composer) close() {
 	if c.cmd.Process != nil {
 		_ = c.cmd.Process.Kill()
@@ -395,6 +413,17 @@ func (c *composer) sendKey(k tea.Key) {
 		return
 	}
 
+	// shift+enter is a line break, not a key to forward. A forwarded CSI-u
+	// <S-CR> (CSI 13;2u) decodes to a lone ESC in nvim builds without a <S-CR>
+	// mapping — and that ESC is the mapped draft exit, so shift+enter in the
+	// composer "exits keeping a draft". Terminal-prompt muscle memory expects
+	// shift+enter to be a newline (a non-vim multiline prompt), so fold it onto
+	// the same plain newline a bare enter gets; nvim cannot misread a \r.
+	if k.Code == uv.KeyEnter && k.Mod&uv.ModShift != 0 {
+		c.em.SendText("\r")
+		return
+	}
+
 	// Printable characters, shifted or not, carry their literal in Text.
 	// This is the path that makes O, D, A, !, ? work.
 	if k.Text != "" && k.Mod&(uv.ModCtrl|uv.ModAlt|uv.ModMeta) == 0 {
@@ -404,9 +433,10 @@ func (c *composer) sendKey(k tea.Key) {
 
 	// Keys carrying modifiers are encoded here rather than handed to
 	// vt.SendKey. vt's fallback drops any modified key it has no explicit
-	// case for (F1) — ctrl+backspace, shift+enter, ctrl+shift+letter — and,
+	// case for (F1) — ctrl+backspace, ctrl+shift+letter — and,
 	// worse, an alt combo carrying a second modifier comes out as a bare
-	// ESC, which throws nvim into normal mode mid-typing.
+	// ESC, which throws nvim into normal mode mid-typing. (shift+enter never
+	// reaches here: it is intercepted above and folded onto a newline.)
 	if k.Mod != 0 {
 		if seq, ok := encodeModifiedKey(k); ok {
 			c.em.SendText(seq)
@@ -430,7 +460,7 @@ func (c *composer) sendKey(k tea.Key) {
 //   - arrows, home, end:              CSI 1 ; <mod> <final>   (xterm)
 //   - insert, delete, pgup, pgdn, F5-F12:  CSI <n> ; <mod> ~
 //   - F1-F4:                          CSI 1 ; <mod> <P/Q/R/S>
-//   - everything else — ctrl+backspace, shift+enter, ctrl+shift+letter:
+//   - everything else — ctrl+backspace, ctrl+shift+letter:
 //     CSI <code> ; <mod> u  (kitty's CSI-u form)
 //
 // The one family left to vt.SendKey (ok=false) is ctrl-only combos vt has a

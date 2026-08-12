@@ -483,7 +483,7 @@ func (m *model) waitForChild() tea.Cmd {
 		return nil
 	}
 	c := m.comp
-	return func() tea.Msg { return childExitMsg{gen: c.gen, err: c.cmd.Wait()} }
+	return func() tea.Msg { return childExitMsg{gen: c.gen, err: <-c.wait()} }
 }
 
 // contentWidth is the reading measure: the width the document's prose wraps

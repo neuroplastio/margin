@@ -185,7 +185,9 @@ Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
 | `esc` (`esc esc` for a new comment) / `:q` / `SPC c d` | Close, keeping a draft — unless nothing changed: editing a comment and closing without editing it keeps no draft |
 | `:q!` / `SPC c k` | Discard |
 
-`ctrl+\` and `ctrl+enter` are the only keys the host intercepts.
+`ctrl+\`, `ctrl+enter` and `shift+enter` are the only keys the host intercepts.
+`ctrl+enter` submits; `shift+enter` is a line break (terminal-prompt muscle
+memory), folded onto the same newline a bare `enter` gets.
 
 ## Install
 

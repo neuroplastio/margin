@@ -1,9 +1,19 @@
 # Board
 
-Last updated: 2026-08-12 (line-level review marks inside a block dive)
+Last updated: 2026-08-12 (shift+enter is a line break, not a draft exit)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (composer shift+enter) `shift+enter` inside the composer inserts a line
+  break instead of exiting keeping a draft — the host intercepts
+  `{Code: KeyEnter, Mod: ModShift}` and forwards the same `\r` a bare enter
+  gets (the ctrl+enter-intercept shape), because forwarding the CSI-u `<S-CR>`
+  was unreliable: nvim 0.12.4 dropped it silently and the maintainer's nvim
+  turned it into the draft exit (the sequence's lone ESC in normal mode IS the
+  mapped draft-exit) — whether shift+enter now reads as a line break, whether
+  the exit the maintainer saw is gone on their nvim, and whether
+  `interaction.md`'s "ctrl+\ and ctrl+enter are the only keys the host takes"
+  should name shift+enter too (F26) — journal 2026-08-12.2
 - (dive line marks) `space`/`r`/`f` inside a block dive now mark the focused
   source line, not the whole block — a diveable block's (table, raw) review
   state IS the roll-up of its lines, so each marked line renders its own
@@ -357,6 +367,22 @@ Last updated: 2026-08-12 (line-level review marks inside a block dive)
 *(none)*
 
 ## Done
+
+- [x] **(feedback)** `shift+enter` in the composer is a line break, not an
+      exit — `sendKey` intercepts `{Code: KeyEnter, Mod: ModShift}` and
+      forwards the same `\r` a bare enter gets, the ctrl+enter-intercept shape
+      (F16), because forwarding the CSI-u `<S-CR>` (`\x1b[13;2u`) was
+      unreliable: nvim 0.12.4 dropped it silently in insert mode and the
+      maintainer's nvim turned it into the draft exit (the sequence's leading
+      ESC, unbound, is the mapped `<Esc>` draft-exit — F19's meta-key catch).
+      A composer mapping was rejected: it only works on nvim builds that decode
+      the key at all, and the unreliability *is* the bug. Chosen: host
+      intercept over CSI-u forwarding. `composer.wait()` now caches the child's
+      exit error so a poll and a blocking wait never call `cmd.Wait` twice
+      (the second call errors and read as `discarded`); `waitForChild` and the
+      test helpers share it. New `waitExitPoll` helper. Drains
+      `vault/feedback/2026-08-12-shift-enter-line-break.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-12.2 — done 2026-08-12
 
 - [x] **(feedback)** mark and comment individual lines when diving inside a
       block — `space`/`r`/`f` on a dived source line mark that line only
