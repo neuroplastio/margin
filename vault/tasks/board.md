@@ -364,7 +364,10 @@ Last updated: 2026-08-12 (shift+enter is a line break, not a draft exit)
 
 ## In progress
 
-*(none)*
+- **(feedback)** a "threads" view where the user can discover threads even if
+  they can't be attached to the block anymore, plus next/previous comment
+  actions and bindings — `vault/feedback/2026-08-12-threads-view.md` —
+  claimed 2026-08-12 (leg, draining the feedback)
 
 ## Done
 
