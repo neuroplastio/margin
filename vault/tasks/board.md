@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-08-12 (mermaid subgraph layout bands)
+Last updated: 2026-08-13 (import comments from the current GitHub PR)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -382,7 +382,9 @@ Last updated: 2026-08-12 (mermaid subgraph layout bands)
 
 ## In progress
 
-*(none)*
+- **(feedback)** import comments from the current GitHub pull request —
+  `vault/feedback/2026-08-13-import-comments-from-gh-pr.md` — claimed 2026-08-13
+  (leg, draining the feedback)
 
 ## Done
 
