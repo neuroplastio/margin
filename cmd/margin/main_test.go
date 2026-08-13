@@ -612,7 +612,7 @@ func TestSkillPrintsTheDocument(t *testing.T) {
 	if !strings.HasPrefix(out, "# margin") {
 		t.Errorf("skill output is not the markdown document:\n%s", out)
 	}
-	for _, want := range []string{"comments wait", "comment add", "export", "--author agent", "event log"} {
+	for _, want := range []string{"comments wait", "comment add", "export", "--author agent", "event log", "import-pr"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("skill does not teach the agent about %q:\n%s", want, out)
 		}

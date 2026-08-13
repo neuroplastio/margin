@@ -19,19 +19,31 @@ func TestKeymapResolvesToRegisteredCommands(t *testing.T) {
 }
 
 // TestEveryCommandIsReachableByAKey: the registry is meant to be the one
-// source of truth for both keys and (eventually) the palette. A command with
-// no key bound to it yet is fine once the palette exists, but today, before
-// it does, every registered command should still be reachable — otherwise it
-// is dead code.
+// source of truth for both keys and the palette. Today the palette exists, so
+// a command need not have a key — import.pr deliberately does not (the board's
+// own demo recipe asked for ":import-pr"). The guard now checks the reachable
+// union: every command is reachable by a key, or by the palette for some model
+// that makes it Applicable. The store-backed model below is exactly the state
+// import.pr applies in; a keyless command that no model would ever list is dead
+// code and fails here.
 func TestEveryCommandIsReachableByAKey(t *testing.T) {
 	bound := map[string]bool{}
 	for _, id := range keymap {
 		bound[id] = true
 	}
+	// A store-backed model — the one state import.pr (the only keyless command
+	// today) applies in. Other keyless commands in future must extend this.
+	m := newTestModel(t)
+	m.store = &threadStore{root: t.TempDir(), docPath: "document.md"}
+	paletteIDs := map[string]bool{}
+	for _, r := range paletteRows(m, commands, "") {
+		paletteIDs[r.Command.ID] = true
+	}
 	for _, c := range commands {
-		if !bound[c.ID] {
-			t.Errorf("command %q is registered but no key resolves to it", c.ID)
+		if bound[c.ID] || paletteIDs[c.ID] {
+			continue
 		}
+		t.Errorf("command %q is registered but reachable neither by a key nor by the palette", c.ID)
 	}
 }
 

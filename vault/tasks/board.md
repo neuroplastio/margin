@@ -12,8 +12,10 @@ Last updated: 2026-08-13 (import comments from the current GitHub PR)
   comments are left alone, and comments on other files or no-matching-line
   comments are reported not dropped — whether line-based mapping lands
   comments on the right blocks, whether the summary readout is enough, and
-  whether the TUI should gain a `:import-pr` palette action that calls it —
-  journal 2026-08-13.1
+  whether the new `:import-pr` palette action (journal 2026-08-13.2 — runs
+  the same ImportPR in the background and reports the same ImportSummary in
+  the status line) reads as an action in the palette and reports sensibly —
+  journal 2026-08-13.1, 2026-08-13.2
 - (mermaid subgraph layout) subgraph diagrams now render each root subgraph
   in its own band of the grid — the maintainer's three-subgraph reproduction
   draws as three disjoint frames with every node inside its own frame, and

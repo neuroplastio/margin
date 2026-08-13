@@ -39,6 +39,7 @@ func TestSkillSpellsTheInteractiveLoopEndToEnd(t *testing.T) {
 		"margin export FILE.md",
 		"margin comments wait --since ID --timeout 60s",
 		`margin comment add FILE.md --anchor ID --text "..." --author agent`,
+		"margin import-pr FILE.md",
 	} {
 		if !strings.Contains(doc, cmd) {
 			t.Errorf("skill does not teach the command %q:\n%s", cmd, doc)

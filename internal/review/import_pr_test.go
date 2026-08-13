@@ -3,6 +3,7 @@ package review
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -277,5 +278,88 @@ func TestImportPRFailsBeforeCallingGH(t *testing.T) {
 	}
 	if called {
 		t.Error("gh was called for a document that does not exist")
+	}
+}
+
+// --- the TUI half: :import-pr -------------------------------------------------
+
+// TestImportPRCommandRefusesWithoutAReviewRoot: import.pr writes thread files,
+// so it needs a review root — an ephemeral stdin review has no store and the
+// command must say so rather than run gh against nothing.
+func TestImportPRCommandRefusesWithoutAReviewRoot(t *testing.T) {
+	m := newTestModel(t)
+	cmd, ok := commandByID("import.pr")
+	if !ok {
+		t.Fatal("import.pr is not registered")
+	}
+	if cmd.Applicable(m) {
+		t.Error("import.pr applicable on a model with no store")
+	}
+	got := cmd.Run(m, "")
+	if got != nil {
+		t.Errorf("import.pr on a store-less model produced a command %v, want nil", got)
+	}
+	if m.status == "" {
+		t.Error("import.pr on a store-less model left no status message")
+	}
+}
+
+// TestImportPRCommandRunsInTheBackground: with a store the command is
+// applicable and its Run returns a tea.Cmd (the gh call must not block the
+// render goroutine), rather than running the import synchronously.
+func TestImportPRCommandRunsInTheBackground(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+	m.path = filepath.Join(root, "document.md")
+	cmd, ok := commandByID("import.pr")
+	if !ok {
+		t.Fatal("import.pr is not registered")
+	}
+	if !cmd.Applicable(m) {
+		t.Error("import.pr not applicable on a store-backed model")
+	}
+	if got := cmd.Run(m, ""); got == nil {
+		t.Fatal("import.pr produced no command; the gh call should run in the background")
+	}
+}
+
+// TestImportPRMsgHandlerSurfacesTheSummary: a successful background import
+// lands in the status line as the shared ImportSummary, and the thread reload
+// the handler performs does not clobber it.
+func TestImportPRMsgHandlerSurfacesTheSummary(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+	m.status = ""
+
+	_, cmd := m.Update(importPRMsg{rep: ImportReport{
+		PR: 7, Owner: "acme", Repo: "crate", Imported: 2, Skipped: 1,
+	}})
+	if cmd != nil {
+		t.Errorf("importPRMsg handler returned a command %v, want none", cmd)
+	}
+	if !strings.Contains(m.status, "imported 2 comments from PR #7 (acme/crate)") {
+		t.Errorf("status = %q, want the import summary", m.status)
+	}
+	if !strings.Contains(m.status, "1 already imported") {
+		t.Errorf("status = %q, want the skipped count reported", m.status)
+	}
+}
+
+// TestImportPRMsgHandlerSurfacesAnError: a failed background import is
+// reported as an error, not swallowed.
+func TestImportPRMsgHandlerSurfacesAnError(t *testing.T) {
+	m := newTestModel(t)
+	root := t.TempDir()
+	m.store = &threadStore{root: root, docPath: "document.md"}
+	m.status = ""
+
+	_, cmd := m.Update(importPRMsg{err: errors.New("import-pr: detecting the pull request: no pull requests found for branch \"main\"")})
+	if cmd != nil {
+		t.Errorf("importPRMsg error handler returned a command %v, want none", cmd)
+	}
+	if !strings.Contains(m.status, "no pull requests found") {
+		t.Errorf("status = %q, want the import error", m.status)
 	}
 }

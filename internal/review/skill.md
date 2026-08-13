@@ -8,7 +8,7 @@ participant in that review: you read what the human says and you reply. This
 document is the whole contract for taking part. Where it and `margin --help`
 disagree, trust this — it is the loop that has been settled and tested.
 
-## The four commands
+## The five commands
 
 | Command | What it is for |
 | --- | --- |
@@ -16,9 +16,20 @@ disagree, trust this — it is the loop that has been settled and tested.
 | `margin export FILE.md` | Print the review as it stands on disk: every block that is commented or flagged, with its anchor id, a quote, and the conversation. The non-interactive way to read the current state. |
 | `margin comments wait [--since ID] [--timeout DUR]` | Block until a new event lands in the review's event log, then print its lines. The way you notice the human has spoken. |
 | `margin comment add FILE.md --anchor ID --text "..." [--author agent]` | Append a reply to a block's thread. The way you speak. |
+| `margin import-pr FILE.md` | Import the current branch's GitHub pull request comments into the review of FILE.md. The bridge from GitHub: gh detects the PR and fetches its review comments, and each comment naming this file lands as an ordinary margin thread on the block its line falls in. |
 
-All four operate on the same `.margin/` directory the TUI reads and writes, so
+All five operate on the same `.margin/` directory the TUI reads and writes, so
 they work in a pipe, a CI job, or a bare shell — no terminal, no running margin.
+
+`import-pr` is the one command you are not expected to reach for in the loop:
+it is how a review gets seeded from GitHub in the first place, usually before
+you or the human start talking. Run it when the document under review is part
+of a pull request and the PR's review comments should appear as threads —
+gh must be installed, authenticated, and able to find the PR from the branch
+the document's checkout is on. Re-running is safe: a comment already imported
+(same author, same text) is skipped. Comments on other files, and comments
+whose line matches no block, are reported rather than dropped, and the PR's
+general conversation comments (which have no line) are left to gh.
 
 ## Reading the human's screen
 

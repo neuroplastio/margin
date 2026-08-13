@@ -67,6 +67,15 @@ type childExitMsg struct {
 	err error
 }
 
+// importPRMsg carries the outcome of a background `:import-pr` run: the
+// import report on success, or the error the CLI would have printed. The
+// gh CLI call must not run on the render goroutine, so the command performs
+// it in a tea.Cmd and reports back here.
+type importPRMsg struct {
+	rep ImportReport
+	err error
+}
+
 // cursorState mirrors the child's cursor. The emulator reports style and
 // visibility through callbacks, which fire on the pty reader goroutine, so it
 // needs its own lock — View() reads it from the Bubble Tea goroutine.
@@ -1805,6 +1814,37 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.noticeNewEvents()
 		}
 		return m, m.watcher.wait()
+
+	case importPRMsg:
+		if m.quitting {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.status = "import: " + msg.err.Error()
+			return m, nil
+		}
+		if m.store == nil {
+			// The import can only have run with a review root (importPR
+			// refuses without one), so this is belt-and-braces — but the
+			// handler must never panic on the store a nil one would.
+			m.status = "nothing to import into"
+			return m, nil
+		}
+		// The import wrote thread files on disk; pull them into the on-screen
+		// threads so the imported comments show without waiting for the watcher.
+		if err := m.reloadThreads(); err != nil {
+			m.status = "import: " + err.Error()
+			return m, nil
+		}
+		// The import's own comment.posted events are the reviewer's doing — the
+		// same self-emit rule that stops a reviewer's own posts from being
+		// announced back. Advance the cursor so the watcher does not re-report
+		// them as new.
+		if evs, err := readEvents(m.store.root); err == nil && len(evs) > 0 {
+			m.lastEventID = evs[len(evs)-1].id
+		}
+		m.status = ImportSummary(msg.rep)
+		return m, nil
 
 	case tea.MouseClickMsg:
 		return m, m.handleClick(msg.Mouse())

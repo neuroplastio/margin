@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 // cmdRunner runs an external command and returns its combined output. ImportPR
@@ -260,4 +262,48 @@ func describeUnmapped(c ghReviewComment) string {
 		line = *c.OriginalLine
 	}
 	return fmt.Sprintf("%s:%d — %s: %s", c.Path, line, c.User.Login, firstLine(c.Body))
+}
+
+// ImportSummary renders an ImportReport as the one-paragraph human readout —
+// shared by the `margin import-pr` command and the TUI's `:import-pr` palette
+// action, so the two never disagree about what an import did.
+func ImportSummary(rep ImportReport) string {
+	noun := "comment"
+	if rep.Imported != 1 {
+		noun = "comments"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "imported %d %s from PR #%d (%s/%s)", rep.Imported, noun, rep.PR, rep.Owner, rep.Repo)
+	if rep.Skipped > 0 {
+		fmt.Fprintf(&b, "; %d already imported", rep.Skipped)
+	}
+	if rep.OtherFiles > 0 {
+		fmt.Fprintf(&b, "; %d on other files left alone", rep.OtherFiles)
+	}
+	if n := len(rep.Unmapped); n > 0 {
+		fmt.Fprintf(&b, "; %d on no matching line", n)
+	}
+	b.WriteString(".")
+	return b.String()
+}
+
+// importPR runs the gh CLI import against the document under review, in the
+// background — gh is a blocking external call and must not run on the render
+// goroutine — and reports the outcome through importPRMsg. It refuses where
+// there is no review root to write threads into (an ephemeral stdin review,
+// or a document that never resolved a store). The report's summary lands in
+// the status line; any error is surfaced the same way. It never modifies the
+// model before the message returns: the import's effect is on disk, and
+// importPRMsg's handler is what reconciles the on-screen threads with it.
+func (m *model) importPR() tea.Cmd {
+	if m.store == nil {
+		m.status = "nothing to import into"
+		return nil
+	}
+	m.status = "importing comments from the current pull request…"
+	path := m.path
+	return func() tea.Msg {
+		rep, err := ImportPR(path, nil)
+		return importPRMsg{rep: rep, err: err}
+	}
 }

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/neuroplastio/margin/internal/review"
@@ -90,6 +89,10 @@ adds them back, for an agent that wants to see what it already addressed.
 
 The mouse wheel scrolls the document three lines per tick; --wheel-speed sets
 a different step size (e.g. --wheel-speed 1 for fine-grained scrolling).
+
+The ':' palette offers every verb margin can perform — including :import-pr,
+which imports the current branch's GitHub pull request comments into this
+review (the TUI half of the margin import-pr command below).
 
 margin skill prints the markdown document an agent loads to learn how to take
 part in an interactive review: launch margin in a terminal for the human, poll
@@ -298,7 +301,7 @@ func newSkillCmd() *cobra.Command {
 		Use:   "skill",
 		Short: "Print the skill document an agent loads to use margin",
 		Long: `Print the markdown document an agent loads to learn how to use margin:
-the four CLI commands, the interactive review loop that binds them — launch the
+the five CLI commands, the interactive review loop that binds them — launch the
 review in a new terminal for the human, poll for their comments with comments
 wait, reply through comment add, and let the thread watcher carry the reply
 live to the open document — how a live participant knows when the review is
@@ -318,7 +321,8 @@ files, and anchors.`,
 // ordinary margin thread files on the blocks their lines fall in — the same
 // threads a reviewer typing `c` would create, so the pull request's
 // conversation reads and responds to inside margin. This is the "import" half
-// of the 2026-08-13 feedback; a TUI action that calls it would be its own leg.
+// of the 2026-08-13 feedback; the TUI action that calls it is the `:import-pr`
+// palette command (command.go), sharing this same ImportPR and ImportSummary.
 func newImportPRCmd(importPR func(path string) (review.ImportReport, error)) *cobra.Command {
 	return &cobra.Command{
 		Use:   "import-pr FILE.md",
@@ -345,32 +349,11 @@ general conversation comments have no line to attach to and are left alone.`,
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), importSummary(rep))
+			fmt.Fprintln(cmd.OutOrStdout(), review.ImportSummary(rep))
 			for _, u := range rep.Unmapped {
 				fmt.Fprintln(cmd.OutOrStdout(), "  "+u)
 			}
 			return nil
 		},
 	}
-}
-
-// importSummary renders an ImportReport as the one-paragraph human readout.
-func importSummary(rep review.ImportReport) string {
-	noun := "comment"
-	if rep.Imported != 1 {
-		noun = "comments"
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "imported %d %s from PR #%d (%s/%s)", rep.Imported, noun, rep.PR, rep.Owner, rep.Repo)
-	if rep.Skipped > 0 {
-		fmt.Fprintf(&b, "; %d already imported", rep.Skipped)
-	}
-	if rep.OtherFiles > 0 {
-		fmt.Fprintf(&b, "; %d on other files left alone", rep.OtherFiles)
-	}
-	if n := len(rep.Unmapped); n > 0 {
-		fmt.Fprintf(&b, "; %d on no matching line", n)
-	}
-	b.WriteString(".")
-	return b.String()
 }

@@ -130,7 +130,7 @@ margin comments wait --since 1N7KB52S0NPCH   # block for the next event
 ```
 
 `margin skill` prints the full picture: the markdown document an agent loads to
-learn how to take part in an interactive review — the same four commands, the
+learn how to take part in an interactive review — the same five commands, the
 loop that binds them (launch the review in a new terminal for the human, poll
 for their comments, reply through the CLI, let the thread watcher carry the
 reply live), how a live participant knows when the review is done (the launch

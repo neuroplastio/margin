@@ -537,6 +537,22 @@ var commands = []command{
 		Run:         func(m *model, val string) tea.Cmd { m.reloadDoc(); return nil },
 	},
 	{
+		// import.pr is the TUI half of `margin import-pr` (2026-08-13): it
+		// imports the current branch's GitHub pull request comments into the
+		// review of the document under review. gh does the detecting and the
+		// fetching; each comment naming this document lands as an ordinary
+		// margin thread on the block its line falls in. It runs in the
+		// background (gh is a blocking external call) and reports through
+		// importPRMsg. Palette-only by design — the board's own demo recipe
+		// asked for ":import-pr" — so it deliberately has no key binding;
+		// firstBinding returns "" and TestEveryCommandIsReachableByAKey is
+		// satisfied because import.pr is reachable from the palette.
+		ID:          "import.pr",
+		Description: "Import comments from the current pull request",
+		Applicable:  func(m *model) bool { return m.store != nil },
+		Run:         func(m *model, val string) tea.Cmd { return m.importPR() },
+	},
+	{
 		ID:          "app.quit",
 		Description: "Quit",
 		Applicable:  func(m *model) bool { return true },

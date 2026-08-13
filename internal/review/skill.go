@@ -3,7 +3,7 @@ package review
 import _ "embed"
 
 // skillDocument is the markdown document `margin skill` prints — the whole
-// contract an agent needs to take part in an interactive review: the four CLI
+// contract an agent needs to take part in an interactive review: the five CLI
 // commands, the loop that binds them (launch the review in a terminal, poll the
 // event log for the human's comments, reply through comment add, let the thread
 // watcher carry the reply live), and the on-disk shapes the loop depends on —
