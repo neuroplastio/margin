@@ -4,6 +4,16 @@ Last updated: 2026-08-13 (import comments from the current GitHub PR)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (PR comment import) `margin import-pr FILE.md` imports the current branch's
+  GitHub pull request review comments on that file as ordinary margin threads
+  — gh detects the PR (`gh pr view`), `gh api --paginate` fetches its review
+  comments, each comment attaches to the block its line falls in (content
+  anchor, quoted text), re-imports skip on author+body, PR-level conversation
+  comments are left alone, and comments on other files or no-matching-line
+  comments are reported not dropped — whether line-based mapping lands
+  comments on the right blocks, whether the summary readout is enough, and
+  whether the TUI should gain a `:import-pr` palette action that calls it —
+  journal 2026-08-13.1
 - (mermaid subgraph layout) subgraph diagrams now render each root subgraph
   in its own band of the grid — the maintainer's three-subgraph reproduction
   draws as three disjoint frames with every node inside its own frame, and
@@ -382,9 +392,31 @@ Last updated: 2026-08-13 (import comments from the current GitHub PR)
 
 ## In progress
 
-- **(feedback)** import comments from the current GitHub pull request —
-  `vault/feedback/2026-08-13-import-comments-from-gh-pr.md` — claimed 2026-08-13
-  (leg, draining the feedback)
+*(none)*
+
+## Done
+
+- [x] **(feedback)** import comments from the current GitHub pull request — a
+      new `margin import-pr FILE.md` command runs the gh CLI (PR detected from
+      the branch via `gh pr view`, review comments via `gh api --paginate
+      repos/<owner>/<repo>/pulls/<n>/comments`) and writes the comments that
+      name this document as ordinary margin thread files, each attached to the
+      block whose source-line range contains its line (`line`, falling back to
+      `original_line` for a base-side comment), with the block's content anchor
+      and a quote — the same thread a reviewer's `c` would produce, so a PR
+      comment becomes a local thread without any GitHub-shaped on-disk format
+      (goals.md's "must not shape the local design"). Re-imports are safe:
+      same-author-same-body comments are skipped. Comments on other files and
+      comments whose line maps to no block are counted and listed, never
+      dropped; the PR's general conversation (no line to attach to) is left to
+      gh; each import appends best-effort `comment.posted` events (D13/D14).
+      Chosen: CLI over a TUI action (a `:import-pr` palette command is a later
+      felt leg calling the same `ImportPR`), line-mapping over a GitHub
+      id-anchor scheme (a format change, forbidden here). Drains
+      `vault/feedback/2026-08-13-import-comments-from-gh-pr.md`; the file is
+      deleted. `[felt]` — see journal 2026-08-13.1 — done 2026-08-13
+
+
 
 ## Done
 

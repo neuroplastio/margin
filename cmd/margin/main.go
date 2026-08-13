@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/neuroplastio/margin/internal/review"
@@ -17,7 +18,9 @@ import (
 var version = "dev"
 
 func main() {
-	if err := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor, review.WaitEvents).Execute(); err != nil {
+	if err := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor, review.WaitEvents, func(path string) (review.ImportReport, error) {
+		return review.ImportPR(path, nil)
+	}).Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -26,7 +29,7 @@ func main() {
 // non-interactive command handlers as arguments and is a function rather than a
 // package var so tests can construct an isolated command with its own I/O,
 // args, and handlers that do not open a terminal or touch disk.
-func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), exportReview func(path string, includeResolved bool) (string, error), defaultAuthor func() string, waitEvents func(path, since string, timeout time.Duration) ([]string, error)) *cobra.Command {
+func newRootCmd(run func(path string, opts review.RunOptions) error, addComment func(path, anchor, author, text string) (string, error), exportReview func(path string, includeResolved bool) (string, error), defaultAuthor func() string, waitEvents func(path, since string, timeout time.Duration) ([]string, error), importPR func(path string) (review.ImportReport, error)) *cobra.Command {
 	var stdout bool
 	var includeResolved bool
 	var stdin bool
@@ -135,6 +138,7 @@ the launch's completion as the signal that the review is done.`,
 	root.AddCommand(newExportCmd(exportReview))
 	root.AddCommand(newCommentsCmd(waitEvents))
 	root.AddCommand(newSkillCmd())
+	root.AddCommand(newImportPRCmd(importPR))
 	return root
 }
 
@@ -306,4 +310,67 @@ files, and anchors.`,
 			return nil
 		},
 	}
+}
+
+// newImportPRCmd builds the `margin import-pr` subcommand: the bridge from a
+// GitHub pull request into the review. It shells out to the gh CLI to find the
+// PR the current branch is on and fetch its review comments, and writes them as
+// ordinary margin thread files on the blocks their lines fall in — the same
+// threads a reviewer typing `c` would create, so the pull request's
+// conversation reads and responds to inside margin. This is the "import" half
+// of the 2026-08-13 feedback; a TUI action that calls it would be its own leg.
+func newImportPRCmd(importPR func(path string) (review.ImportReport, error)) *cobra.Command {
+	return &cobra.Command{
+		Use:   "import-pr FILE.md",
+		Short: "Import comments from the current GitHub pull request into the review",
+		Long: `Import the review comments of the GitHub pull request the current branch is
+on into the review of FILE.md, using the gh CLI (gh must be installed and
+authenticated, and the document must live in a git checkout). Each comment
+that names this file is attached to the block its line falls in and written as
+an ordinary margin thread file, so it appears in the review exactly as a
+comment typed with c would. gh detects the pull request from the branch, so
+there is nothing to configure.
+
+Comments already imported (same author, same text) are skipped, so re-running
+the command is safe. Comments on other files, and comments whose line matches
+no block in the document, are reported instead of dropped. The pull request's
+general conversation comments have no line to attach to and are left alone.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Same runtime-error discipline as the other subcommands: a missing
+			// gh, no PR for the branch, a bad document — runtime errors that
+			// should not bury their message under the help text.
+			cmd.SilenceUsage = true
+			rep, err := importPR(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), importSummary(rep))
+			for _, u := range rep.Unmapped {
+				fmt.Fprintln(cmd.OutOrStdout(), "  "+u)
+			}
+			return nil
+		},
+	}
+}
+
+// importSummary renders an ImportReport as the one-paragraph human readout.
+func importSummary(rep review.ImportReport) string {
+	noun := "comment"
+	if rep.Imported != 1 {
+		noun = "comments"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "imported %d %s from PR #%d (%s/%s)", rep.Imported, noun, rep.PR, rep.Owner, rep.Repo)
+	if rep.Skipped > 0 {
+		fmt.Fprintf(&b, "; %d already imported", rep.Skipped)
+	}
+	if rep.OtherFiles > 0 {
+		fmt.Fprintf(&b, "; %d on other files left alone", rep.OtherFiles)
+	}
+	if n := len(rep.Unmapped); n > 0 {
+		fmt.Fprintf(&b, "; %d on no matching line", n)
+	}
+	b.WriteString(".")
+	return b.String()
 }

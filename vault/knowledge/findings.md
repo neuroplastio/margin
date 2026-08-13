@@ -628,3 +628,25 @@ mode's overflow/scroll measurement. Expanding is also the only faithful
 option for a terminal renderer: a literal tab *cannot* be shown as itself, so
 the choice is between resolved stops and expanded spaces, and only the latter
 is deterministic and measurable.
+
+## F28 — the gh CLI's shape for PR comment imports
+
+`gh` is the intended bridge for `margin import-pr` (2026-08-13), and three of
+its shapes cost a probe to get right:
+
+- **Run `gh` in the document's directory, not the process cwd.** `gh pr view`
+  resolves the repository from the current working directory, so a margin
+  invoked from elsewhere in the tree would look up the wrong checkout. ImportPR
+  binds the runner to `filepath.Dir(path)`.
+- **`gh pr view` fails loudly and its stderr is the useful error.** No PR for
+  the branch → exit 1, `no pull requests found for branch "main"`; no git
+  remotes → `no git remotes found`. Both messages are what the user needs, so
+  runGH wraps and passes gh's stderr through rather than inventing its own.
+- **`gh api --paginate` concatenates pages into one JSON array** — a long
+  review is not truncated at the first page, and the result is still a single
+  array to unmarshal.
+- **A review comment's `line` is its head-side blob line; `original_line` its
+  base-side line, and only one is set** depending on which side of the diff the
+  comment sits on. `--paginate repos/{o}/{r}/pulls/N/comments` (review
+  comments) is separate from `issues/N/comments` (the PR's general
+  conversation, which has no line and nothing to attach to).

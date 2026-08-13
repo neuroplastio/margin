@@ -17,7 +17,7 @@ func exec(t *testing.T, run func(string, review.RunOptions) error, args ...strin
 		run = func(string, review.RunOptions) error { return nil }
 	}
 	var out bytes.Buffer
-	root := newRootCmd(run, nil, nil, nil, nil)
+	root := newRootCmd(run, nil, nil, nil, nil, nil)
 	root.SetOut(&out)
 	root.SetErr(&out)
 	root.SetArgs(args)
@@ -309,7 +309,7 @@ func execComment(t *testing.T, args []string) (path, anchor, author, text string
 		return "/root/.margin/threads/doc.md/x.md", nil
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, addComment, nil, nil, nil)
+	root := newRootCmd(nil, addComment, nil, nil, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs(args)
@@ -385,7 +385,7 @@ func TestCommentAddSurfacesRuntimeError(t *testing.T) {
 		return "", errors.New("no commentable block with anchor ^abc in spec.md")
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, addComment, nil, nil, nil)
+	root := newRootCmd(nil, addComment, nil, nil, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs([]string{"comment", "add", "spec.md", "--anchor", "^abc", "--text", "hi"})
@@ -430,7 +430,7 @@ func execWait(t *testing.T, args []string) (path, since string, timeout time.Dur
 		return []string{"line one", "line two"}, nil
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, nil, nil, nil, waitEvents)
+	root := newRootCmd(nil, nil, nil, nil, waitEvents, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs(args)
@@ -529,7 +529,7 @@ func execExport(t *testing.T, args []string) (path string, includeResolved bool,
 		return "# Review of " + p + "\n", nil
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, nil, exportReview, nil, nil)
+	root := newRootCmd(nil, nil, exportReview, nil, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs(args)
@@ -575,7 +575,7 @@ func TestExportSurfacesRuntimeError(t *testing.T) {
 		return "", errors.New("open nope.md: no such file or directory")
 	}
 	var buf bytes.Buffer
-	root := newRootCmd(nil, nil, exportReview, nil, nil)
+	root := newRootCmd(nil, nil, exportReview, nil, nil, nil)
 	root.SetOut(&buf)
 	root.SetErr(&buf)
 	root.SetArgs([]string{"export", "nope.md"})
@@ -633,5 +633,83 @@ func TestHelpMentionsSkill(t *testing.T) {
 	}
 	if !strings.Contains(out, "skill") {
 		t.Errorf("help does not mention the skill subcommand:\n%s", out)
+	}
+}
+
+// --- import-pr ----------------------------------------------------------------
+
+// execImportPR runs `import-pr` with a stub ImportPR handler, capturing the
+// output.
+func execImportPR(t *testing.T, args []string) (out string, err error) {
+	t.Helper()
+	importPR := func(path string) (review.ImportReport, error) {
+		if path == "boom.md" {
+			return review.ImportReport{}, errors.New("import-pr: detecting the pull request: no pull requests found for branch \"main\"")
+		}
+		return review.ImportReport{
+			PR:         42,
+			Owner:      "acme",
+			Repo:       "crate",
+			Imported:   2,
+			Skipped:    1,
+			OtherFiles: 3,
+			Unmapped:   []string{"doc.md:99 — toly: nowhere to land"},
+		}, nil
+	}
+	var buf bytes.Buffer
+	root := newRootCmd(nil, nil, nil, nil, nil, importPR)
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs(args)
+	err = root.Execute()
+	return buf.String(), err
+}
+
+func TestImportPRReachesTheHandler(t *testing.T) {
+	out, err := execImportPR(t, []string{"import-pr", "spec.md"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !strings.Contains(out, "imported 2 comments from PR #42 (acme/crate)") {
+		t.Errorf("summary does not name the import:\n%s", out)
+	}
+	if !strings.Contains(out, "1 already imported") {
+		t.Errorf("summary does not report the skipped re-import:\n%s", out)
+	}
+	if !strings.Contains(out, "3 on other files left alone") {
+		t.Errorf("summary does not report the other-file comments:\n%s", out)
+	}
+	if !strings.Contains(out, "doc.md:99 — toly: nowhere to land") {
+		t.Errorf("output does not list the unmapped comment:\n%s", out)
+	}
+}
+
+func TestImportPRRequiresAFile(t *testing.T) {
+	_, err := execImportPR(t, []string{"import-pr"})
+	if err == nil {
+		t.Fatal("import-pr without a file reported success")
+	}
+}
+
+func TestImportPRSurfacesRuntimeError(t *testing.T) {
+	out, err := execImportPR(t, []string{"import-pr", "boom.md"})
+	if err == nil {
+		t.Fatal("a failing import reported success")
+	}
+	if !strings.Contains(out, "no pull requests found") {
+		t.Errorf("the actual error is missing:\n%s", out)
+	}
+	if strings.Contains(out, "Usage:") {
+		t.Errorf("runtime error printed the usage block:\n%s", out)
+	}
+}
+
+func TestHelpMentionsImportPR(t *testing.T) {
+	out, err := exec(t, nil, "--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if !strings.Contains(out, "import-pr") {
+		t.Errorf("help does not mention the import-pr subcommand:\n%s", out)
 	}
 }

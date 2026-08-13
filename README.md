@@ -158,6 +158,15 @@ lines, so an agent takes the last line's id as the next `--since`:
 margin comments wait --since 1N7KB52S0NPCH --timeout 60s
 ```
 
+`margin import-pr FILE.md` brings a GitHub pull request into the review: it
+uses the `gh` CLI to find the PR the current branch is on and imports the PR's
+review comments on that file as ordinary margin threads — each attached to the
+block its line falls in — so comments already made on the PR read and respond
+to inside margin. Re-running is safe (comments already imported are skipped);
+comments on other files, or on lines no block covers, are reported, not
+dropped. Requires `gh` installed and authenticated, and the document living in
+a git checkout.
+
 The anchor is the `(^id)` shown in a block's export header. `--author` defaults
 to the current user. The reply appears on the reviewer's next open (or live, via
 the file watcher) — and while the review is open it is announced in the status
