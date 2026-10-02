@@ -209,16 +209,43 @@ memory), folded onto the same newline a bare `enter` gets.
 
 ## Install
 
+Every push to `main` that passes `make check` is published to margin's `dev`
+channel on pkg.neuroplast.io: a static binary for Linux and macOS (amd64 and
+arm64), signed with the neuroplastio release key. Fetch the newest, check it
+against that key, and put it on your `PATH`:
+
+```sh
+f=margin_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+u=https://pkg.neuroplast.io/margin/dev/latest
+curl -fsS -O "$u/manifest" -O "$u/manifest.sig" -O "$u/$f"
+echo 'release@neuroplast.io namespaces="engram" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDCsEZcn1tiubvKQzEVs5pJ4QVXoFmSDtO+k6SdetUdf' > allowed_signers
+ssh-keygen -Y verify -f allowed_signers -I release@neuroplast.io -n engram -s manifest.sig < manifest &&
+  grep -qw "sha256=$( (sha256sum "$f" 2>/dev/null || shasum -a 256 "$f") | cut -d' ' -f1)" manifest &&
+  install -m 755 "$f" ~/.local/bin/margin
+```
+
+`ssh-keygen` proves the manifest is signed by the release key; the `grep`
+proves the binary is one the manifest names. If the `grep` fails right after a
+push, a publish was midway through; run it again.
+
+From then on, margin updates itself:
+
+```
+margin update            # the dev channel's newest build, checked against the key built into margin
+margin update 0d7c52f    # a particular build, older ones included, while the channel still holds it
+margin --version         # 26.10.02-dev.0d7c52f for a channel build; the short commit for your own
+```
+
+`margin update` replaces the file you ran (through any symlink), so install it
+somewhere you can write, such as `~/.local/bin`. A margin you built yourself
+updates to the channel's newest build too, and says so. Builds stay on the
+channel for 30 days after a newer one replaces them.
+
+With a Go toolchain you can also build it yourself:
+
 ```
 go install github.com/neuroplastio/margin/cmd/margin@latest
 ```
-
-Every push to `main` also builds the artifacts for Linux and macOS (amd64 +
-arm64) and uploads them to the run's **Artifacts** list: `margin_<sha>_<os>_<arch>.tar.gz`
-per platform plus `checksums.txt`. The archive is just the binary, the README
-and the LICENSE — grab the one for your platform, verify it against
-`checksums.txt` with `sha256sum -c`, and run `./margin`. This is for machines
-without a Go toolchain; the version is the short commit sha (`margin --version`).
 
 ## Build
 
@@ -239,6 +266,7 @@ margin --version
 make check              # build + test + vet
 make doctor             # prove this machine can run the composer tests
 make run FILE=doc.md
+make dist               # the release binaries, dist/margin_<os>_<arch>
 ```
 
 Requires Go 1.24+ and `nvim` 0.8+ on `PATH`. `./scripts/setup-env.sh` provisions

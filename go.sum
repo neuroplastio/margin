@@ -49,6 +49,8 @@ github.com/mattn/go-runewidth v0.0.24 h1:cpokDiIn0MGnhdHwuWnJBITySJ20QyNGnY2kR/a
 github.com/mattn/go-runewidth v0.0.24/go.mod h1:XBkDxAl56ILZc9knddidhrOlY5R/pDhgLpndooCuJAs=
 github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELUXHmA=
 github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
+github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec h1:nYDocJy/nGYsyog3gBVBrObPDtYYpX4XjhMmzM42/V4=
+github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec/go.mod h1:9X8xfh6qCZPjvq+2AMBXkDM4bGwl46t6JFbsREnnVWk=
 github.com/neuroplastio/hotty-go v0.0.0-20261002075537-44e207d03fca h1:Pt0a5ZvLVYHFDNEdlhdufwrpRSCb5LXYDyS2F4h1dZE=
 github.com/neuroplastio/hotty-go v0.0.0-20261002075537-44e207d03fca/go.mod h1:2napVjxJDsFwF1WM/HXn6AXanVwgTYMWoJhjxdIUHlQ=
 github.com/neuroplastio/hotty-go/hottytea v0.0.0-20261002075537-44e207d03fca h1:bz7nlH9LSbeDC1y2VfDwaBA03XvcEq1pLZg3DqYd7S8=

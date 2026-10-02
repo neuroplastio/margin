@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-02 (HOTTY: prose blocks as HTML surfaces)
+Last updated: 2026-10-02 (published to an engram channel; `margin update`)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -409,6 +409,13 @@ Last updated: 2026-10-02 (HOTTY: prose blocks as HTML surfaces)
 
 ## Done
 
+- [x] **(direction)** publish via engram and update in place: every push to
+      main that passes `make check` is a signed build on
+      `pkg.neuroplast.io/margin/dev` (bare static binaries, as plx and engram
+      publish), replacing the goreleaser snapshot pipeline, and
+      `margin update [commit]` replaces the running binary with a verified
+      build from it (D18). `[mech]` — see journal 2026-10-02.2 — done
+      2026-10-02
 - [x] **(direction)** HOTTY support: margin renders its prose blocks as HTML
       surfaces on a HOTTY host through `neuroplastio/hotty-go` (made public
       for it), and keeps the review in cells (D17). `[felt]` — see journal

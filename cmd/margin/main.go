@@ -10,16 +10,17 @@ import (
 	"time"
 
 	"github.com/neuroplastio/margin/internal/review"
+	"github.com/neuroplastio/margin/internal/update"
+	"github.com/neuroplastio/margin/internal/version"
 	"github.com/spf13/cobra"
 )
 
-// version is stamped at build time; see the Makefile.
-var version = "dev"
-
 func main() {
-	if err := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor, review.WaitEvents, func(path string) (review.ImportReport, error) {
+	root := newRootCmd(review.Run, review.AddComment, review.Export, review.DefaultAuthor, review.WaitEvents, func(path string) (review.ImportReport, error) {
 		return review.ImportPR(path, nil)
-	}).Execute(); err != nil {
+	})
+	root.AddCommand(newUpdateCmd(update.Self))
+	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -38,7 +39,7 @@ func newRootCmd(run func(path string, opts review.RunOptions) error, addComment 
 	root := &cobra.Command{
 		Use:     "margin [FILE.md|DIR/]",
 		Short:   "Review markdown in the terminal",
-		Version: version,
+		Version: version.Current().String(),
 		Long: `margin opens markdown for review: read the rendered prose, leave
 comments anchored to blocks, mark what you have reviewed and what still needs
 attention, then copy the whole review out for whatever wrote the document.

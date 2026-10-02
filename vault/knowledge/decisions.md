@@ -380,3 +380,55 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   in cells); per-line surfaces (a wrapped paragraph's lines are the host's to
   break); guessing heights from character counts (proportional text breaks
   wherever the font says).
+
+**D18 — margin is published to an engram channel, and updates itself from
+it.** Maintainer direction (2026-10-02): "Let's publish margin via engram. See
+plx pipelines to see how its done. And implement margin update command that
+updates itself." It replaces the goreleaser snapshot pipeline (feedback
+2026-08-11-goreleaser-ci), whose artifacts could only be downloaded by hand
+from a workflow run.
+
+- **The channel.** Every push to main that passes `make check` is a build on
+  `pkg.neuroplast.io/margin/dev`, published with `engram publish` exactly as
+  plx and engram are: one manifest per build, signed in AWS KMS by the
+  neuroplastio release key, naming the size and sha256 of each artifact.
+  Builds are addressed by full commit; no tags, no GitHub releases. Builds
+  expire 30 days after they are superseded (`--retention 720h`).
+- **Bare binaries.** The artifacts are the binaries themselves,
+  `margin_<os>_<arch>` for linux/darwin × amd64/arm64, static (CGO off) — not
+  archives. `margin update` puts the file in place of itself, so there is
+  nothing to unpack, and `latest/margin_<os>_<arch>` is a URL a person can
+  curl. The cost: engram's `install.sh` unpacks a tarball and cannot install
+  them, so the README's install recipe checks the signature with
+  `ssh-keygen` directly.
+- **Name and identity.** As in plx: `Version` is the name — `YY.MM.DD-dev.<sha7>`
+  (the commit's date, UTC) for a channel build, the short commit (`+dirty`
+  for a modified tree) for a local one; `Commit` is the identity; `Channel`
+  is stamped only by `make dist`, so every local build is on no channel.
+  All in `internal/version`, set by `-ldflags -X`; an unstamped build falls
+  back to the commit Go recorded.
+- **`margin update [commit]`.** Asks the build's own channel (dev for a local
+  build) for its newest build, or the named one (a full commit, or a prefix
+  resolved through the unsigned journal), and believes only the release key
+  pinned in `internal/update`. A channel build first reads its own manifest
+  and refuses a head older than itself (SPEC's rollback rule; naming a commit
+  is the explicit way back). The binary is checked against the manifest's
+  sha256, written beside the running executable (symlinks followed),
+  `chmod 0755`, fsynced and renamed over it. Already on that build: says so,
+  touches nothing. An unwritable directory is an error that says to install
+  margin somewhere the user owns — never to elevate.
+- **Test seams.** `MARGIN_PKG_URL` moves the server (a mirror, a test); the key
+  does not move with it. The key can be replaced only in a binary built with
+  `-tags updatetest` (`MARGIN_UPDATE_SIGNERS`), which no release is; a test
+  compiled without the tag proves the variable does nothing.
+- **CI.** One workflow on GitHub-hosted runners (margin is public: never a
+  self-hosted runner): `make check` with the pinned official nvim tarball and
+  `make doctor`, on pull requests and main; `make dist` and the publish on
+  main only. The role ARN, bucket, KMS alias and distribution id are written
+  in the workflow (not repository variables); there are no secrets — the
+  publish signs in to AWS with GitHub's OIDC token as
+  `github-pkg-publish-margin`, which may write under `margin/` and sign.
+- **Rejected.** Tarballs, so `install.sh` would work (update would then have to
+  unpack, and a curl of `latest/` would too); enboot-style handover as plx
+  does (margin is a short-lived TUI with nothing to hand over); keeping
+  goreleaser for four `go build`s.

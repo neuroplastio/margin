@@ -1,0 +1,46 @@
+package main
+
+import (
+	"context"
+	"io"
+
+	"github.com/neuroplastio/margin/internal/update"
+	"github.com/spf13/cobra"
+)
+
+// newUpdateCmd builds `margin update`. It takes the update as an argument, like
+// newRootCmd takes its handlers, so a test can drive the command without a
+// channel or a binary to replace.
+func newUpdateCmd(run func(ctx context.Context, out io.Writer, commit string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:   "update [commit]",
+		Short: "Replace this margin with the newest build from its release channel",
+		Long: `margin update fetches the newest build of margin from the dev channel on
+pkg.neuroplast.io, checks it against the release key built into this margin
+(the signature over the build's manifest, then the binary's sha256), and puts
+it in place of the margin you ran — following symlinks to the real file,
+written beside it and renamed over it.
+
+A commit (full, or its first few characters) installs that build instead,
+older ones included, as long as the channel still holds it.
+
+A local build (built from a checkout, on no channel) updates to the dev
+channel's newest build; margin says what it replaced. If this margin's
+directory is not writable by you, update refuses: install margin somewhere
+you own, such as ~/.local/bin.
+
+MARGIN_PKG_URL points it at another server (a mirror, or a test); the key
+does not move with it.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			commit := ""
+			if len(args) == 1 {
+				commit = args[0]
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), update.Timeout)
+			defer cancel()
+			return run(ctx, cmd.OutOrStdout(), commit)
+		},
+	}
+}

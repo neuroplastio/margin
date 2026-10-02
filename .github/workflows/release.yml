@@ -1,65 +1,185 @@
-# Release artifacts for every push to main (feedback 2026-08-11-goreleaser-ci).
-# The main point is artifacts you can download, and the version is the short
-# commit sha — no semver tags, no GitHub release objects. `goreleaser release
-# --snapshot --clean` builds Linux/macOS amd64/arm64 archives and raw binaries
-# plus checksums into `dist/` and publishes nothing, and upload-artifact makes
-# them downloadable from the workflow run's artifact list.
+# Release: every push to main that passes the gate is a build on margin's dev
+# channel, pkg.neuroplast.io/margin/dev — four static binaries, signed by the
+# release key, which `margin update` installs (D18). Three jobs:
 #
-# `check` runs before the build because they catch different things: a snapshot
-# happily succeeds on deprecated options, and deprecated options are how config
-# rots into artifacts that break.
+#   • check — `make check`, with a real nvim so the composer tests run instead
+#     of skipping. On pull requests this is all that runs.
+#   • build — on main, beside check: `make dist`, the four binaries, as a job
+#     artifact. Building needs no gate; publishing does.
+#   • publish — on main, after both: `engram publish` the binaries, then read
+#     the build back through the CDN, the way `margin update` will.
+#
+# margin is a public repository, so every job runs on GitHub's hosted runners:
+# a self-hosted runner would run anyone's pull request on our machine.
+#
+# Builds are addressed by full commit and named YY.MM.DD-dev.<sha7> (the
+# commit's date, UTC). Nothing here tags the repository or makes a GitHub
+# release.
+#
+# There are no secrets. The publish job signs in to AWS with GitHub's OIDC
+# token, as a role that may write under margin/ in the bucket and sign with the
+# release key, and nothing else (neuroplastio/infra, pkg/). The role, bucket,
+# key and distribution are not secret, so they are written here, not kept in
+# repository variables.
 name: Release
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 permissions:
   contents: read
 
 env:
-  # Pinned exactly, and load-bearing: .goreleaser.yml tracks the current v2
-  # schema and an older goreleaser refuses to parse it at all (v2.5.1 cannot).
-  GORELEASER_VERSION: v2.17.1
+  AWS_ROLE_ARN: arn:aws:iam::816026731201:role/github-pkg-publish-margin
+  BUCKET: neuroplastio-pkg
+  KMS_KEY: alias/release-signing
+  DISTRIBUTION_ID: E2JRO3ARI7TXDT
+  PKG_URL: https://pkg.neuroplast.io
+  # The release key's public half, pinned here rather than fetched: it is what
+  # the engram installer checks engram against, and what the publish is read
+  # back against. A key fetched from the server it vouches for would prove
+  # nothing. margin pins the same key in internal/update.
+  ENGRAM_SIGNERS: release@neuroplast.io namespaces="engram" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDCsEZcn1tiubvKQzEVs5pJ4QVXoFmSDtO+k6SdetUdf
+  # The composer is a real nvim, and its tests skip without one. The official
+  # tarball, pinned with its digest: Ubuntu's nvim lags far behind the 0.12
+  # the composer is developed against (vault/knowledge/findings.md).
+  NVIM_VERSION: v0.12.5
+  NVIM_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
 
 jobs:
-  snapshot:
-    name: goreleaser snapshot
+  check:
+    name: make check
     runs-on: ubuntu-latest
     concurrency:
-      group: release-snapshot-${{ github.ref }}
+      # A pull request's newer push cancels the older check; a push to main
+      # is its own group, since a cancelled check would keep that commit off
+      # the channel.
+      group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # goreleaser reads the git log for the snapshot version metadata.
-          fetch-depth: 0
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          # Single source of truth for the Go floor: the go.mod directive.
           go-version-file: go.mod
-          check-latest: true
 
-      - uses: goreleaser/goreleaser-action@v6
+      - name: Install nvim
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/nvim.tar.gz" \
+            "https://github.com/neovim/neovim/releases/download/$NVIM_VERSION/nvim-linux-x86_64.tar.gz"
+          echo "$NVIM_SHA256  $RUNNER_TEMP/nvim.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/nvim"
+          tar -xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP/nvim" --strip-components=1
+          echo "$RUNNER_TEMP/nvim/bin" >> "$GITHUB_PATH"
+
+      # A suite whose composer tests skipped would still report ok; this
+      # demands one of them pass.
+      - run: make doctor
+
+      - run: make check
+
+  build:
+    name: build the binaries
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
         with:
-          version: ${{ env.GORELEASER_VERSION }}
-          args: check
+          go-version-file: go.mod
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: ${{ env.GORELEASER_VERSION }}
-          args: release --snapshot --clean
+      # dist/margin_<os>_<arch>: static (CGO off), stamped with the commit,
+      # the dev channel and the build's name.
+      - run: make dist
 
-      # The whole point: the run's artifacts are the deliverable. Archives +
-      # checksums only — each tar.gz already holds the binary, LICENSE and
-      # README, so uploading the bare-binary build output too would double the
-      # upload for no new bits.
-      - uses: actions/upload-artifact@v4
+      - name: Check the stamp
+        run: |
+          dist/margin_linux_amd64 --version
+          dist/margin_linux_amd64 --version | grep -q "^margin [0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]-dev\.$(git rev-parse --short=7 HEAD) ($(git rev-parse HEAD))$"
+          test "$(ls dist | wc -l)" -eq 4
+
+      - uses: actions/upload-artifact@v7
         with:
           name: margin-${{ github.sha }}
-          path: |
-            dist/*.tar.gz
-            dist/checksums.txt
+          path: dist/
           retention-days: 7
           if-no-files-found: error
+
+  publish:
+    name: publish to margin/dev
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the job request the OIDC token it signs in to AWS with.
+      id-token: write
+    concurrency:
+      # Never cancel a publishing run.
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: margin-${{ github.sha }}
+          path: dist/
+
+      # The name the binaries carry, read from one of them, so the channel
+      # and `margin --version` can never disagree.
+      - name: Name the build
+        run: |
+          chmod +x dist/*
+          echo "MARGIN_VERSION=$(dist/margin_linux_amd64 --version | cut -d' ' -f2)" >> "$GITHUB_ENV"
+
+      - name: Install engram
+        run: curl -fsS "$PKG_URL/engram/install.sh" | sh -s -- engram ./bin
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # Bare binaries, not archives: `margin update` puts the file in place of
+      # itself. dist/margin_<os>_<arch> is published as margin/<os>/<arch>.
+      # Idempotent: re-running this job for a commit already in the journal
+      # succeeds without doing anything.
+      - name: Publish
+        run: |
+          artifacts=()
+          for f in dist/margin_*; do
+            platform="${f#dist/margin_}"
+            artifacts+=("margin/${platform%_*}/${platform#*_}=$f")
+          done
+          bin/engram publish \
+            --bucket "$BUCKET" --kms "$KMS_KEY" --cloudfront "$DISTRIBUTION_ID" \
+            --project margin --channel dev --retention 720h \
+            --commit "$(git rev-parse HEAD)" --version "$MARGIN_VERSION" \
+            --time "$(git show -s --format=%cI HEAD)" \
+            "${artifacts[@]}"
+
+      # Read it back the way `margin update` will: through the CDN, against
+      # the pinned key. Three attempts, 10 s then 30 s apart, so a transient
+      # CDN error does not fail a release; a build that really does not verify
+      # fails all three.
+      - name: Verify what was published
+        run: |
+          printf '%s\n' "$ENGRAM_SIGNERS" > allowed_signers
+          for attempt in 1 2 3; do
+            if bin/engram verify --url "$PKG_URL" --project margin --channel dev \
+              --signers allowed_signers --commit "$(git rev-parse HEAD)" --fetch; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt == 1 ? 10 : 30))
+              echo "::warning::engram verify failed (attempt $attempt of 3); retrying in ${delay}s"
+              sleep "$delay"
+            fi
+          done
+          echo "::error::engram verify failed three times"
+          exit 1

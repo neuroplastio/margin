@@ -1,8 +1,24 @@
 BIN := bin/margin
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: check build test test-race vet fmt run doctor clean
+# A build has a name and an identity (D18). COMMIT is the identity: the full
+# commit. MODIFIED marks a tree with uncommitted changes, whose commit names
+# code the binary does not contain. A local build is named after its short
+# commit (+dirty) and is on no channel; `make dist`, which the release workflow
+# runs, names it YY.MM.DD-dev.<sha7> — the commit's date in UTC — and stamps
+# the dev channel it is published to.
+SHORT    := $(shell git rev-parse --short=7 HEAD 2>/dev/null)
+COMMIT   ?= $(shell git rev-parse HEAD 2>/dev/null)
+MODIFIED ?= $(if $(shell git status --porcelain 2>/dev/null),true,)
+CHANNEL  ?= dev
+DIST_VERSION = $(shell TZ=UTC git show -s --date=format-local:%y.%m.%d --format=%cd HEAD)-$(CHANNEL).$(SHORT)
+
+VERSION_PKG := github.com/neuroplastio/margin/internal/version
+LDFLAGS := -X $(VERSION_PKG).Commit=$(COMMIT) -X $(VERSION_PKG).modified=$(MODIFIED)
+DIST_LDFLAGS := -s -w -X $(VERSION_PKG).Commit=$(COMMIT) \
+	-X $(VERSION_PKG).Version=$(DIST_VERSION) -X $(VERSION_PKG).Channel=$(CHANNEL)
+DIST_PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+
+.PHONY: check build dist test test-race vet fmt run doctor clean
 
 # The canonical gate. Keep the tree green.
 check: build test vet
@@ -10,6 +26,19 @@ check: build test vet
 build:
 	go build ./...
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/margin
+
+# The release binaries: static, one per platform, dist/margin_<os>_<arch>, as
+# the release workflow publishes them to the channel. Refuses a modified tree,
+# whose build would claim a commit it does not contain.
+dist:
+	@test -z "$(MODIFIED)" || { echo "make dist: the tree has uncommitted changes" >&2; exit 1; }
+	rm -rf dist
+	@set -e; for p in $(DIST_PLATFORMS); do \
+		os=$${p%/*}; arch=$${p#*/}; \
+		echo "dist/margin_$${os}_$${arch}"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags '$(DIST_LDFLAGS)' \
+			-o dist/margin_$${os}_$${arch} ./cmd/margin; \
+	done
 
 test:
 	go test ./...
@@ -38,4 +67,4 @@ run: build
 	$(BIN) $(FILE)
 
 clean:
-	rm -rf bin
+	rm -rf bin dist
