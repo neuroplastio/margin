@@ -26,18 +26,22 @@ check: build test vet
 build:
 	go build ./...
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/margin
+	go build -ldflags '$(LDFLAGS)' -o $(BIN)-launcher ./cmd/margin-launcher
 
 # The release binaries: static, one per platform, dist/margin_<os>_<arch>, as
-# the release workflow publishes them to the channel. Refuses a modified tree,
+# the release workflow publishes them to the channel, and beside each its thin
+# launcher, dist/margin-launcher_<os>_<arch> (D20). Refuses a modified tree,
 # whose build would claim a commit it does not contain.
 dist:
 	@test -z "$(MODIFIED)" || { echo "make dist: the tree has uncommitted changes" >&2; exit 1; }
 	rm -rf dist
 	@set -e; for p in $(DIST_PLATFORMS); do \
 		os=$${p%/*}; arch=$${p#*/}; \
-		echo "dist/margin_$${os}_$${arch}"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags '$(DIST_LDFLAGS)' \
-			-o dist/margin_$${os}_$${arch} ./cmd/margin; \
+		for b in margin margin-launcher; do \
+			echo "dist/$${b}_$${os}_$${arch}"; \
+			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags '$(DIST_LDFLAGS)' \
+				-o dist/$${b}_$${os}_$${arch} ./cmd/$$b; \
+		done; \
 	done
 
 test:

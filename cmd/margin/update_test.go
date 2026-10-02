@@ -129,3 +129,79 @@ func TestAStaleMarginReplacesItself(t *testing.T) {
 		t.Errorf("after the refused update: --version = %q", out)
 	}
 }
+
+// The launcher, end to end: margin-launcher in a directory nobody may write,
+// a home with nothing in it. The first launch fetches margin a and runs it;
+// margin update, in a margin the launcher started, installs b into the home
+// and leaves every file it ran from alone; the next launch runs b.
+func TestTheLauncherFetchesMarginAndUpdateMovesIt(t *testing.T) {
+	gobin, err := osexec.LookPath("go")
+	if err != nil {
+		t.Skip("no go toolchain on PATH to build margin with")
+	}
+	commitA, commitB := testchannel.Commit('a'), testchannel.Commit('b')
+	const verA, verB = "26.10.01-dev.aaaaaaa", "26.10.02-dev.bbbbbbb"
+	dir := t.TempDir()
+	build := func(pkg, name, v, commit string) []byte {
+		t.Helper()
+		out := filepath.Join(dir, name)
+		vp := "github.com/neuroplastio/margin/internal/version"
+		cmd := osexec.Command(gobin, "build", "-tags", "updatetest", "-o", out,
+			"-ldflags", "-X "+vp+".Version="+v+" -X "+vp+".Commit="+commit+" -X "+vp+".Channel=dev", pkg)
+		if b, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("building %s %s: %v\n%s", name, v, err, b)
+		}
+		data, err := os.ReadFile(out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	older, newer := build(".", "margin-a", verA, commitA), build(".", "margin-b", verB, commitB)
+	launcher := build("../margin-launcher", "margin-launcher", verA, commitA)
+
+	ch := testchannel.New(t)
+	ch.Publish(t, commitA, verA, older)
+
+	usr := t.TempDir()
+	installed := filepath.Join(usr, "margin")
+	if err := os.WriteFile(installed, launcher, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(usr, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(usr, 0o755) })
+	home := t.TempDir()
+	mhome := filepath.Join(home, ".local", "margin")
+	margin := func(env []string, args ...string) (string, error) {
+		t.Helper()
+		cmd := osexec.Command(installed, args...)
+		cmd.Env = append(os.Environ(), "HOME="+home, "MARGIN_PKG_URL="+ch.URL, "MARGIN_UPDATE_SIGNERS="+ch.Signers())
+		cmd.Env = append(cmd.Env, env...)
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+
+	// ENLAUNCH_FETCH: a seed in this machine's /usr/lib/margin, from a
+	// package, must not stand in for the first fetch.
+	out, err := margin([]string{"ENLAUNCH_FETCH=1"}, "--version")
+	if err != nil || !strings.HasSuffix(out, "margin "+verA+" ("+commitA+")\n") || !strings.Contains(out, "margin: fetching") {
+		t.Fatalf("first launch: %v\n%s", err, out)
+	}
+
+	ch.Publish(t, commitB, verB, newer)
+	out, err = margin(nil, "update")
+	if err != nil || !strings.Contains(out, "margin "+verA+" → "+verB) || !strings.Contains(out, "installed in "+mhome) {
+		t.Fatalf("margin update under the launcher: %v\n%s", err, out)
+	}
+	if out, _ := margin(nil, "--version"); out != "margin "+verB+" ("+commitB+")\n" {
+		t.Errorf("the next launch: --version = %q", out)
+	}
+	if data, _ := os.ReadFile(installed); !bytes.Equal(data, launcher) {
+		t.Error("the launcher was written")
+	}
+	if data, _ := os.ReadFile(filepath.Join(mhome, "builds", commitA, "margin")); !bytes.Equal(data, older) {
+		t.Error("margin a, which ran the update, was written")
+	}
+}

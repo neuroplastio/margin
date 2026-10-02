@@ -51,6 +51,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
 github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
 github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec h1:nYDocJy/nGYsyog3gBVBrObPDtYYpX4XjhMmzM42/V4=
 github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec/go.mod h1:9X8xfh6qCZPjvq+2AMBXkDM4bGwl46t6JFbsREnnVWk=
+github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d h1:uQ+WOItvABuJ2zU5Bd0uJgVTmbGwwAMSCUF5imF9QDw=
+github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d/go.mod h1:Rw9J2irj6uPmmvFaGIEoVSeUWrZ80f5JSRUHauF3IkI=
 github.com/neuroplastio/hotty-go v0.0.0-20261002175536-699cfd49a865 h1:tWoWvA3oNmGyoLUA/zA7hPr7sDP8/uy5Hi//ECgfwhY=
 github.com/neuroplastio/hotty-go v0.0.0-20261002175536-699cfd49a865/go.mod h1:2napVjxJDsFwF1WM/HXn6AXanVwgTYMWoJhjxdIUHlQ=
 github.com/neuroplastio/hotty-go/hottytea v0.0.0-20261002175536-699cfd49a865 h1:ikssywhHpwCpL52xnlHpAMIpt1YCZQCTOHUw9FMrOLw=

@@ -279,16 +279,43 @@ func TestAnUnwritableDirectoryIsAClearError(t *testing.T) {
 }
 
 func TestClientFollowsTheBuildsChannel(t *testing.T) {
-	t.Setenv(EnvURL, "")
 	c, err := Client(version.Info{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Base != DefaultURL || c.Project != "margin" || c.Channel != "dev" || len(c.Keys) != 1 {
+	if c.Base != URL || c.Project != "margin" || c.Channel != "dev" || len(c.Keys) != 1 {
 		t.Errorf("a local build's client: %+v", c)
 	}
-	t.Setenv(EnvURL, "http://127.0.0.1:1")
-	if c, _ := Client(version.Info{Channel: "stable"}); c.Base != "http://127.0.0.1:1" || c.Channel != "stable" {
-		t.Errorf("moved: %+v", c)
+	if c, _ := Client(version.Info{Channel: "stable"}); c.Channel != "stable" {
+		t.Errorf("a stable build's client: %+v", c)
+	}
+}
+
+// A margin a launcher started leaves its own file alone: the build goes into
+// the launcher's home, and bin moves to it for the next launch.
+func TestUnderALauncherTheBuildGoesIntoItsHome(t *testing.T) {
+	ch := twoBuilds(t)
+	exe := installed(t, "margin build a")
+	home := filepath.Join(t.TempDir(), "margin")
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{Client: ch.Client(), Self: onDev(commitA, "26.10.01-dev.aaaaaaa"), Exe: exe, Home: home, Out: &out})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := content(t, exe); got != "margin build a" {
+		t.Errorf("the running file was replaced: %q", got)
+	}
+	if got := content(t, filepath.Join(home, "bin", "margin")); got != "margin build b" {
+		t.Errorf("the home's margin is %q", got)
+	}
+	if !strings.Contains(out.String(), "margin 26.10.01-dev.aaaaaaa → 26.10.02-dev.bbbbbbb\ninstalled in "+home) {
+		t.Errorf("said:\n%s", out.String())
+	}
+}
+
+func TestTheLauncherFollowsTheBuildsChannel(t *testing.T) {
+	l := Launcher(version.Info{})
+	if l.Base != URL || l.Project != "margin" || l.Channel != "dev" || l.Signers != releaseSigners {
+		t.Errorf("a local build's launcher: %+v", l)
 	}
 }

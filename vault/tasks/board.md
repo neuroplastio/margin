@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-02 (published to an engram channel; `margin update`)
+Last updated: 2026-10-02 (margin-launcher, D20)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -431,6 +431,11 @@ Last updated: 2026-10-02 (published to an engram channel; `margin update`)
 
 ## Done
 
+- [x] **(direction)** margin-launcher: an opt-in thin binary from engram's
+      enlaunch, which a package installs as margin; it fetches margin into
+      `~/.local/margin` the first time and hands over, and `margin update`
+      under it installs there (D20). `[mech]` — see journal 2026-10-02.7 —
+      done 2026-10-02
 - [x] **(direction)** margin in a plx pane, and a demo document: one
       measuring surface per block, `MARGIN_HOTTY_LOG`, `testdata/demo/`;
       plx's side is plexos HOTTY-PLACE-REPLY-01. `[felt]` — see journal

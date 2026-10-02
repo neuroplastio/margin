@@ -484,3 +484,44 @@ cells.
   a headless browser or `mmdc` on PATH (a dependency the user must install);
   sending mermaid source to the host (HOTTY has no such thing, and a host
   should not need one).
+
+**D20 — margin-launcher: an opt-in thin binary a package installs as
+margin.** Maintainer direction (2026-10-02): a published binary in the AUR
+that still updates, through engram's `enlaunch` package; then "I still want
+to have a complete thick binary in margin. Thin wrapper should be an
+architectural opt-in", laid out as: enlaunch is "a low level downloader
+passthrough", the first launch fetches, "if the binary is there, thin binary
+must just pass the control over", and "`update` command is inside the thick
+binary". Extends D18; nothing in it changes.
+
+- **margin stays the complete binary** of D18: installable by hand, and
+  `margin update` replaces its own file. Nothing of enlaunch runs at its
+  start.
+- **`cmd/margin-launcher`** is `enlaunch.Main(update.Launcher(...))` and
+  nothing else: the channel, and the release key pinned in `internal/update`.
+  A package installs it as `margin`. When `~/.local/margin/bin` is there it
+  execs it (same pid, same arguments); when it is not, it fetches the
+  channel's newest margin, verified, into `builds/<commit>/`, links it, and
+  hands over. It compares and checks nothing.
+- **`margin update` started by the launcher** (it sets `ENLAUNCH_HOME`)
+  picks the build exactly as D18 does, then installs it into the home with
+  `enlaunch.Install`, which moves `bin`; it never writes a file it runs
+  from. The next launch runs the new build.
+- **Packages.** `ENLAUNCH_PRELOAD=<dir> margin-launcher` fetches the newest
+  into `<dir>` and exits: a package can carry a build in `/usr/lib/margin`,
+  which the launcher runs while the user's home has none.
+  `ENLAUNCH_FETCH=1` fetches anew whatever is installed: the way back from
+  a broken build. No smoke test, no rollback in the launcher: if a build
+  breaks, it breaks.
+- **Published beside margin**: `margin-launcher_<os>_<arch>` on the same
+  channel, so a package can fetch it pinned like any artifact.
+- **The server is pinned like the key and the channel** (maintainer, the
+  same day: "We shouldn't allow changing the URL either"). Supersedes D18's
+  test-seam bullet: `MARGIN_PKG_URL` now works only in a `-tags updatetest`
+  build, beside `MARGIN_UPDATE_SIGNERS`, in margin and margin-launcher
+  alike; there is no mirror seam.
+- **Rejected.** enlaunch compiled into margin's own start, handing over to
+  newer builds and updating in the background (built first, the same day:
+  it made every margin a launcher, where the launcher should be opt-in); a
+  generic engram launcher with a per-tool config file (the tool would not
+  own its binary).

@@ -29,8 +29,10 @@ channel's newest build; margin says what it replaced. If this margin's
 directory is not writable by you, update refuses: install margin somewhere
 you own, such as ~/.local/bin.
 
-MARGIN_PKG_URL points it at another server (a mirror, or a test); the key
-does not move with it.`,
+A margin that margin-launcher started (a package's margin) installs the
+build into ~/.local/margin instead, and the next margin you start runs it.
+
+The server and the key are built into margin; nothing moves them.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

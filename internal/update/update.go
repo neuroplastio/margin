@@ -8,6 +8,10 @@
 // below has signed, and swaps the binary it is running from for the one it
 // fetched — written beside it and renamed over it, so the file is the old
 // build or the new one and never half of either.
+//
+// A margin that margin-launcher started (D20) is not its own file to
+// replace: the launcher owns ~/.local/margin, and update installs the build
+// there, with enlaunch, for the launcher to run next.
 package update
 
 import (
@@ -24,16 +28,15 @@ import (
 	"time"
 
 	"github.com/neuroplastio/engram"
+	"github.com/neuroplastio/engram/enlaunch"
 	"github.com/neuroplastio/engram/sshsig"
 	"github.com/neuroplastio/margin/internal/version"
 )
 
 const (
-	// DefaultURL is where channels are served. EnvURL moves it, for a test or
-	// a mirror; the key does not move with it, so a mirror can serve only
-	// what the release key signed.
-	DefaultURL = "https://pkg.neuroplast.io"
-	EnvURL     = "MARGIN_PKG_URL"
+	// URL is where channels are served, pinned like the key: no release can
+	// be pointed at another server (D20).
+	URL = "https://pkg.neuroplast.io"
 
 	// Project is margin's name on the channel server.
 	Project = "margin"
@@ -52,10 +55,14 @@ const (
 // release adds the next key before the old one retires.
 const releaseSigners = `release@neuroplast.io namespaces="engram" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDCsEZcn1tiubvKQzEVs5pJ4QVXoFmSDtO+k6SdetUdf`
 
-// signers is the allowed_signers text the channel is checked against. Always
-// the pinned key, except in a binary built with -tags updatetest, which no
-// release is (see signers_updatetest.go).
-var signers = func() string { return releaseSigners }
+// signers is the allowed_signers text the channel is checked against, and
+// pkgURL the server it is read from. Always the pinned key and URL, except in
+// a binary built with -tags updatetest, which no release is (see
+// seams_updatetest.go).
+var (
+	signers = func() string { return releaseSigners }
+	pkgURL  = func() string { return URL }
+)
 
 // Client is the channel self updates from — its own, or dev for a build on
 // none — believing only the pinned key.
@@ -64,25 +71,29 @@ func Client(self version.Info) (*engram.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("update: the pinned release key: %w", err)
 	}
-	base := DefaultURL
-	if v := os.Getenv(EnvURL); v != "" {
-		base = v
-	}
+	l := Launcher(self)
+	return &engram.Client{Base: l.Base, Project: l.Project, Channel: l.Channel, Keys: keys}, nil
+}
+
+// Launcher is self's channel as enlaunch reads it: what margin-launcher is
+// built with, and what update installs into the launcher's home with.
+func Launcher(self version.Info) enlaunch.Config {
 	channel := self.Channel
 	if channel == "" {
 		channel = DefaultChannel
 	}
-	return &engram.Client{Base: base, Project: Project, Channel: channel, Keys: keys}, nil
+	return enlaunch.Config{Base: pkgURL(), Project: Project, Channel: channel, Signers: signers()}
 }
 
-// Self updates this process's own binary: what `margin update [commit]` runs.
+// Self updates this margin: what `margin update [commit]` runs.
 func Self(ctx context.Context, out io.Writer, commit string) error {
 	self := version.Current()
 	c, err := Client(self)
 	if err != nil {
 		return err
 	}
-	return Run(ctx, Options{Client: c, Self: self, Commit: commit, Out: out})
+	home, _ := enlaunch.Launched()
+	return Run(ctx, Options{Client: c, Self: self, Commit: commit, Home: home, Out: out})
 }
 
 // Options is one update.
@@ -93,6 +104,10 @@ type Options struct {
 	// Exe is the file to replace; empty means this process's executable.
 	// Symlinks are followed, so the file replaced is the one they lead to.
 	Exe string
+	// Home is the home of the launcher that started this margin
+	// (enlaunch.Launched). When set, the build is installed there and Exe is
+	// left alone.
+	Home string
 	// Commit asks for that build: a full commit, or the start of a live
 	// one's. Empty means the channel's newest.
 	Commit string
@@ -104,10 +119,6 @@ type Options struct {
 // running it says so and touches nothing.
 func Run(ctx context.Context, o Options) error {
 	c := o.Client
-	exe, err := resolveExe(o.Exe)
-	if err != nil {
-		return fmt.Errorf("update: finding the margin binary: %w", err)
-	}
 	m, err := pick(ctx, c, o.Self, o.Commit)
 	if err != nil {
 		return fmt.Errorf("update: %w", err)
@@ -121,6 +132,29 @@ func Run(ctx context.Context, o Options) error {
 			fmt.Fprintf(o.Out, "margin %s is already the newest build on %s; nothing to do\n", o.Self.Version, c.Channel)
 		}
 		return nil
+	}
+	old := o.Self.Version
+	if !o.Self.Published() {
+		old += " (local build)"
+	}
+	if o.Home != "" {
+		// The keys o.Client believes, so that one Client is all the trust.
+		var keys strings.Builder
+		for _, k := range c.Keys {
+			keys.WriteString(sshsig.AllowedSigners(Project, engram.Namespace, k))
+		}
+		cfg := enlaunch.Config{Base: c.Base, Project: Project, Channel: c.Channel, Signers: keys.String(), Home: o.Home}
+		if _, err := enlaunch.Install(ctx, cfg, m.Build.Commit); err != nil {
+			return fmt.Errorf("update: installing margin %s: %w", m.Build.Version, err)
+		}
+		fmt.Fprintf(o.Out, "margin %s → %s\n", old, m.Build.Version)
+		fmt.Fprintf(o.Out, "installed in %s; the next margin you start runs it\n", o.Home)
+		return nil
+	}
+
+	exe, err := resolveExe(o.Exe)
+	if err != nil {
+		return fmt.Errorf("update: finding the margin binary: %w", err)
 	}
 	a, ok := m.Find(Project, runtime.GOOS, runtime.GOARCH)
 	if !ok {
@@ -150,10 +184,6 @@ func Run(ctx context.Context, o Options) error {
 	}
 	tmp = nil
 
-	old := o.Self.Version
-	if !o.Self.Published() {
-		old += " (local build)"
-	}
 	fmt.Fprintf(o.Out, "margin %s → %s\n", old, m.Build.Version)
 	fmt.Fprintf(o.Out, "replaced %s\n", exe)
 	return nil

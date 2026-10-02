@@ -243,6 +243,13 @@ somewhere you can write, such as `~/.local/bin`. A margin you built yourself
 updates to the channel's newest build too, and says so. Builds stay on the
 channel for 30 days after a newer one replaces them.
 
+A package can install `margin-launcher` as `margin` instead, from the same
+channel: a thin binary that runs the margin in `~/.local/margin`, fetching
+the newest there, checked against the same key, the first time it starts.
+`margin update` then installs into `~/.local/margin` rather than replacing a
+file the package owns. `ENLAUNCH_FETCH=1 margin` fetches the newest again,
+whatever is installed.
+
 With a Go toolchain you can also build it yourself:
 
 ```

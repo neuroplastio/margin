@@ -1,6 +1,7 @@
 # Release: every push to main that passes the gate is a build on margin's dev
 # channel, pkg.neuroplast.io/margin/dev — four static binaries, signed by the
-# release key, which `margin update` installs (D18). Three jobs:
+# release key, which `margin update` installs (D18), and beside each the thin
+# launcher a package installs as margin (D20). Three jobs:
 #
 #   • check — `make check`, with a real nvim so the composer tests run instead
 #     of skipping. On pull requests this is all that runs.
@@ -92,15 +93,16 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # dist/margin_<os>_<arch>: static (CGO off), stamped with the commit,
-      # the dev channel and the build's name.
+      # dist/margin_<os>_<arch> and dist/margin-launcher_<os>_<arch>: static
+      # (CGO off), stamped with the commit, the dev channel and the build's
+      # name.
       - run: make dist
 
       - name: Check the stamp
         run: |
           dist/margin_linux_amd64 --version
           dist/margin_linux_amd64 --version | grep -q "^margin [0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]-dev\.$(git rev-parse --short=7 HEAD) ($(git rev-parse HEAD))$"
-          test "$(ls dist | wc -l)" -eq 4
+          test "$(ls dist | wc -l)" -eq 8
 
       - uses: actions/upload-artifact@v7
         with:
@@ -146,15 +148,16 @@ jobs:
           aws-region: us-east-1
 
       # Bare binaries, not archives: `margin update` puts the file in place of
-      # itself. dist/margin_<os>_<arch> is published as margin/<os>/<arch>.
+      # itself. dist/<name>_<os>_<arch> is published as <name>/<os>/<arch>,
+      # for margin and margin-launcher.
       # Idempotent: re-running this job for a commit already in the journal
       # succeeds without doing anything.
       - name: Publish
         run: |
           artifacts=()
-          for f in dist/margin_*; do
-            platform="${f#dist/margin_}"
-            artifacts+=("margin/${platform%_*}/${platform#*_}=$f")
+          for f in dist/*_*_*; do
+            base="${f#dist/}"; name="${base%%_*}"; platform="${base#*_}"
+            artifacts+=("$name/${platform%_*}/${platform#*_}=$f")
           done
           bin/engram publish \
             --bucket "$BUCKET" --kms "$KMS_KEY" --cloudfront "$DISTRIBUTION_ID" \

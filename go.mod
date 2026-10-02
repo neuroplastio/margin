@@ -12,6 +12,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/mattn/go-runewidth v0.0.24
 	github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec
+	github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d
 	github.com/neuroplastio/hotty-go v0.0.0-20261002175536-699cfd49a865
 	github.com/neuroplastio/hotty-go/hottytea v0.0.0-20261002175536-699cfd49a865
 	github.com/neuroplastio/hotty-go/hottytest v0.0.0-20261002175536-699cfd49a865
