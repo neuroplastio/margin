@@ -203,6 +203,7 @@ func (m *model) applySearch(lines []string) []string {
 			m.searchMatches = append(m.searchMatches, searchMatch{line: li, lo: r.lo, hi: r.hi, entry: entry})
 		}
 	}
+	m.hotMatches(q)
 	if m.searchCurrent >= len(m.searchMatches) {
 		m.searchCurrent = len(m.searchMatches) - 1
 	}

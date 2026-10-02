@@ -47,6 +47,14 @@ rewriting a document. Blocks carry a stable id, so a paragraph can be completely
 reworded and keep its thread — and when a block is deleted, its thread is
 detectably orphaned rather than silently misplaced.
 
+**Real typography where the terminal has it.** In a terminal that shows HTML
+(a [HOTTY](https://github.com/neuroplastio/hotty) host, such as hottyterm),
+margin sets headings, paragraphs, lists and quotes in a proportional reading
+font, with real heading sizes, links you can click and images inline. The
+review itself stays in cells beside them: the gutter, threads, the nvim
+composer, code blocks and tables. Every other terminal gets the cell rendering
+as before, and `--no-hotty` asks for it on a HOTTY host too.
+
 ## Keys
 
 | Key | Does |
@@ -262,6 +270,7 @@ of the stripped one, for comparison.
 - [x] Link navigation between blocks, with a jumplist
 - [x] Directory reviews (`margin DIR/`): a file-tree pane, tab to switch focus,
       enter to open the focused document
+- [x] HTML prose and images on HOTTY terminals, the review in cells beside it
 - [ ] Rendered diff between review rounds
 
 ## License

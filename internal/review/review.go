@@ -30,6 +30,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/neuroplastio/hotty-go/hottytea"
 )
 
 const (
@@ -354,6 +355,11 @@ type model struct {
 	// (rebuild), like every other index of the block list.
 	headingSlugs map[string]int
 
+	// hot is margin on a HOTTY host (D17, hotty.go): prose blocks as
+	// surfaces. nil with --no-hotty, and on every model a test builds unless
+	// it asks for one.
+	hot *hotState
+
 	// Latency instrumentation: keyAt is stamped when a keypress is forwarded
 	// and sampled on the first frame the child's response reaches, so samples
 	// measure the whole round trip — host key, pty, nvim, emulator, our frame.
@@ -471,7 +477,14 @@ func (m *model) rebuildSlugs() {
 	}
 }
 
-func (m *model) Init() tea.Cmd { return tea.Batch(m.heartbeat(), m.watcher.wait()) }
+func (m *model) Init() tea.Cmd {
+	if m.hot != nil {
+		// Whether the terminal is a HOTTY host (D17): until it answers, and
+		// wherever it is not, margin draws in cells as it always has.
+		return tea.Batch(m.heartbeat(), m.watcher.wait(), m.hot.s.Detect())
+	}
+	return tea.Batch(m.heartbeat(), m.watcher.wait())
+}
 
 func (m *model) heartbeat() tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return heartbeatMsg(t) })
@@ -1759,7 +1772,8 @@ func (m *model) dismiss(err error) tea.Cmd {
 
 // --- update -----------------------------------------------------------------
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// update is margin's Update; on a HOTTY host, Update (hotty.go) wraps it.
+func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -2612,6 +2626,9 @@ func (m *model) toggleRaw() {
 // hit-testing, the cursor position and scrolling from drifting apart — deriving
 // any of them separately is how the cursor ended up a row off earlier.
 func (m *model) render() []string {
+	if m.hot != nil {
+		m.hot.blocks = m.hot.blocks[:0]
+	}
 	if m.raw {
 		return m.renderRaw()
 	}
@@ -2632,13 +2649,25 @@ func (m *model) render() []string {
 		switch {
 		case e.b.kind == blockHeading:
 			mark, partial := rollUp(m.sectionMarks(i))
+			gutter := m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, partial)
+			if base, rows, ok := m.hotRows(e.b, w, len(lines)); ok {
+				// A heading surface (D17): the section's roll-up in the
+				// gutter on every row it takes, as a block's mark is.
+				m.hot.blocks = append(m.hot.blocks, hotBlock{
+					entry: i, start: len(lines), rows: rows, base: base, kind: hotClass(e.b),
+					selected: selected, searchText: []string{e.b.text},
+				})
+				for range rows {
+					lines = append(lines, gutter+strings.Repeat(" ", w))
+				}
+				lines = append(lines, "")
+				break
+			}
 			text := headingStyle(e.b.level).Render(e.b.text)
 			if selected {
 				text = selLine(text)
 			}
-			lines = append(lines,
-				m.gutter(focused && m.at.comment == commentNone, hovered, selected, mark, partial)+
-					text, "")
+			lines = append(lines, gutter+text, "")
 
 		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable, e.b.kind == blockFrontmatter:
 			mark, markPartial := m.blockMark(e.b)
@@ -2752,6 +2781,23 @@ func (m *model) render() []string {
 					body = rawStyle
 				}
 			}
+			// On a HOTTY host a prose block is a surface over its rows (D17):
+			// the rows are blank cells the size the host laid the block out,
+			// the gutter beside them as on any block, and the cell rendering
+			// kept for the search to read.
+			surface := false
+			if base, rows, ok := m.hotRows(e.b, w, len(lines)); ok {
+				surface = true
+				m.hot.blocks = append(m.hot.blocks, hotBlock{
+					entry: i, start: len(lines), rows: rows, base: base, kind: hotClass(e.b),
+					reviewed: mark == markOK && !markPartial, selected: selected, searchText: out,
+				})
+				out = make([]string, rows)
+				for r := range out {
+					out[r] = strings.Repeat(" ", w)
+				}
+				rule, preStyled = "", true
+			}
 			// A line dive (a table or raw block whose lines are walked
 			// individually) moves the focus bar onto the dived source line's
 			// rendered row — at block level the whole block carries it. Row
@@ -2769,7 +2815,9 @@ func (m *model) render() []string {
 					text = body.Render(l)
 				}
 				text = rule + text
-				if selected {
+				if selected && !surface {
+					// A surface shows its own selection; its rows' cells
+					// stay blank under it.
 					text = selLine(text)
 				}
 				rowFocused := focused && m.at.comment == commentNone && (m.at.line == 0 || row == focusedRow)
@@ -3006,7 +3054,16 @@ func humanAge(t time.Time) string {
 	}
 }
 
+// View is the frame. On a HOTTY host it was drawn in Update, with the
+// surfaces it holds (hotFrame); anywhere else it is drawn here.
 func (m *model) View() tea.View {
+	if m.hot != nil && m.hot.frame != nil {
+		return *m.hot.frame
+	}
+	return m.view()
+}
+
+func (m *model) view() tea.View {
 	if m.quitting {
 		return tea.NewView("")
 	}
@@ -3029,6 +3086,15 @@ func (m *model) View() tea.View {
 	}
 
 	lines := m.render()
+	if m.hot != nil && m.hot.anchor != nil {
+		// Blocks measured since the last frame changed height: the block
+		// that was at the top of the screen stays there.
+		if a := m.hot.anchor; a.entry < len(m.spans) {
+			s := m.spans[a.entry]
+			m.scroll = s.start + min(a.off, s.end-s.start)
+		}
+		m.hot.anchor = nil
+	}
 	// The emulator's first row sits one line below the focused thread's box
 	// border, past whatever conversation render() drew ahead of it — both
 	// measured by the render pass that just ran.
@@ -3060,6 +3126,12 @@ func (m *model) View() tea.View {
 	} else {
 		m.scroll = m.clampScroll(len(lines), viewport)
 		visible = lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]
+	}
+	if m.hot != nil {
+		// Where the surfaces go: the document's column, beside the gutter,
+		// as tall as the rows the document has on screen.
+		m.hot.shown = !m.inbox && !m.raw
+		m.hot.col = hottytea.Rect{X: m.docX() + gutterW, Y: 0, W: m.contentWidth(), H: viewport}
 	}
 
 	// A directory review puts the file tree in a left column: each visible
@@ -3988,6 +4060,9 @@ type RunOptions struct {
 	// point. The export names the document "stdin".
 	Stdin bool
 
+	// NoHotty keeps margin in cells on a HOTTY host (D17): --no-hotty.
+	NoHotty bool
+
 	// WheelSpeed is how many lines one mouse wheel tick scrolls the document
 	// viewport. 0 means the default of 3 lines per tick — the maintainer's
 	// "mouse wheel speed should be tunable" ask (2026-08-09), satisfied with
@@ -4104,6 +4179,10 @@ func Run(path string, opts RunOptions) error {
 func runModel(m *model, opts RunOptions) error {
 	m.includeResolved = opts.IncludeResolved
 	m.ephemeral = opts.Stdin
+	if !opts.NoHotty {
+		m.hot = newHotState()
+		m.hotOpen()
+	}
 	if opts.WheelSpeed > 0 {
 		m.wheelSpeed = opts.WheelSpeed
 	}
@@ -4136,10 +4215,12 @@ func runModel(m *model, opts RunOptions) error {
 			return fmt.Errorf("run: --stdout needs a controlling terminal to draw the interface on: %w", err)
 		}
 		defer tty.Close()
-		progOpts = append(progOpts, tea.WithOutput(tty))
+		progOpts = append(progOpts, tea.WithOutput(m.hotWatch(tty)))
 		if opts.Stdin {
 			progOpts = append(progOpts, tea.WithInput(tty))
 		}
+	} else if m.hot != nil {
+		progOpts = append(progOpts, tea.WithOutput(m.hotWatch(os.Stdout)))
 	}
 	if m.watcher != nil {
 		// A closure, not `defer m.watcher.close()`: openTreeFile replaces
@@ -4147,7 +4228,13 @@ func runModel(m *model, opts RunOptions) error {
 		// must close whatever is current at exit, not the original watch.
 		defer func() { m.watcher.close() }()
 	}
-	if _, err := tea.NewProgram(m, progOpts...).Run(); err != nil {
+	p := tea.NewProgram(m, progOpts...)
+	if m.hot != nil {
+		// The Session asks for a new layout when the renderer erases or
+		// scrolls the screen under the surfaces.
+		m.hot.s.Attach(p.Send)
+	}
+	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
 	reportLatency(m.samples)

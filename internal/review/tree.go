@@ -274,6 +274,7 @@ func (m *model) openTreeFile(i int) {
 		m.watcher = watcher
 	}
 	m.path = abs
+	m.hotOpen()
 	// Tree progress is session state keyed per document: the outgoing
 	// document's marks go into the cache and the incoming document's come back
 	// out — a switch is a move between reviews, not a discard of them. The

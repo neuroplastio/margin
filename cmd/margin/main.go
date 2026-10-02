@@ -33,6 +33,7 @@ func newRootCmd(run func(path string, opts review.RunOptions) error, addComment 
 	var includeResolved bool
 	var stdin bool
 	var wheelSpeed int
+	var noHotty bool
 
 	root := &cobra.Command{
 		Use:     "margin [FILE.md|DIR/]",
@@ -129,6 +130,7 @@ the launch's completion as the signal that the review is done.`,
 				IncludeResolved: includeResolved,
 				Stdin:           ephemeral,
 				WheelSpeed:      wheelSpeed,
+				NoHotty:         noHotty,
 			})
 		},
 	}
@@ -136,6 +138,7 @@ the launch's completion as the signal that the review is done.`,
 	root.Flags().BoolVar(&includeResolved, "include-resolved", false, "include resolved threads in the export, instead of leaving them out")
 	root.Flags().BoolVar(&stdin, "stdin", false, "read the document from stdin for an ephemeral review: nothing is saved, and the review is printed on quit (implies --stdout)")
 	root.Flags().IntVar(&wheelSpeed, "wheel-speed", 0, "lines one mouse wheel tick scrolls (default 3)")
+	root.Flags().BoolVar(&noHotty, "no-hotty", false, "draw everything in cells, even in a terminal that shows HTML (a HOTTY host)")
 	root.SetVersionTemplate("margin {{.Version}}\n")
 	root.AddCommand(newCommentCmd(addComment, defaultAuthor))
 	root.AddCommand(newExportCmd(exportReview))

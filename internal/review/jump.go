@@ -114,25 +114,33 @@ func (m *model) followLink() {
 		return
 	}
 	for _, href := range hrefs {
-		if strings.HasPrefix(href, "#") {
-			target, ok := m.headingSlugs[strings.TrimPrefix(href, "#")]
-			if !ok {
-				m.status = "no heading matches " + href
-				return
-			}
-			m.pushJump(cursor{entry: target, comment: commentNone})
-			m.jumpToEntry(target)
-			m.status = "followed " + href + " — " + m.entries[target].b.text
-			return
-		}
-		// Cross-document: only a tree review has another document to switch
-		// to — a single-document review (`margin FILE.md`, D10) stays one
-		// document, so its outside-document report is unchanged.
-		if m.tree != nil && m.store != nil && m.followDoc(href) {
+		if m.followHref(href) {
 			return
 		}
 	}
 	m.status = "links here point outside this document"
+}
+
+// followHref follows one link, as followLink does each of the focused
+// block's, and reports whether it was one margin follows: a `#heading` (the
+// status says when no heading matches), or in a tree review a document of the
+// tree. A click on a link in a block's surface follows it here too (D17).
+func (m *model) followHref(href string) bool {
+	if strings.HasPrefix(href, "#") {
+		target, ok := m.headingSlugs[strings.TrimPrefix(href, "#")]
+		if !ok {
+			m.status = "no heading matches " + href
+			return true
+		}
+		m.pushJump(cursor{entry: target, comment: commentNone})
+		m.jumpToEntry(target)
+		m.status = "followed " + href + " — " + m.entries[target].b.text
+		return true
+	}
+	// Cross-document: only a tree review has another document to switch
+	// to — a single-document review (`margin FILE.md`, D10) stays one
+	// document, so its outside-document report is unchanged.
+	return m.tree != nil && m.store != nil && m.followDoc(href)
 }
 
 // followDoc follows a cross-document link: an href naming a markdown file in

@@ -1,9 +1,20 @@
 # Board
 
-Last updated: 2026-08-13 (import comments from the current GitHub PR)
+Last updated: 2026-10-02 (HOTTY: prose blocks as HTML surfaces)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (HOTTY surfaces) on a HOTTY host (hottyterm, the xterm.js addon) headings,
+  paragraphs, list items and quotes are HTML surfaces — sans prose at an 80ch
+  measure, sized headings, inline markup, images sent in-band — while the
+  gutter, threads, composer, footer, tree pane, code, tables and mermaid stay
+  in cells; heights are the host's, measured with `r=auto`, cells until the
+  reply comes; `--no-hotty` forces cells (D17) — whether half-proportional,
+  half-monospace reads as one page, whether 80ch and the heading sizes are
+  right, whether `•`/`☐`/`☑` markers read, whether the 20-row image cap is
+  right, whether the selection's grey background is visible enough, and
+  whether opening flashes from cells to HTML or scrolling feels slower than
+  cells — journal 2026-10-02.1
 - (PR comment import) `margin import-pr FILE.md` imports the current branch's
   GitHub pull request review comments on that file as ordinary margin threads
   — gh detects the PR (`gh pr view`), `gh api --paginate` fetches its review
@@ -398,6 +409,10 @@ Last updated: 2026-08-13 (import comments from the current GitHub PR)
 
 ## Done
 
+- [x] **(direction)** HOTTY support: margin renders its prose blocks as HTML
+      surfaces on a HOTTY host through `neuroplastio/hotty-go` (made public
+      for it), and keeps the review in cells (D17). `[felt]` — see journal
+      2026-10-02.1 — done 2026-10-02
 - [x] **(feedback)** import comments from the current GitHub pull request — a
       new `margin import-pr FILE.md` command runs the gh CLI (PR detected from
       the branch via `gh pr view`, review comments via `gh api --paginate

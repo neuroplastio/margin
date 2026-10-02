@@ -136,5 +136,6 @@ moved without re-reading it.
 - GitHub / GitLab review sync
 - An MCP server so an agent can ask an anchored question and block on the answer
   (the idea is good and worth stealing; it is not v1)
-- Images, mermaid, LaTeX in the rendered view
+- LaTeX in the rendered view (mermaid renders in cells, D16; images render on
+  a HOTTY host, D17)
 - Any form of multi-user collaboration

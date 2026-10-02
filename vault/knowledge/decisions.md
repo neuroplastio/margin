@@ -329,3 +329,54 @@ diagrams).
   dispatch branch in `internal/review/mermaid.go`; the parser is strict
   (composite states and notes reject the whole diagram, which then falls back
   to plain source), so the fallback contract needs no carve-out.
+
+**D17 — On a HOTTY host, prose blocks are HTML surfaces and the review stays
+in cells.** Maintainer direction (2026-10-02): "Let's implement hotty support
+in margin", with `neuroplastio/hotty-go` (now public) as the dependency. HOTTY
+is "HTML over the TTY" (`neuroplastio/hotty`, SPEC.md): a terminal that is a
+HOTTY host places HTML documents (surfaces) over cell rectangles.
+
+- **What is a surface.** Headings, paragraphs, list items (D12) and quotes —
+  each block its own surface, named from the document's path and the block's
+  anchor. The document is the block's own source lines rendered by goldmark
+  (the parser that found the block), with one shared stylesheet sent once as a
+  resource. Everything that *is* the review stays in cells: the gutter (focus,
+  marks, roll-ups), threads, the composer, the footer, the tree pane, and the
+  blocks a cell renderer already does well or a surface would do no better —
+  code, tables, mermaid, frontmatter. Raw view (`\`) and the threads view
+  (`i`) place no surfaces.
+- **Heights are the host's.** A block takes the rows the host lays it out in
+  at the column's width: each is measured once on a throwaway `r=auto`
+  surface (SPEC §5.2), nearest the screen first, 64 at a time, and cached by
+  (html, width). Until a block's reply comes it shows in cells, as on a plain
+  terminal; a host that never answers within 3s is treated as deaf and the
+  whole document stays in cells. After a resize a block keeps its last height
+  until the new width's arrives, and the top visible block holds still.
+- **Review state never moves a line.** Reviewed (dimmed) and selected
+  (background) are classes, a search hit is a `<mark>`: none may change a row,
+  because the host measured the block without them. Search matches come from
+  the block's text, so `/` finds words inside surfaces as it does in cells.
+- **Events.** A press on a surface focuses its block (and blurs an open
+  composer), exactly as a click on cells does. A link within the review
+  (`#heading`, `other.md`) is a click margin follows through the same
+  `followHref` the cell renderer uses; a link to the web is a hyperlink
+  (`target=_blank`) the terminal opens. An image beside the document is sent
+  in-band as a resource (≤8 MiB); a web image, or one too large, becomes a
+  link in its place — a surface fetches nothing.
+- **Mechanics.** Surfaces are placed from `Update` (hottytea's `Layout`),
+  since that is the only place Bubble Tea lets a program write: on a host the
+  frame is rendered in `Update` and `View` hands back the cached frame, so the
+  placement batch always precedes the frame it belongs to. Off a host
+  `Detect` finds nothing and none of this runs. `--no-hotty` forces cells on a
+  host.
+- **Targets native hosts.** `hottyterm` (and the xterm.js addon) render this
+  correctly. The kitty polyfill (`hotty run`) shows a document's first screen
+  but loses blocks on large scrolls — two defects in the polyfill, not in
+  margin: a frame redrawn after a placement overwrites its Unicode placeholder
+  cells, and the polyfill's own DECSC/DECRC clobbers the cursor margin saved
+  around a placement. Those are fixed in hotty-blitz, not worked around here.
+- **Rejected.** One surface for the whole document (the gutter, threads and
+  the composer would have to be HTML, or cut holes in it — and nvim must stay
+  in cells); per-line surfaces (a wrapped paragraph's lines are the host's to
+  break); guessing heights from character counts (proportional text breaks
+  wherever the font says).

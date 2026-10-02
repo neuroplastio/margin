@@ -227,6 +227,7 @@ func (m *model) reloadDoc() {
 	m.doc = doc
 	m.src = src
 	m.rawH = 0
+	m.hotOpen()
 	// The tree's per-document totals follow the reloaded blocks, so a
 	// document an agent rewrote re-counts its markable blocks (a reload is
 	// exactly the "prose moved under me" case a stale total would misreport).
