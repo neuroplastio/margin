@@ -1,0 +1,50 @@
+[package]
+name = "margin-mermaid"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "margin's mermaid-to-SVG renderer, built as a WASI command for internal/mermaidsvg."
+license = "MIT"
+
+[[bin]]
+name = "margin-mermaid"
+path = "src/main.rs"
+
+[dependencies]
+# Pinned exactly: merman's alphas change defaults between releases, and the
+# embedded mermaid.wasm.gz should only change when this line does.
+#
+# The diagram kinds are the ones markdown documents commonly carry. The rest
+# of merman's 37 (architecture, block, C4, kanban, packet, quadrant, radar,
+# requirement, sankey, treemap, xychart, zenuml and the newer ones) would add
+# about 3MB of wasm (10.3MB instead of 7.3MB) and a second of cold compile;
+# a kind left out is an error from Render, and margin falls back to text. To
+# add one, add its `diagram-*` feature (architecture also needs
+# `layout-cytoscape`) and run `make mermaid-wasm`; README.md lists each one's
+# cost.
+merman = { version = "=0.8.0-alpha.7", default-features = false, features = [
+    "svg",
+    "diagram-flowchart",
+    "diagram-sequence",
+    "diagram-state",
+    "diagram-er",
+    "diagram-class",
+    "diagram-gantt",
+    "diagram-pie",
+    "diagram-mindmap",
+    "diagram-git-graph",
+    "diagram-journey",
+    "diagram-timeline",
+] }
+serde_json = "1"
+
+[dev-dependencies]
+# Only examples/gen_metrics.rs, which regenerates src/inter_metrics.rs.
+ttf-parser = "0.25"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

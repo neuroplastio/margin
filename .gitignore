@@ -7,3 +7,7 @@
 # Thread store, written wherever a document is reviewed. Committing it would
 # mean committing review state; the documents carry their block ids already.
 .margin/
+
+# Cargo's build output for the embedded mermaid renderer; `make mermaid-wasm`
+# commits the result as internal/mermaidsvg/mermaid.wasm.gz.
+/internal/mermaidsvg/wasm/target/

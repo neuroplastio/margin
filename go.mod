@@ -16,6 +16,7 @@ require (
 	github.com/neuroplastio/hotty-go/hottytea v0.0.0-20261002075537-44e207d03fca
 	github.com/neuroplastio/hotty-go/hottytest v0.0.0-20261002075537-44e207d03fca
 	github.com/spf13/cobra v1.10.2
+	github.com/tetratelabs/wazero v1.12.1-0.20260928190838-e234f6fe6ecd // at or after 424d3ca (wazero#2535), see internal/mermaidsvg
 	github.com/yuin/goldmark v1.8.5
 )
 
