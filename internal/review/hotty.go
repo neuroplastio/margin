@@ -194,6 +194,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 	case hottytea.ReadyMsg:
 		h.tracef("ready: mode %v, caps %+v", msg.Mode, msg.Caps)
 		if msg.Mode == hottytea.Native {
+			h.docs.net = msg.Caps.Net["img-src"]
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 		}
 		return nil, true

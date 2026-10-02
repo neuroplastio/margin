@@ -4,6 +4,11 @@ Last updated: 2026-10-02 (published to an engram channel; `margin update`)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (web images) an `https` image in a document shows inline on a host whose
+  network policy allows https images (hottyterm with it turned on; the
+  xterm.js addon), and stays a link elsewhere — whether a page of them
+  reads well while they load, and whether a link is the right fallback —
+  journal 2026-10-02.4
 - (HOTTY in plx) margin in a plx pane renders as HTML once plx has
   HOTTY-PLACE-REPLY-01 (`770e69c`, `plx update`); each block is measured on
   a surface of its own; `MARGIN_HOTTY_LOG` traces the host; demo document at

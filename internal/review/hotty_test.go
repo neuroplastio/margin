@@ -309,6 +309,25 @@ func TestHotWebImage(t *testing.T) {
 	if !strings.Contains(got, `<a href="https://example.com/a.png" target="_blank">[image: logo]</a>`) {
 		t.Errorf("web image: %s", got)
 	}
+	// A host whose img-src allows https fetches it: the image stays, and
+	// the document asks for it.
+	for _, net := range [][]string{{"https:"}, {"https://example.com"}} {
+		d := hotDocs{dir: t.TempDir(), net: net}
+		got := d.render("![logo](https://example.com/a.png)")
+		if !strings.Contains(got, `<img src="https://example.com/a.png" alt="logo">`) {
+			t.Errorf("net %v: web image: %s", net, got)
+		}
+		if doc := hotDocument(got, "para", false, false, ""); !strings.Contains(doc, `<meta name="hotty-network" content="img-src https:">`) {
+			t.Errorf("net %v: the document does not ask: %s", net, doc)
+		}
+	}
+	d.net = []string{"https://other.org"}
+	if got := d.render("![logo](http://example.com/a.png)"); strings.Contains(got, "<img") {
+		t.Errorf("an http image, or one from an origin the host does not allow, is a link: %s", got)
+	}
+	if doc := hotDocument("<p>x</p>", "para", false, false, ""); strings.Contains(doc, "hotty-network") {
+		t.Errorf("a document with no web image asks for the network: %s", doc)
+	}
 	got = d.render("![gone](missing.png)")
 	if !strings.Contains(got, `<a href="missing.png">[image: gone]</a>`) {
 		t.Errorf("missing image: %s", got)

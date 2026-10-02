@@ -363,8 +363,13 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   (`#heading`, `other.md`) is a click margin follows through the same
   `followHref` the cell renderer uses; a link to the web is a hyperlink
   (`target=_blank`) the terminal opens. An image beside the document is sent
-  in-band as a resource (≤8 MiB); a web image, or one too large, becomes a
-  link in its place — a surface fetches nothing.
+  in-band as a resource (≤8 MiB). An https image stays an image when the
+  host's half of the network policy lets its origin in (SPEC §7.2, the
+  caps' `net["img-src"]`): a block with one asks for `img-src https:` in its
+  own `<meta name="hotty-network">`, so the host's user decides (2026-10-02,
+  maintainer: "margin should allow loading images via https by default").
+  Any other web image, or a local one too large, becomes a link in its
+  place. margin itself fetches nothing.
 - **Mechanics.** Surfaces are placed from `Update` (hottytea's `Layout`),
   since that is the only place Bubble Tea lets a program write: on a host the
   frame is rendered in `Update` and `View` hands back the cached frame, so the

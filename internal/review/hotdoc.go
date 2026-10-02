@@ -11,6 +11,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,6 +117,9 @@ var hotMarkdown = goldmark.New(goldmark.WithExtensions(extension.GFM))
 type hotDocs struct {
 	dir  string
 	res  func(id, mime string, data []byte)
+	// net is the host's img-src sources (SPEC §7.2, its capabilities' net):
+	// an https image it lets a document fetch stays an image.
+	net []string
 	imgs map[string]hotImage // by the image's path
 	html map[string]string   // by the block's markdown
 
@@ -263,6 +267,9 @@ func (d *hotDocs) adapt(doc ast.Node, src []byte) {
 	})
 	for _, img := range images {
 		dest := string(img.Destination)
+		if d.webImage(dest) {
+			continue // the host fetches it: the document asks (hotDocument)
+		}
 		if !external(dest) {
 			if im := d.image(dest); im.id != "" {
 				img.Destination = []byte("cid:" + im.id)
@@ -304,6 +311,28 @@ func altText(n ast.Node, src []byte) string {
 	}
 	return b.String()
 }
+
+// webImage reports whether an image on the web is one the host will fetch:
+// https, from an origin the host's img-src allows. Every margin document
+// asks for img-src https: (hotDocument), so the host's half decides.
+func (d *hotDocs) webImage(dest string) bool {
+	u, err := url.Parse(dest)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return false
+	}
+	origin := "https://" + strings.ToLower(u.Host)
+	for _, src := range d.net {
+		src = strings.ToLower(strings.TrimSuffix(src, "/"))
+		if src == "https:" || src == origin || (u.Port() == "" && src == origin+":443") {
+			return true
+		}
+	}
+	return false
+}
+
+// hotNetwork is the document's half of the network policy (SPEC §7.2):
+// images from any https origin. Only a document that has one asks.
+const hotNetwork = `<meta name="hotty-network" content="img-src https:">`
 
 // external reports whether a link leaves the review: a URL with a scheme.
 func external(href string) bool {
@@ -397,7 +426,11 @@ func hotDocument(body, kind string, reviewed, selected bool, query string) strin
 	if query != "" {
 		body = markMatches(body, query)
 	}
-	return `<link rel="stylesheet" href="cid:` + hotCSSID + `"><main class="` + class + `">` + body + `</main>`
+	head := `<link rel="stylesheet" href="cid:` + hotCSSID + `">`
+	if strings.Contains(body, `<img src="https://`) {
+		head = hotNetwork + head
+	}
+	return head + `<main class="` + class + `">` + body + `</main>`
 }
 
 // hotClass names a block's kind for the stylesheet.
