@@ -347,7 +347,9 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   (`i`) place no surfaces.
 - **Heights are the host's.** A block takes the rows the host lays it out in
   at the column's width: each is measured once on a throwaway `r=auto`
-  surface (SPEC §5.2), nearest the screen first, 64 at a time, and cached by
+  surface of its own (deleted straight after its placement, so a relay that
+  sizes it a frame later can only see that block's document — journal
+  2026-10-02.3), nearest the screen first, 64 at a time, and cached by
   (html, width). Until a block's reply comes it shows in cells, as on a plain
   terminal; a host that never answers within 3s is treated as deaf and the
   whole document stays in cells. After a resize a block keeps its last height
@@ -370,7 +372,9 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   `Detect` finds nothing and none of this runs. `--no-hotty` forces cells on a
   host.
 - **Targets native hosts.** `hottyterm` (and the xterm.js addon) render this
-  correctly. The kitty polyfill (`hotty run`) shows a document's first screen
+  correctly, and so does a plx pane inside one from plexos `770e69c` on
+  (HOTTY-PLACE-REPLY-01: before it, plx answered no numbered placement, so
+  every measure went unanswered and margin drew cells). The kitty polyfill (`hotty run`) shows a document's first screen
   but loses blocks on large scrolls — two defects in the polyfill, not in
   margin: a frame redrawn after a placement overwrites its Unicode placeholder
   cells, and the polyfill's own DECSC/DECRC clobbers the cursor margin saved

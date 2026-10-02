@@ -2,9 +2,11 @@ package review
 
 import (
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -61,6 +63,8 @@ type hotState struct {
 	relayoutDue bool
 	anchor      *hotAnchor
 	closed      bool
+
+	trace *log.Logger // MARGIN_HOTTY_LOG
 }
 
 type hotKey struct {
@@ -122,7 +126,20 @@ func newHotState() *hotState {
 		sent:    map[string]string{},
 	}
 	h.docs.res = func(id, mime string, data []byte) { h.s.Send(hotty.Res(id, mime, data)) }
+	if path := os.Getenv("MARGIN_HOTTY_LOG"); path != "" {
+		if f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+			h.trace = log.New(f, "", log.Lmicroseconds)
+		}
+	}
 	return h
+}
+
+// tracef notes what margin and the host said to each other, when
+// MARGIN_HOTTY_LOG names a file: the way to see why a host gets cells.
+func (h *hotState) tracef(format string, args ...any) {
+	if h.trace != nil {
+		h.trace.Printf(format, args...)
+	}
 }
 
 // native reports whether surfaces are in use: the terminal is a host, and
@@ -175,16 +192,19 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 	case nil:
 		return nil, false
 	case hottytea.ReadyMsg:
+		h.tracef("ready: mode %v, caps %+v", msg.Mode, msg.Caps)
 		if msg.Mode == hottytea.Native {
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 		}
 		return nil, true
 	case hottytea.AckMsg:
+		h.tracef("ack: %+v", msg.Reply)
 		if h.measured(msg.Reply) {
 			return h.relayoutSoon(), false
 		}
 		return nil, false
 	case hottytea.ErrorMsg:
+		h.tracef("error: %+v", msg.Reply)
 		if h.measured(msg.Reply) {
 			return h.relayoutSoon(), false
 		}
@@ -206,6 +226,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		}
 		// A host that leaves a whole wave unanswered will not answer the
 		// next: show everything in cells rather than wait on it.
+		h.tracef("deaf: wave %d left %d measures unanswered", msg.wave, len(h.pending))
 		h.deaf = true
 		h.pending = map[int]hotKey{}
 		return nil, true
@@ -338,10 +359,10 @@ func (m *model) hotResend() {
 }
 
 // hotMeasure sends the next wave of measures, nearest the screen first, once
-// the last has come back. Each block goes to the one measuring surface, is
-// placed with r=auto in the screen's last cell beneath everything (a window
-// of one cell, z=-1000), and the host's reply says its rows; the surface is
-// deleted at the end of the wave, so nothing of it stays on screen.
+// the last has come back. Each block goes to a measuring surface of its own,
+// is placed with r=auto in the screen's last cell beneath everything (a
+// window of one cell, z=-1000), and the host's reply says its rows; the
+// surface is deleted straight after, so nothing of it stays on screen.
 func (m *model) hotMeasure() tea.Cmd {
 	h := m.hot
 	if len(h.pending) > 0 || len(h.want) == 0 || h.deaf {
@@ -368,16 +389,22 @@ func (m *model) hotMeasure() tea.Cmd {
 		h.asked[w.key] = true
 		h.nextN++
 		h.pending[h.nextN] = w.key
-		h.s.Send(hotty.Doc(hotMeasureName, hotDocument(w.key.html, "measure", false, false, "")),
-			hotty.PlaceAt(hotMeasureName, max(0, m.w-1), max(0, m.h-1),
-				hotty.Placement{Cols: w.key.w, Window: hotty.Window{W: 1, H: 1}, Z: -1000}, hotty.N(h.nextN)))
+		// A surface of its own for each measure, gone as soon as it is
+		// placed: a host that sizes it later than the placement (a
+		// multiplexer relaying it on its next frame, as plx does) can only
+		// ever see this block's document under this name.
+		name := hotMeasureName + "-" + strconv.Itoa(h.nextN)
+		h.s.Send(hotty.Doc(name, hotDocument(w.key.html, "measure", false, false, "")),
+			hotty.PlaceAt(name, max(0, m.w-1), max(0, m.h-1),
+				hotty.Placement{Cols: w.key.w, Window: hotty.Window{W: 1, H: 1}, Z: -1000}, hotty.N(h.nextN)),
+			hotty.Del(name))
 		n++
 	}
 	if n == 0 {
 		return nil
 	}
-	h.s.Send(hotty.Del(hotMeasureName))
 	h.wave++
+	h.tracef("measure: wave %d, %d blocks", h.wave, n)
 	wave := h.wave
 	return tea.Tick(hotMeasureWait, func(time.Time) tea.Msg { return hotMeasureTimeoutMsg{wave} })
 }

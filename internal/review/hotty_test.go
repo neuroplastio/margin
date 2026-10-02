@@ -87,7 +87,7 @@ func surfaceWith(t *testing.T, h *hottytest.Host, want string) *hottytest.Surfac
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		for _, s := range h.Surfaces() {
-			if s.Name() != hotMeasureName && s.Placed() && strings.Contains(s.Text(), want) {
+			if !strings.HasPrefix(s.Name(), hotMeasureName) && s.Placed() && strings.Contains(s.Text(), want) {
 				return s
 			}
 		}
@@ -130,7 +130,7 @@ func TestHottyProseIsSurfaces(t *testing.T) {
 	}
 	measured := false
 	for _, c := range h.Commands() {
-		if c.Get("a") == "place" && c.Get("s") == hotMeasureName && c.Get("r") == "auto" && c.Get("n") != "" {
+		if c.Get("a") == "place" && strings.HasPrefix(c.Get("s"), hotMeasureName+"-") && c.Get("r") == "auto" && c.Get("n") != "" {
 			measured = true
 		}
 	}

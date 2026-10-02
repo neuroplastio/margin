@@ -54,6 +54,8 @@ font, with real heading sizes, links you can click and images inline. The
 review itself stays in cells beside them: the gutter, threads, the nvim
 composer, code blocks and tables. Every other terminal gets the cell rendering
 as before, and `--no-hotty` asks for it on a HOTTY host too.
+`MARGIN_HOTTY_LOG=/tmp/hotty.log` records what margin and the terminal said to
+each other, for when a HOTTY terminal still gets cells.
 
 ## Keys
 

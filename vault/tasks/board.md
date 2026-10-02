@@ -4,6 +4,12 @@ Last updated: 2026-10-02 (published to an engram channel; `margin update`)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (HOTTY in plx) margin in a plx pane renders as HTML once plx has
+  HOTTY-PLACE-REPLY-01 (`770e69c`, `plx update`); each block is measured on
+  a surface of its own; `MARGIN_HOTTY_LOG` traces the host; demo document at
+  `testdata/demo/demo.md` — whether the page settles fast with no flash in
+  the pane's corner, and whether the demo is a good tour — journal
+  2026-10-02.3
 - (HOTTY surfaces) on a HOTTY host (hottyterm, the xterm.js addon) headings,
   paragraphs, list items and quotes are HTML surfaces — sans prose at an 80ch
   measure, sized headings, inline markup, images sent in-band — while the
@@ -409,6 +415,10 @@ Last updated: 2026-10-02 (published to an engram channel; `margin update`)
 
 ## Done
 
+- [x] **(direction)** margin in a plx pane, and a demo document: one
+      measuring surface per block, `MARGIN_HOTTY_LOG`, `testdata/demo/`;
+      plx's side is plexos HOTTY-PLACE-REPLY-01. `[felt]` — see journal
+      2026-10-02.3 — done 2026-10-02
 - [x] **(direction)** publish via engram and update in place: every push to
       main that passes `make check` is a signed build on
       `pkg.neuroplast.io/margin/dev` (bare static binaries, as plx and engram
