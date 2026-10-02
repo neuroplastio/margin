@@ -1,6 +1,7 @@
 package review
 
 import (
+	"context"
 	"io"
 	"log"
 	"os"
@@ -12,6 +13,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/neuroplastio/hotty-go"
 	"github.com/neuroplastio/hotty-go/hottytea"
+
+	"github.com/neuroplastio/margin/internal/mermaidsvg"
 )
 
 // margin on a HOTTY host (D17): where the terminal can show HTML, the prose
@@ -65,6 +68,9 @@ type hotState struct {
 	closed      bool
 
 	trace *log.Logger // MARGIN_HOTTY_LOG
+
+	// mermaid draws a diagram as SVG: mermaidsvg.Render, but for tests.
+	mermaid func(ctx context.Context, src string) ([]byte, error)
 }
 
 type hotKey struct {
@@ -101,6 +107,14 @@ type hotAnchor struct{ entry, off int }
 // hotRelayoutMsg draws the frame again once a wave of measures has come back.
 type hotRelayoutMsg struct{}
 
+// hotDiagramMsg is a mermaid diagram drawn, or why it could not be.
+type hotDiagramMsg struct {
+	src  string
+	svg  []byte
+	err  error
+	took time.Duration
+}
+
 // hotMeasureTimeoutMsg gives up on a wave of measures the host did not
 // answer.
 type hotMeasureTimeoutMsg struct{ wave int }
@@ -124,6 +138,7 @@ func newHotState() *hotState {
 		asked:   map[hotKey]bool{},
 		pending: map[int]hotKey{},
 		sent:    map[string]string{},
+		mermaid: mermaidsvg.Render,
 	}
 	h.docs.res = func(id, mime string, data []byte) { h.s.Send(hotty.Res(id, mime, data)) }
 	if path := os.Getenv("MARGIN_HOTTY_LOG"); path != "" {
@@ -217,6 +232,13 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		return nil, true
 	case hottytea.PongMsg:
 		return nil, false
+	case hotDiagramMsg:
+		if msg.err != nil {
+			h.tracef("mermaid: %v", msg.err)
+			return nil, false
+		}
+		h.tracef("mermaid: %d bytes of SVG in %v", len(msg.svg), msg.took.Round(time.Millisecond))
+		return nil, h.native() && h.docs.drew(msg.src, msg.svg)
 	case hotRelayoutMsg:
 		h.relayoutDue = false
 		m.hotKeepTop()
@@ -279,7 +301,7 @@ func (m *model) hotKeepTop() {
 // and shows in cells meanwhile, unless an earlier width's rows stand in.
 func (m *model) hotRows(b block, w, line int) (base string, rows int, ok bool) {
 	h := m.hot
-	if !h.native() || h.deaf || !hotKind(b.kind) {
+	if !h.native() || h.deaf || !hotShows(b) {
 		return "", 0, false
 	}
 	base = h.docs.base(b, m.src)
@@ -309,7 +331,23 @@ func (m *model) hotFrame() tea.Cmd {
 	h.s.Layout(m.hotSurfaces())
 	m.hotResend()
 	measuring := m.hotMeasure()
-	return tea.Batch(h.s.Flush(), measuring)
+	return tea.Batch(h.s.Flush(), measuring, h.draw())
+}
+
+// draw renders the diagrams the frame found, each off the update loop: the
+// first waits for the renderer to compile, seconds on a cold cache.
+func (h *hotState) draw() tea.Cmd {
+	var cmds []tea.Cmd
+	for _, src := range h.docs.diagramsDue {
+		render := h.mermaid
+		cmds = append(cmds, func() tea.Msg {
+			start := time.Now()
+			svg, err := render(context.Background(), src)
+			return hotDiagramMsg{src: src, svg: svg, err: err, took: time.Since(start)}
+		})
+	}
+	h.docs.diagramsDue = nil
+	return tea.Batch(cmds...)
 }
 
 // hotSurfaces are the blocks on screen, as surfaces in the document's column.

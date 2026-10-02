@@ -4,6 +4,12 @@ Last updated: 2026-10-02 (published to an engram channel; `margin update`)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (mermaid as SVG) on a HOTTY host a mermaid fence is its diagram as SVG
+  (D19), in cells for the ~2.5 s the renderer compiles on first use, then
+  in place; `testdata/demo/demo.md`'s three diagrams — whether they read at
+  that size beside the prose, whether edge labels' dark patches bother you
+  on hottyterm's background, and the flowchart's `plan.md → margin` edge,
+  drawn as an arrowhead with no line in hottyterm — journal 2026-10-02.5
 - (web images) an `https` image in a document shows inline on a host whose
   network policy allows https images (hottyterm with it turned on; the
   xterm.js addon), and stays a link elsewhere — whether a page of them

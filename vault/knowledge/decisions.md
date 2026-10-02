@@ -343,7 +343,8 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   resource. Everything that *is* the review stays in cells: the gutter (focus,
   marks, roll-ups), threads, the composer, the footer, the tree pane, and the
   blocks a cell renderer already does well or a surface would do no better —
-  code, tables, mermaid, frontmatter. Raw view (`\`) and the threads view
+  code, tables, frontmatter. A mermaid fence is a surface too, its diagram
+  drawn as SVG (D19). Raw view (`\`) and the threads view
   (`i`) place no surfaces.
 - **Heights are the host's.** A block takes the rows the host lays it out in
   at the column's width: each is measured once on a throwaway `r=auto`
@@ -441,3 +442,41 @@ from a workflow run.
   unpack, and a curl of `latest/` would too); enboot-style handover as plx
   does (margin is a short-lived TUI with nothing to hand over); keeping
   goreleaser for four `go build`s.
+
+**D19 — On a HOTTY host a mermaid fence is its diagram, drawn as SVG in
+margin's process.** Maintainer direction (2026-10-02): "I want images, gifs
+and mermaid diagrams to render via hotty". Amends D17, which kept mermaid in
+cells.
+
+- **The renderer is merman** (`=0.8.0-alpha.7`, a Rust port of Mermaid 12,
+  MIT OR Apache-2.0), compiled to a WASI command and embedded gzipped
+  (`internal/mermaidsvg/mermaid.wasm.gz`, 2.5 MB; +5.4 MB on a release
+  binary with wazero). wazero runs it in-process, one fresh instance per
+  diagram, bounded to 128 MiB and 10 s; a crash or a parse error is an error,
+  never margin's crash. Eleven kinds are built in (flowchart, sequence,
+  state, ER, class, gantt, pie, mindmap, gitGraph, journey, timeline); the
+  rest are an error. Rebuilding it needs Rust (`make mermaid-wasm`); building
+  margin does not.
+- **wazero is pinned past 424d3ca** (#2535): v1.9.0–v1.12.0 miscompile a
+  float operation merman uses on amd64, and every wrapped label lands far
+  off the canvas. `TestRenderKeepsTextOnCanvas` fails on a downgrade.
+- **The SVG is the review's**: margin's palette on a transparent background,
+  labels as plain `<text>` (usvg, which hotty-blitz paints with, cannot
+  draw `<foreignObject>`), measured with Inter's widths, ids prefixed per
+  diagram. Its root's `width`/`height` become the `<img>`'s, so the host
+  lays the block out before it decodes it; the stylesheet caps a diagram at
+  the column's width and 32 rows.
+- **Off the update loop, cells until drawn.** A frame that shows a mermaid
+  block it has no SVG for starts a render (a `tea.Cmd`) and shows the block
+  in cells: the ASCII rendering, or the source. The SVG goes to the host as
+  a resource (`mmd-<hash of the source>`), and the block is then measured
+  and placed like any other. A diagram merman cannot draw stays cells. The
+  compile is ~2.5 s once; wazero's cache (`~/.cache/margin/wazero`) makes
+  the next start ~0.2 s, and one diagram then takes 15–260 ms.
+- **Rejected.** mermaid-little (byte-faithful to upstream, so its labels are
+  `<foreignObject>` and come out blank), mermaid-rs-renderer (slow, odd
+  edges, no `<<abstract>>`), mermaid-svg (smallest and fastest, but cuts off
+  subgraphs with their own direction and lays out composite states wrongly);
+  a headless browser or `mmdc` on PATH (a dependency the user must install);
+  sending mermaid source to the host (HOTTY has no such thing, and a host
+  should not need one).

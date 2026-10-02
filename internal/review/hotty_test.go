@@ -2,6 +2,8 @@ package review
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -44,6 +46,7 @@ func hotRun(t *testing.T, src string, play func(h *hottytest.Host, m *model), op
 	m := newModelAt(path, doc, nil)
 	m.src = data
 	m.hot = newHotState()
+	m.hot.mermaid = fakeMermaid
 	m.hotOpen()
 
 	h := hottytest.New(t, opts...)
@@ -64,6 +67,16 @@ func hotRun(t *testing.T, src string, play func(h *hottytest.Host, m *model), op
 		t.Fatal("margin did not quit")
 	}
 	return m, h
+}
+
+// fakeMermaid stands in for merman (internal/mermaidsvg has its own tests,
+// and compiling it takes seconds): an SVG 300×144 for a flowchart, and the
+// parser's refusal for anything else.
+func fakeMermaid(_ context.Context, src string) ([]byte, error) {
+	if !strings.HasPrefix(strings.TrimSpace(src), "flowchart") {
+		return nil, errors.New("mermaid: Unsupported diagram type")
+	}
+	return []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="143.5" viewBox="0 0 300 143.5"><rect width="10" height="10"/></svg>`), nil
 }
 
 func writePNG(t *testing.T, path string, w, h int) {
@@ -185,6 +198,57 @@ func TestHottyProseIsSurfaces(t *testing.T) {
 			names = append(names, s.Name())
 		}
 		t.Errorf("surfaces left after quitting: %v", names)
+	}
+}
+
+// A mermaid fence on a host is its diagram as SVG, sent as a resource and
+// shown by an <img> sized from it; one merman cannot draw stays cells.
+func TestHottyMermaidIsAnSVG(t *testing.T) {
+	src := "Before.\n\n```mermaid\nflowchart LR\n    a --> b\n```\n\n```mermaid\npie\n    \"x\" : 1\n```\n"
+	var diagram *hottytest.Surface
+	var screen string
+	_, h := hotRun(t, src, func(h *hottytest.Host, m *model) {
+		waitFor(t, "the diagram's surface", func() bool {
+			for _, s := range h.Surfaces() {
+				if strings.Contains(s.HTML(), `class="diagram"`) && s.Placed() {
+					diagram = s
+					return true
+				}
+			}
+			return false
+		})
+		waitFor(t, "the frame after it", func() bool {
+			screen = h.Screen()
+			return !strings.Contains(screen, "a --> b") && !strings.Contains(screen, "│ a")
+		})
+	})
+	doc := diagram.HTML()
+	if !strings.Contains(doc, `width="300" height="144"`) || !strings.Contains(doc, `src="cid:mmd-`) {
+		t.Errorf("the diagram's document: %s", doc)
+	}
+	id := doc[strings.Index(doc, "cid:mmd-")+len("cid:"):]
+	id = id[:strings.IndexByte(id, '"')]
+	if mime, data, ok := h.Resource(id); !ok || mime != "image/svg+xml" || !bytes.HasPrefix(data, []byte("<svg")) {
+		t.Errorf("the diagram's resource %s: %q %v", id, mime, ok)
+	}
+	if !strings.Contains(screen, "pie") {
+		t.Errorf("the diagram merman could not draw is not in cells:\n%s", screen)
+	}
+}
+
+func TestSVGSize(t *testing.T) {
+	for _, c := range []struct {
+		svg  string
+		w, h int
+	}{
+		{`<svg width="300" height="143.5">`, 300, 144},
+		{`<?xml version="1.0"?><svg xmlns="x" height="20px" width="10px"><rect width="5" height="5"/></svg>`, 10, 20},
+		{`<svg viewBox="0 0 1 1">`, 0, 0},
+		{`no svg`, 0, 0},
+	} {
+		if w, h := svgSize([]byte(c.svg)); w != c.w || h != c.h {
+			t.Errorf("svgSize(%s) = %d×%d, want %d×%d", c.svg, w, h, c.w, c.h)
+		}
 	}
 }
 

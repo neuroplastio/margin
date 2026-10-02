@@ -14,6 +14,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/neuroplastio/hotty-go"
@@ -90,22 +92,26 @@ main .li .mk.box { font-family: var(--mono); }
 main .li .lt { flex: 1; min-width: 0; }
 main .li.done .lt { color: var(--dim); }
 main img { display: block; max-width: 100%; max-height: calc(20 * var(--row)); width: auto; height: auto; }
+main img.diagram { max-height: calc(32 * var(--row)); }
 main hr { border: 0; height: var(--row); background: linear-gradient(var(--dim), var(--dim)) center / 100% 1px no-repeat; }
 main table { border-collapse: collapse; }
 main th, main td { padding: 0 var(--col); text-align: left; }
 `
 
-// hotKind reports whether a block of this kind shows as a surface. Code,
-// mermaid, tables, frontmatter and raw blocks stay cells: their layout is
-// their content, the cells already draw it exactly, and a table's rows are
-// what a line dive walks (D17).
-func hotKind(k blockKind) bool {
-	switch k {
+// hotShows reports whether a block shows as a surface: prose, and a mermaid
+// diagram. Code, tables, frontmatter and raw blocks stay cells: their layout
+// is their content, the cells already draw it exactly, and a table's rows
+// are what a line dive walks (D17).
+func hotShows(b block) bool {
+	switch b.kind {
 	case blockHeading, blockPara, blockListItem, blockQuote:
 		return true
 	}
-	return false
+	return hotMermaid(b)
 }
+
+// hotMermaid reports whether a block is a mermaid fence.
+func hotMermaid(b block) bool { return b.kind == blockCode && b.lang == "mermaid" }
 
 // hotMarkdown is the goldmark that renders blocks: the parser's own
 // extensions (GFM), and raw HTML left out, as goldmark leaves it by default.
@@ -122,6 +128,11 @@ type hotDocs struct {
 	net []string
 	imgs map[string]hotImage // by the image's path
 	html map[string]string   // by the block's markdown
+
+	// diagrams is each mermaid diagram by its source, and diagramsDue the
+	// ones a frame showed that no render has started for (hotDraw).
+	diagrams    map[string]*hotDiagram
+	diagramsDue []string
 
 	// The current document's: each block's body, and where its lines
 	// start. open forgets them.
@@ -142,6 +153,15 @@ func (d *hotDocs) open(dir string) {
 	d.dir, d.imgs, d.byBlock, d.starts = dir, nil, nil, nil
 }
 
+// hotDiagram is a mermaid diagram drawn as SVG (internal/mermaidsvg), sent
+// as a resource that an <img> in the block's document shows. Until it is
+// drawn, and for one merman cannot draw, the block stays cells: the ASCII
+// rendering, or the source.
+type hotDiagram struct {
+	id   string // the resource; "" until drawn
+	w, h int    // the SVG's size in pixels
+}
+
 type hotImage struct {
 	id   string // the resource; "" when the file cannot be shown
 	w, h int    // its size in pixels, 0 when unknown
@@ -154,6 +174,9 @@ const hotImageMax = 8 << 20
 // base returns a block's document body: its markdown as HTML, before any
 // review state. "" means the block has nothing to show as a surface.
 func (d *hotDocs) base(b block, src []byte) string {
+	if hotMermaid(b) {
+		return d.diagram(b)
+	}
 	bk := hotBlockKey{b.kind, b.line, b.endLine, b.start, b.stop, b.anchor}
 	if s, ok := d.byBlock[bk]; ok {
 		return s
@@ -193,6 +216,66 @@ func (d *hotDocs) base(b block, src []byte) string {
 	d.html[md] = s
 	d.byBlock[bk] = s
 	return s
+}
+
+// diagram is a mermaid block's document body once its SVG is drawn, and ""
+// until then: the first time, it is queued to be drawn.
+func (d *hotDocs) diagram(b block) string {
+	src := strings.Join(b.lines, "\n")
+	g := d.diagrams[src]
+	if g == nil {
+		if d.diagrams == nil {
+			d.diagrams = map[string]*hotDiagram{}
+		}
+		d.diagrams[src] = &hotDiagram{}
+		d.diagramsDue = append(d.diagramsDue, src)
+		return ""
+	}
+	if g.id == "" {
+		return ""
+	}
+	return fmt.Sprintf(`<img class="diagram" src="cid:%s" width="%d" height="%d" alt="a mermaid diagram">`, g.id, g.w, g.h)
+}
+
+// drew takes a diagram's SVG: sent as a resource, and shown from the next
+// frame on. It reports whether the diagram can show.
+func (d *hotDocs) drew(src string, svg []byte) bool {
+	g := d.diagrams[src]
+	if g == nil || g.id != "" {
+		return false
+	}
+	w, h := svgSize(svg)
+	if w <= 0 || h <= 0 {
+		return false
+	}
+	sum := sha256.Sum256([]byte(src))
+	g.id, g.w, g.h = "mmd-"+hex.EncodeToString(sum[:8]), w, h
+	d.res(g.id, "image/svg+xml", svg)
+	return true
+}
+
+var (
+	svgTag  = regexp.MustCompile(`<svg\b[^>]*>`)
+	svgAttr = regexp.MustCompile(`\s(width|height)="([0-9.]+)(?:px)?"`)
+)
+
+// svgSize is an SVG's width and height in pixels, from its root element:
+// what the <img> says, so the host lays the block out before it decodes it.
+func svgSize(svg []byte) (w, h int) {
+	tag := svgTag.Find(svg)
+	for _, m := range svgAttr.FindAllSubmatch(tag, -1) {
+		f, err := strconv.ParseFloat(string(m[2]), 64)
+		if err != nil {
+			continue
+		}
+		n := int(f + 0.999)
+		if string(m[1]) == "width" {
+			w = n
+		} else {
+			h = n
+		}
+	}
+	return w, h
 }
 
 // blockMarkdown is the block's own markdown: its whole source lines (a
@@ -442,6 +525,9 @@ func hotClass(b block) string {
 		return "item"
 	case blockQuote:
 		return "quote"
+	}
+	if hotMermaid(b) {
+		return "diagram"
 	}
 	return "para"
 }
