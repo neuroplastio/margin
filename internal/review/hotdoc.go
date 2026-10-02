@@ -121,11 +121,11 @@ var hotMarkdown = goldmark.New(goldmark.WithExtensions(extension.GFM))
 // document's relative images are, and res receives each image's bytes, once,
 // before a document refers to it.
 type hotDocs struct {
-	dir  string
-	res  func(id, mime string, data []byte)
+	dir string
+	res func(id, mime string, data []byte)
 	// net is the host's img-src sources (SPEC §7.2, its capabilities' net):
 	// an https image it lets a document fetch stays an image.
-	net []string
+	net  []string
 	imgs map[string]hotImage // by the image's path
 	html map[string]string   // by the block's markdown
 

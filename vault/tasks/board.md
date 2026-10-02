@@ -10,6 +10,11 @@ Last updated: 2026-10-02 (published to an engram channel; `margin update`)
   that size beside the prose, whether edge labels' dark patches bother you
   on hottyterm's background, and the flowchart's `plan.md → margin` edge,
   drawn as an arrowhead with no line in hottyterm — journal 2026-10-02.5
+- (fit) a block whose image arrives after it was measured grows to fit it on
+  a host that sends `fit` (hottyterm and the xterm.js addon from their fit
+  releases, a plx pane from plexos HOTTY-FIT-01), and the page below moves
+  down with the top of the screen held still — whether the jump reads as the
+  image arriving or as the page lurching — journal 2026-10-02.6
 - (web images) an `https` image in a document shows inline on a host whose
   network policy allows https images (hottyterm with it turned on; the
   xterm.js addon), and stays a link elsewhere — whether a page of them

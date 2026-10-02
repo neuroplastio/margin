@@ -27,6 +27,9 @@ import (
 // column's width. Each block is measured once on a throwaway surface placed
 // with r=auto (SPEC §5.2), and until its reply comes the block shows in cells
 // (D17), so a host that is slow to answer still shows the whole document.
+// A block can grow after it is measured, when an image decodes or a font
+// loads: placed with fit (f=1), the host says so, and the block takes the
+// rows it says from then on.
 //
 // Surfaces are placed from Update (hottytea.Session.Layout), which is where
 // Bubble Tea lets a program send anything, so on a host the frame is drawn
@@ -50,6 +53,7 @@ type hotState struct {
 	wave    int  // the measuring wave the timeout belongs to
 	deaf    bool // a host that never answered a measure: everything in cells
 	want    []hotWant
+	fit     bool // the host sends fit: blocks are placed asking for it
 
 	// The frame: what View returns on a host, the blocks render placed in
 	// it, and where the document's column is.
@@ -210,6 +214,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		h.tracef("ready: mode %v, caps %+v", msg.Mode, msg.Caps)
 		if msg.Mode == hottytea.Native {
 			h.docs.net = msg.Caps.Net["img-src"]
+			h.fit = msg.Caps.Sends(hotty.EventFit)
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 		}
 		return nil, true
@@ -227,6 +232,12 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		m.status = "hotty: " + msg.Err().Error()
 		return nil, true
 	case hottytea.EventMsg:
+		if msg.Event.Kind == hotty.EventFit {
+			if m.hotFit(msg.Event) {
+				return h.relayoutSoon(), false
+			}
+			return nil, false
+		}
 		return m.hotEvent(msg.Event), true
 	case hottytea.RelayoutMsg:
 		return nil, true
@@ -273,6 +284,30 @@ func (h *hotState) measured(r hotty.Reply) bool {
 		h.rows[key] = 0
 	}
 	return true
+}
+
+// hotFit takes a fit: a block's document needs other rows than it was placed
+// with (an image decoded after it was measured, say). They become the block's
+// rows at this width, and it reports whether they changed anything.
+func (m *model) hotFit(ev hotty.Event) bool {
+	h := m.hot
+	rows, ok := ev.FitRows()
+	if !ok {
+		return false
+	}
+	for _, b := range h.blocks {
+		if hotName(m.path, m.entries[b.entry].b.anchor, b.entry) != ev.Surface {
+			continue
+		}
+		h.tracef("fit: %s needs %d rows, placed with %d", ev.Surface, rows, b.rows)
+		k := hotKey{b.base, h.col.W}
+		if h.rows[k] == rows {
+			return false
+		}
+		h.rows[k], h.last[b.base] = rows, rows
+		return true
+	}
+	return false
 }
 
 // relayoutSoon draws the frame again shortly, once for a wave's replies
@@ -374,6 +409,7 @@ func (m *model) hotSurfaces() []hottytea.Surface {
 			Clip:  &clip,
 			Keep:  true,
 			Press: true,
+			Fit:   h.fit,
 			Doc: func() string {
 				h.sent[name] = doc
 				return doc

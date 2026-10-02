@@ -355,6 +355,10 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   terminal; a host that never answers within 3s is treated as deaf and the
   whole document stays in cells. After a resize a block keeps its last height
   until the new width's arrives, and the top visible block holds still.
+  A block can need more rows after it was measured, when an image decodes or
+  a web image loads late: on a host that sends `fit` (SPEC §5.2) every
+  block is placed with `f=1`, and the rows a `fit` reports replace the
+  block's measured ones at that width, as a measure's reply would.
 - **Review state never moves a line.** Reviewed (dimmed) and selected
   (background) are classes, a search hit is a `<mark>`: none may change a row,
   because the host measured the block without them. Search matches come from

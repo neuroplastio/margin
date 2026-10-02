@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -250,6 +251,35 @@ func TestSVGSize(t *testing.T) {
 			t.Errorf("svgSize(%s) = %d×%d, want %d×%d", c.svg, w, h, c.w, c.h)
 		}
 	}
+}
+
+// A block that needs more rows than it was measured at, an image decoded
+// after the measure, is placed asking for fit (SPEC §5.2), and takes the rows
+// the host's fit says: it is placed again taller, and what follows it moves
+// down.
+func TestHottyFitGrowsABlock(t *testing.T) {
+	var grown atomic.Value // the surface the host now lays out taller
+	grown.Store("")
+	rows := func(s *hottytest.Surface, _ int) int {
+		if s.Name() == grown.Load() {
+			return 5
+		}
+		return 2
+	}
+	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		quote := surfaceWith(t, h, "a quote")
+		second := surfaceWith(t, h, "Second")
+		if p := quote.Placement(); !p.Fit || p.Rows != 2 {
+			t.Fatalf("the quote is placed %+v, want fit and its measured 2 rows", p)
+		}
+		_, below := second.At()
+		grown.Store(quote.Name())
+		if err := h.Emit(quote.Name(), hotty.EventFit, "", map[string]int{"r": 5}); err != nil {
+			t.Fatal(err)
+		}
+		waitFor(t, "the quote placed with 5 rows", func() bool { return quote.Placement().Rows == 5 })
+		waitFor(t, "the heading below moved down 3", func() bool { _, row := second.At(); return row == below+3 })
+	}, hottytest.AutoRows(rows))
 }
 
 // A press on a block's surface focuses the block, as a click on cells does.
