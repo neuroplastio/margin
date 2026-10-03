@@ -3,9 +3,10 @@
 // through it), D18.
 //
 // A build has a name and an identity, and they are different things. Version
-// is the name, for people, never compared or sorted: `YY.MM.DD-dev.<sha7>` for
-// a build of main published to the dev channel (the date is the commit's, in
-// UTC), and the short commit for a local build. Commit is the identity: the
+// is the name, for people, never compared or sorted: `YY.MM.DD` for a release
+// on the stable channel (its tag, D21), `YY.MM.DD-dev.<sha7>` for a build of
+// main published to the dev channel (the date is the commit's, in UTC), and
+// the short commit for a local build. Commit is the identity: the
 // full commit the binary was built from. Channel is where it was published,
 // and empty for a binary nobody published — every local build.
 package version

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-02 (margin-launcher, D20)
+Last updated: 2026-10-03 (stable channel, D21)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -431,6 +431,11 @@ Last updated: 2026-10-02 (margin-launcher, D20)
 
 ## Done
 
+- [x] **(direction)** a stable channel and a release pipeline driven by git
+      tags: a tag named for its day (`26.10.03`) on main is built, made a
+      GitHub release and published to `pkg.neuroplast.io/margin/stable`;
+      `make release` cuts one (D21). `[mech]` — see journal 2026-10-03.1 —
+      done 2026-10-03
 - [x] **(direction)** margin-launcher: an opt-in thin binary from engram's
       enlaunch, which a package installs as margin; it fetches margin into
       `~/.local/margin` the first time and hands over, and `margin update`

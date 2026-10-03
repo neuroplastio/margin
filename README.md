@@ -211,14 +211,22 @@ memory), folded onto the same newline a bare `enter` gets.
 
 ## Install
 
-Every push to `main` that passes `make check` is published to margin's `dev`
-channel on pkg.neuroplast.io: a static binary for Linux and macOS (amd64 and
-arm64), signed with the neuroplastio release key. Fetch the newest, check it
-against that key, and put it on your `PATH`:
+margin is published to two channels on pkg.neuroplast.io, each build a static
+binary for Linux and macOS (amd64 and arm64), signed with the neuroplastio
+release key:
+
+- **`stable`** — releases, named for the day they were cut (`26.10.03`). Each
+  is also a [GitHub release](https://github.com/neuroplastio/margin/releases)
+  with the same files.
+- **`dev`** — every push to `main` that passes `make check`
+  (`26.10.03-dev.5fbd3da`).
+
+Fetch the newest release, check it against that key, and put it on your
+`PATH` (for `dev`, change `stable` in the second line):
 
 ```sh
 f=margin_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-u=https://pkg.neuroplast.io/margin/dev/latest
+u=https://pkg.neuroplast.io/margin/stable/latest
 curl -fsS -O "$u/manifest" -O "$u/manifest.sig" -O "$u/$f"
 echo 'release@neuroplast.io namespaces="engram" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDCsEZcn1tiubvKQzEVs5pJ4QVXoFmSDtO+k6SdetUdf' > allowed_signers
 ssh-keygen -Y verify -f allowed_signers -I release@neuroplast.io -n engram -s manifest.sig < manifest &&
@@ -228,27 +236,29 @@ ssh-keygen -Y verify -f allowed_signers -I release@neuroplast.io -n engram -s ma
 
 `ssh-keygen` proves the manifest is signed by the release key; the `grep`
 proves the binary is one the manifest names. If the `grep` fails right after a
-push, a publish was midway through; run it again.
+publish, it was midway through; run it again. A GitHub release carries the
+same `manifest` and `manifest.sig`, so its files can be checked the same way.
 
-From then on, margin updates itself:
+From then on, margin updates itself from the channel it came from:
 
 ```
-margin update            # the dev channel's newest build, checked against the key built into margin
+margin update            # the channel's newest build, checked against the key built into margin
 margin update 0d7c52f    # a particular build, older ones included, while the channel still holds it
-margin --version         # 26.10.02-dev.0d7c52f for a channel build; the short commit for your own
+margin --version         # 26.10.03 for a release, 26.10.02-dev.0d7c52f for a dev build, the short commit for your own
 ```
 
 `margin update` replaces the file you ran (through any symlink), so install it
 somewhere you can write, such as `~/.local/bin`. A margin you built yourself
-updates to the channel's newest build too, and says so. Builds stay on the
-channel for 30 days after a newer one replaces them.
+updates to the dev channel's newest build, and says so. To move between
+channels, install from the other one as above. Releases stay on `stable` for
+good; a `dev` build stays for 30 days after a newer one replaces it.
 
-A package can install `margin-launcher` as `margin` instead, from the same
+A package can install `margin-launcher` as `margin` instead, from either
 channel: a thin binary that runs the margin in `~/.local/margin`, fetching
-the newest there, checked against the same key, the first time it starts.
-`margin update` then installs into `~/.local/margin` rather than replacing a
-file the package owns. `ENLAUNCH_FETCH=1 margin` fetches the newest again,
-whatever is installed.
+the newest from its channel there, checked against the same key, the first
+time it starts. `margin update` then installs into `~/.local/margin` rather
+than replacing a file the package owns. `ENLAUNCH_FETCH=1 margin` fetches
+the newest again, whatever is installed.
 
 With a Go toolchain you can also build it yourself:
 
@@ -275,7 +285,7 @@ margin --version
 make check              # build + test + vet
 make doctor             # prove this machine can run the composer tests
 make run FILE=doc.md
-make dist               # the release binaries, dist/margin_<os>_<arch>
+make dist               # the dev binaries, dist/margin{,-launcher}_<os>_<arch>
 ```
 
 Requires Go 1.24+ and `nvim` 0.8+ on `PATH`. `./scripts/setup-env.sh` provisions
@@ -287,6 +297,35 @@ catches that.
 
 `MARGIN_NVIM_CONFIG=user` runs the composer with your own nvim config instead
 of the stripped one, for comparison.
+
+## Releasing
+
+A release is a tag on `main` named for the day it is cut, in UTC: `26.10.03`.
+At most one a day. From a clean checkout of the commit to release:
+
+```
+make release            # tags HEAD with today's date and pushes the tag
+```
+
+The tag is the whole act. The release workflow builds the tagged commit,
+named after the tag and stamped with the `stable` channel; makes the GitHub
+release with its binaries and the changes since the previous release; then
+publishes the same files to `pkg.neuroplast.io/margin/stable`, reads them back
+against the release key, and attaches the signed manifest to the GitHub
+release. A tag that is not a day, not on `main`, or on a commit already
+released is refused before anything is published.
+
+**Replacing a release.** A release that has to be withdrawn is replaced under
+the same name. Scrap its build — its files leave the channel, and the
+channel's journal says it was withdrawn and why — then move the tag to the fix
+(on `main`) and push it again; the workflow replaces the GitHub release's
+notes and files:
+
+```
+engram scrap --bucket neuroplastio-pkg --cloudfront E2JRO3ARI7TXDT --project margin --channel stable \
+  --commit <full commit> --reason broken
+git tag -fa 26.10.03 -m "margin 26.10.03" <fix> && git push -f origin refs/tags/26.10.03
+```
 
 ## Roadmap
 

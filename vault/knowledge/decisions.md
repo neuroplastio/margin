@@ -525,3 +525,53 @@ binary". Extends D18; nothing in it changes.
   it made every margin a launcher, where the launcher should be opt-in); a
   generic engram launcher with a per-tool config file (the tool would not
   own its binary).
+
+**D21 — A release is a tag named for its day, and goes to a stable channel.**
+Maintainer direction (2026-10-03): "establish a new "stable" channel and
+release pipeline driven by git tags. Git tag -> gh release -> publish to
+stable", "Versioning is calver". margin is the first neuroplastio project
+with a stable channel. Extends D18, and amends its "no tags, no GitHub
+releases" for releases; the dev channel is unchanged.
+
+- **The name is the day**: `YY.MM.DD`, the date the release is cut, in UTC,
+  and the tag's name exactly — no `v`. The organisation's CalVer as plexos
+  D55 sets it: at most one release a day, and a withdrawn release is replaced
+  under the same name. Under engram's rule (SPEC, `version`) the name is for
+  people and never compared or sorted; the full commit stays the identity.
+  engram's own repository writes down only the dev form (`YY.MM.DD-dev.<sha7>`,
+  in its Makefile), so D55 is where the stable form is defined.
+- **The tag is the whole act.** One run of the release workflow on a pushed
+  tag: `make check` beside `make dist RELEASE=<tag>` (named after the tag,
+  stamped `stable`), then the GitHub release with the eight binaries, then
+  `engram publish` of the same files to `pkg.neuroplast.io/margin/stable`,
+  read back through the CDN against the pinned key, then the build's signed
+  `manifest` and `manifest.sig` attached to the GitHub release so its files
+  can be checked where they were downloaded. `make release` tags HEAD with
+  today's date and pushes it.
+- **Refused before anything is published**: a tag that is not a calendar day
+  (the trigger's `[0-9][0-9].[0-9][0-9].[0-9][0-9]` admits `26.02.30`), a
+  commit not on main, and a commit another release tag already names — the
+  channel holds a commit once, so the second publish would do nothing while
+  its GitHub release carried binaries stamped with a name the manifest does
+  not have. `make release` refuses the same, a dirty tree, and a day already
+  released.
+- **Releases stay** on stable for good (`--retention 0`); dev keeps 30 days.
+- **The GitHub release** is a mirror: the same bytes as the channel, notes
+  listing the commit subjects since the previous release tag on main (chores
+  left out). A re-run, or a release replaced under its name, edits the notes
+  and replaces the files. margin never reads GitHub.
+- **AWS trust.** The publish role trusted only main's OIDC subject; infra's
+  `release_tags` lets margin's `refs/tags/??.??.??` assume it too. Anyone
+  who can push a tag can push to main, which is unprotected, so this widens
+  nothing.
+- **Clients are unchanged.** A margin follows the channel stamped into it
+  (D18), a release's launcher fetches releases (D20), and D20 pins the
+  channel like the server and the key: there is no `--channel`. Moving
+  channels is installing a margin from the other one.
+- **Rejected.** A `v` prefix (the name is the day, and `v26.10.03` reads as
+  semver without being it — `03` has a leading zero); the release created by hand
+  and `on: release` publishing it (the tag would not be the act, and a
+  release the workflow's own token creates triggers no workflow); keeping the
+  role main-only and having the tag's run dispatch a publish on main (two
+  runs for one release, and a trust rule the tag routes around anyway);
+  `margin update --channel`.

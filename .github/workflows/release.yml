@@ -1,32 +1,42 @@
-# Release: every push to main that passes the gate is a build on margin's dev
-# channel, pkg.neuroplast.io/margin/dev — four static binaries, signed by the
-# release key, which `margin update` installs (D18), and beside each the thin
-# launcher a package installs as margin (D20). Three jobs:
+# Release: margin's two channels on pkg.neuroplast.io, each build four static
+# binaries signed by the release key, which `margin update` installs (D18),
+# and beside each the thin launcher a package installs as margin (D20).
+#
+#   • dev — every push to main that passes the gate, named YY.MM.DD-dev.<sha7>
+#     (the commit's date, UTC).
+#   • stable — every tag named for its day, YY.MM.DD, on a commit of main
+#     (D21). `make release` pushes one. The tag is the release's name, and
+#     it gets a GitHub release with the same files.
+#
+# Five jobs:
 #
 #   • check — `make check`, with a real nvim so the composer tests run instead
 #     of skipping. On pull requests this is all that runs.
-#   • build — on main, beside check: `make dist`, the four binaries, as a job
-#     artifact. Building needs no gate; publishing does.
-#   • publish — on main, after both: `engram publish` the binaries, then read
-#     the build back through the CDN, the way `margin update` will.
+#   • build — on main or a tag, beside check: `make dist`, the eight binaries,
+#     as a job artifact. Building needs no gate; publishing does.
+#   • release — on a tag, after both: the GitHub release, with the binaries.
+#   • publish — after check and build (and release, on a tag): `engram
+#     publish` the binaries to the channel, then read the build back through
+#     the CDN, the way `margin update` will.
+#   • attach — on a tag, after publish: the build's signed manifest to the
+#     GitHub release.
 #
 # margin is a public repository, so every job runs on GitHub's hosted runners:
 # a self-hosted runner would run anyone's pull request on our machine.
 #
-# Builds are addressed by full commit and named YY.MM.DD-dev.<sha7> (the
-# commit's date, UTC). Nothing here tags the repository or makes a GitHub
-# release.
+# Builds are addressed by full commit. Nothing here creates a tag.
 #
 # There are no secrets. The publish job signs in to AWS with GitHub's OIDC
 # token, as a role that may write under margin/ in the bucket and sign with the
-# release key, and nothing else (neuroplastio/infra, pkg/). The role, bucket,
-# key and distribution are not secret, so they are written here, not kept in
-# repository variables.
+# release key, and nothing else; it trusts main and YY.MM.DD tags
+# (neuroplastio/infra, release_tags). The role, bucket, key and distribution
+# are not secret, so they are written here, not kept in repository variables.
 name: Release
 
 on:
   push:
     branches: [main]
+    tags: ['[0-9][0-9].[0-9][0-9].[0-9][0-9]']
   pull_request:
     branches: [main]
 
@@ -49,16 +59,20 @@ env:
   # the composer is developed against (vault/knowledge/findings.md).
   NVIM_VERSION: v0.12.5
   NVIM_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
+  # The channel a build goes to, and how long a superseded build stays on it:
+  # a dev build for 30 days, a release for good.
+  CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'dev' }}
+  RETENTION: ${{ github.ref_type == 'tag' && '0' || '720h' }}
 
 jobs:
   check:
     name: make check
     runs-on: ubuntu-latest
     concurrency:
-      # A pull request's newer push cancels the older check; a push to main
-      # is its own group, since a cancelled check would keep that commit off
-      # the channel.
-      group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+      # A pull request's newer push cancels the older check. A push is a group
+      # of its own, ref and commit: a cancelled check would keep that commit
+      # off its channel, and a tag is often pushed right after its commit.
+      group: check-${{ github.event_name == 'pull_request' && github.ref || format('{0}@{1}', github.ref, github.sha) }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v7
@@ -84,24 +98,55 @@ jobs:
 
   build:
     name: build the binaries
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # All of main, to tell whether a tag's commit is on it.
+          fetch-depth: 0
 
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
+      # A release is a day — 26.02.30 matches the trigger's pattern and is
+      # not one — cut from main, from a commit no other release is. The
+      # channel holds a commit once: a second tag on it would publish
+      # nothing, and its GitHub release would carry binaries named for a day
+      # the channel's manifest does not name.
+      - name: Check the tag
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if [ "$(date -u -d "20${tag//./-}" +%y.%m.%d 2>/dev/null)" != "$tag" ]; then
+            echo "::error::$tag is not a day: a release is named YY.MM.DD"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$tag is on $(git rev-parse --short=7 HEAD), which is not on main"
+            exit 1
+          fi
+          other="$(git tag --points-at HEAD --list '[0-9][0-9].[0-9][0-9].[0-9][0-9]' | grep -vx "$tag" || true)"
+          if [ -n "$other" ]; then
+            echo "::error::$(git rev-parse --short=7 HEAD) is already released as $other"
+            exit 1
+          fi
+
       # dist/margin_<os>_<arch> and dist/margin-launcher_<os>_<arch>: static
-      # (CGO off), stamped with the commit, the dev channel and the build's
-      # name.
-      - run: make dist
+      # (CGO off), stamped with the commit, the channel and the build's name —
+      # the tag, for a release.
+      - run: make dist RELEASE="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
 
       - name: Check the stamp
         run: |
+          if [ "$CHANNEL" = stable ]; then
+            name="$(echo "$GITHUB_REF_NAME" | sed 's/\./\\./g')"
+          else
+            name="[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]-dev\.$(git rev-parse --short=7 HEAD)"
+          fi
           dist/margin_linux_amd64 --version
-          dist/margin_linux_amd64 --version | grep -q "^margin [0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]-dev\.$(git rev-parse --short=7 HEAD) ($(git rev-parse HEAD))$"
+          dist/margin_linux_amd64 --version | grep -q "^margin $name ($(git rev-parse HEAD))$"
           test "$(ls dist | wc -l)" -eq 8
 
       - uses: actions/upload-artifact@v7
@@ -111,10 +156,82 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  publish:
-    name: publish to margin/dev
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+  release:
+    name: the GitHub release
+    if: ${{ github.ref_type == 'tag' }}
     needs: [check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every tag, to find the release before this one.
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: margin-${{ github.sha }}
+          path: dist/
+
+      # What changed since the previous release on main, the chores left out.
+      - name: Write the notes
+        run: |
+          tag="$GITHUB_REF_NAME"
+          commit="$(git rev-parse HEAD)"
+          prev="$(git describe --tags --abbrev=0 --match '[0-9][0-9].[0-9][0-9].[0-9][0-9]' HEAD^ 2>/dev/null || true)"
+          {
+            echo "margin $tag is \`$commit\`, published to the stable channel:"
+            echo "\`margin update\` in a margin from this release follows it."
+            echo
+            if [ -n "$prev" ]; then
+              echo "## Since $prev"
+              echo
+              git log --no-merges --invert-grep --grep='^chore' --format='- %s' "$prev..HEAD"
+            else
+              echo "The first stable release."
+            fi
+            echo
+            echo "## Checking the files"
+            echo
+            echo "These are the files the stable channel holds for this build:"
+            echo "\`margin_<os>_<arch>\`, the complete binary, and"
+            echo "\`margin-launcher_<os>_<arch>\`, the thin launcher a package installs"
+            echo "as margin. \`manifest\` names each one's sha256, and \`manifest.sig\` is"
+            echo "the release key's signature over it:"
+            echo
+            echo '```sh'
+            echo "echo '$ENGRAM_SIGNERS' > allowed_signers"
+            echo 'ssh-keygen -Y verify -f allowed_signers -I release@neuroplast.io -n engram -s manifest.sig < manifest'
+            echo 'grep -w "sha256=$(sha256sum margin_linux_amd64 | cut -d" " -f1)" manifest'
+            echo '```'
+          } > notes.md
+          cat notes.md
+
+      # A re-run, or a release replaced under the same name (README,
+      # Releasing), finds the release there: its notes and files are
+      # replaced.
+      - name: Release
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "margin $tag" --notes-file notes.md
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" --verify-tag --title "margin $tag" --notes-file notes.md dist/*
+          fi
+
+  publish:
+    name: publish to margin/${{ github.ref_type == 'tag' && 'stable' || 'dev' }}
+    # On main, release is skipped, and a skipped need would skip this too.
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push'
+        && needs.check.result == 'success' && needs.build.result == 'success'
+        && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    needs: [check, build, release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -161,7 +278,7 @@ jobs:
           done
           bin/engram publish \
             --bucket "$BUCKET" --kms "$KMS_KEY" --cloudfront "$DISTRIBUTION_ID" \
-            --project margin --channel dev --retention 720h \
+            --project margin --channel "$CHANNEL" --retention "$RETENTION" \
             --commit "$(git rev-parse HEAD)" --version "$MARGIN_VERSION" \
             --time "$(git show -s --format=%cI HEAD)" \
             "${artifacts[@]}"
@@ -174,7 +291,7 @@ jobs:
         run: |
           printf '%s\n' "$ENGRAM_SIGNERS" > allowed_signers
           for attempt in 1 2 3; do
-            if bin/engram verify --url "$PKG_URL" --project margin --channel dev \
+            if bin/engram verify --url "$PKG_URL" --project margin --channel "$CHANNEL" \
               --signers allowed_signers --commit "$(git rev-parse HEAD)" --fetch; then
               exit 0
             fi
@@ -186,3 +303,22 @@ jobs:
           done
           echo "::error::engram verify failed three times"
           exit 1
+
+  # The signed manifest beside the files on the GitHub release, so they can be
+  # checked where they were downloaded. It is the build's own, fetched from
+  # the channel publish just verified.
+  attach:
+    name: the manifest to the GitHub release
+    if: ${{ github.ref_type == 'tag' }}
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - run: |
+          build="$PKG_URL/margin/stable/builds/$GITHUB_SHA"
+          curl -fsS -O "$build/manifest" -O "$build/manifest.sig"
+          gh release upload "$GITHUB_REF_NAME" manifest manifest.sig --clobber

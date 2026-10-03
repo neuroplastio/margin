@@ -318,4 +318,8 @@ func TestTheLauncherFollowsTheBuildsChannel(t *testing.T) {
 	if l.Base != URL || l.Project != "margin" || l.Channel != "dev" || l.Signers != releaseSigners {
 		t.Errorf("a local build's launcher: %+v", l)
 	}
+	// A release's launcher (make dist RELEASE=…) fetches releases.
+	if l := Launcher(version.Info{Channel: "stable"}); l.Channel != "stable" {
+		t.Errorf("a stable build's launcher: %+v", l)
+	}
 }

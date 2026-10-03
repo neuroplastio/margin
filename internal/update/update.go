@@ -2,12 +2,13 @@
 // channel (D18).
 //
 // Every push to main is published to the dev channel of pkg.neuroplast.io
-// with engram: one signed manifest per build, naming the sha256 of a bare
-// margin binary for each platform. `margin update` asks the channel for its
-// newest build (or a named commit), believes only what the release key pinned
-// below has signed, and swaps the binary it is running from for the one it
-// fetched — written beside it and renamed over it, so the file is the old
-// build or the new one and never half of either.
+// with engram, and every release to the stable channel (D21): one signed
+// manifest per build, naming the sha256 of a bare margin binary for each
+// platform. `margin update` asks the build's own channel for its newest build
+// (or a named commit), believes only what the release key pinned below has
+// signed, and swaps the binary it is running from for the one it fetched —
+// written beside it and renamed over it, so the file is the old build or the
+// new one and never half of either.
 //
 // A margin that margin-launcher started (D20) is not its own file to
 // replace: the launcher owns ~/.local/margin, and update installs the build

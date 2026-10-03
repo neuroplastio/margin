@@ -15,11 +15,12 @@ func newUpdateCmd(run func(ctx context.Context, out io.Writer, commit string) er
 	return &cobra.Command{
 		Use:   "update [commit]",
 		Short: "Replace this margin with the newest build from its release channel",
-		Long: `margin update fetches the newest build of margin from the dev channel on
-pkg.neuroplast.io, checks it against the release key built into this margin
-(the signature over the build's manifest, then the binary's sha256), and puts
-it in place of the margin you ran — following symlinks to the real file,
-written beside it and renamed over it.
+		Long: `margin update fetches the newest build of margin from this margin's
+channel on pkg.neuroplast.io (stable for a release, dev for a build of main),
+checks it against the release key built into this margin (the signature over
+the build's manifest, then the binary's sha256), and puts it in place of the
+margin you ran — following symlinks to the real file, written beside it and
+renamed over it.
 
 A commit (full, or its first few characters) installs that build instead,
 older ones included, as long as the channel still holds it.
@@ -32,7 +33,8 @@ you own, such as ~/.local/bin.
 A margin that margin-launcher started (a package's margin) installs the
 build into ~/.local/margin instead, and the next margin you start runs it.
 
-The server and the key are built into margin; nothing moves them.`,
+The server, the key and the channel are built into margin; nothing moves
+them. To move to another channel, install a margin from it.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
