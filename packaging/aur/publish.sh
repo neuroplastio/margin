@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+#
+# Publish margin-bin to the AUR: margin-launcher, installed as margin, and a
+# complete margin as its seed in /usr/lib/margin (D22).
+#
+#   packaging/aur/publish.sh <release> <dir> [--push]
+#
+# <release> is a margin release tag (26.10.03); <dir> holds that release's
+# margin-launcher_linux_amd64/_arm64 and margin_linux_amd64/_arm64, the files
+# on its GitHub release. The package moves when either file's bytes change (or
+# the PKGBUILD does), and keeps its version otherwise:
+#
+#   • the AUR has no margin-bin yet, or other bytes: the package becomes
+#     <release>-1 (or the next pkgrel, when <release> was replaced under its
+#     name with other bytes);
+#   • the same bytes: the package keeps its version, and is published again
+#     with the next pkgrel only if packaging/aur/PKGBUILD changed;
+#   • otherwise there is nothing to publish.
+#
+# Either way the package is built as a user's makepkg would build it, from the
+# GitHub release, before anything is pushed. Without --push it stops there and
+# shows what it would publish. Needs makepkg, so an Arch system; --push needs
+# an SSH key the AUR account margin-bin belongs to has.
+set -euo pipefail
+
+if [ $# -lt 2 ] || { [ $# -eq 3 ] && [ "$3" != --push ]; } || [ $# -gt 3 ]; then
+	echo "usage: $0 <release> <dir> [--push]" >&2
+	exit 2
+fi
+release=$1 dir=$2 push=${3:-}
+here=$(cd "$(dirname "$0")" && pwd)
+pkg=margin-bin
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+if [ -n "$push" ]; then
+	remote=ssh://aur@aur.archlinux.org/$pkg.git
+else
+	remote=https://aur.archlinux.org/$pkg.git
+fi
+# A package nobody has published yet clones as an empty repository, and has
+# no .SRCINFO.
+git -c init.defaultBranch=master -c advice.defaultBranchName=false \
+	clone -q "$remote" "$work/aur" 2>&1 | grep -v 'cloned an empty repository' >&2 || true
+test -d "$work/aur/.git"
+
+srcinfo() {
+	[ -f "$work/aur/.SRCINFO" ] || return 0
+	sed -n "s/^\t$1 = //p" "$work/aur/.SRCINFO" | head -n 1
+}
+cur_ver=$(srcinfo pkgver)
+cur_rel=$(srcinfo pkgrel)
+cur_sums="$(srcinfo sha256sums_x86_64) $(srcinfo sha256sums_aarch64)"
+
+sum() { sha256sum "$dir/$1" | cut -d' ' -f1; }
+l_amd64=$(sum margin-launcher_linux_amd64)
+s_amd64=$(sum margin_linux_amd64)
+l_arm64=$(sum margin-launcher_linux_arm64)
+s_arm64=$(sum margin_linux_arm64)
+
+render() {
+	sed -e "s/@PKGVER@/$1/" -e "s/@PKGREL@/$2/" \
+		-e "s/@SHA256_LAUNCHER_X86_64@/$l_amd64/" -e "s/@SHA256_SEED_X86_64@/$s_amd64/" \
+		-e "s/@SHA256_LAUNCHER_AARCH64@/$l_arm64/" -e "s/@SHA256_SEED_AARCH64@/$s_arm64/" \
+		"$here/PKGBUILD"
+}
+
+if [ -z "$cur_ver" ]; then
+	ver=$release rel=1 why="margin-bin's first version"
+elif [ "$l_amd64 $s_amd64 $l_arm64 $s_arm64" != "$cur_sums" ]; then
+	if [ "$release" = "$cur_ver" ]; then
+		ver=$cur_ver rel=$((cur_rel + 1)) why="the package's files for $release changed"
+	else
+		ver=$release rel=1 why="the files changed in margin $release"
+	fi
+elif render "$cur_ver" "$cur_rel" | cmp -s - "$work/aur/PKGBUILD"; then
+	echo "margin-bin $cur_ver-$cur_rel: margin $release has the same files; nothing to publish"
+	exit 0
+else
+	ver=$cur_ver rel=$((cur_rel + 1)) why="the PKGBUILD changed; the files are still $cur_ver's"
+fi
+
+render "$ver" "$rel" > "$work/aur/PKGBUILD"
+cd "$work/aur"
+makepkg --printsrcinfo > .SRCINFO
+
+# Build it as a user's makepkg would: fetched from the GitHub release, its
+# sha256 checked, packaged. Everything makepkg writes stays in $work.
+PKGDEST="$work/out" SRCDEST="$work/src" BUILDDIR="$work/build" \
+	makepkg --force --nodeps --noconfirm >"$work/makepkg.log" 2>&1 ||
+	{ cat "$work/makepkg.log" >&2; exit 1; }
+built=$(ls "$work/out"/*.pkg.tar.*)
+for f in usr/bin/margin usr/lib/margin/bin/margin; do
+	bsdtar -tf "$built" | grep -qx "$f" ||
+		{ echo "$built has no $f" >&2; exit 1; }
+done
+
+echo "margin-bin $ver-$rel: $why"
+git add --intent-to-add PKGBUILD .SRCINFO
+git --no-pager diff --stat
+if [ -z "$push" ]; then
+	git --no-pager diff
+	echo "(not pushed: run with --push to publish)"
+	exit 0
+fi
+git add PKGBUILD .SRCINFO
+git -c user.name="Anatoly Rugalev" -c user.email="anatoly.rugalev@gmail.com" \
+	commit -q -m "$ver-$rel: $why"
+git push -q origin HEAD:master
+echo "published https://aur.archlinux.org/packages/$pkg"

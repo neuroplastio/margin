@@ -8,7 +8,7 @@
 #     (D21). `make release` pushes one. The tag is the release's name, and
 #     it gets a GitHub release with the same files.
 #
-# Five jobs:
+# Six jobs:
 #
 #   • check — `make check`, with a real nvim so the composer tests run instead
 #     of skipping. On pull requests this is all that runs.
@@ -20,17 +20,20 @@
 #     the CDN, the way `margin update` will.
 #   • attach — on a tag, after publish: the build's signed manifest to the
 #     GitHub release.
+#   • aur — on a tag, after publish: margin-bin, the launcher and a seed
+#     build (D22), to the AUR.
 #
 # margin is a public repository, so every job runs on GitHub's hosted runners:
 # a self-hosted runner would run anyone's pull request on our machine.
 #
 # Builds are addressed by full commit. Nothing here creates a tag.
 #
-# There are no secrets. The publish job signs in to AWS with GitHub's OIDC
-# token, as a role that may write under margin/ in the bucket and sign with the
-# release key, and nothing else; it trusts main and YY.MM.DD tags
-# (neuroplastio/infra, release_tags). The role, bucket, key and distribution
-# are not secret, so they are written here, not kept in repository variables.
+# The one secret is AUR_SSH_PRIVATE_KEY, for the aur job. The publish job
+# signs in to AWS with GitHub's OIDC token, as a role that may write under
+# margin/ in the bucket and sign with the release key, and nothing else; it
+# trusts main and YY.MM.DD tags (neuroplastio/infra, release_tags). The role,
+# bucket, key and distribution are not secret, so they are written here, not
+# kept in repository variables.
 name: Release
 
 on:
@@ -322,3 +325,50 @@ jobs:
           build="$PKG_URL/margin/stable/builds/$GITHUB_SHA"
           curl -fsS -O "$build/manifest" -O "$build/manifest.sig"
           gh release upload "$GITHUB_REF_NAME" manifest manifest.sig --clobber
+
+  # The AUR package, margin-bin: the launcher plus a seed build (D22),
+  # rendered from the GitHub release's linux binaries, built with makepkg
+  # exactly as a user's would be, and pushed by packaging/aur/publish.sh.
+  # makepkg refuses to run as root and needs base-devel, so the job runs in an
+  # Arch container as a user of its own. The one credential is the
+  # AUR_SSH_PRIVATE_KEY secret; without it the job says so and skips rather
+  # than failing a release that is already out.
+  aur:
+    name: publish margin-bin to the AUR
+    if: ${{ github.ref_type == 'tag' }}
+    needs: publish
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed git openssh curl libarchive zstd
+
+      - name: Publish
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          RELEASE: ${{ github.ref_name }}
+        run: |
+          set -eu
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
+            echo "::notice::AUR_SSH_PRIVATE_KEY is not set; skipping the AUR publish"
+            exit 0
+          fi
+          dir=/tmp/release
+          mkdir -p "$dir"
+          for f in margin-launcher_linux_amd64 margin-launcher_linux_arm64 \
+                   margin_linux_amd64 margin_linux_arm64; do
+            curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE/$f" -o "$dir/$f"
+          done
+
+          id -u builder >/dev/null 2>&1 || useradd -m builder
+          install -d -m700 -o builder -g builder /home/builder/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > /home/builder/.ssh/aur
+          chmod 600 /home/builder/.ssh/aur
+          ssh-keyscan -t ed25519 aur.archlinux.org > /home/builder/.ssh/known_hosts 2>/dev/null
+          chown -R builder:builder /home/builder/.ssh "$dir"
+
+          su builder -s /bin/sh -c "cd '$GITHUB_WORKSPACE' && \
+            GIT_SSH_COMMAND='ssh -i /home/builder/.ssh/aur -o IdentitiesOnly=yes -o UserKnownHostsFile=/home/builder/.ssh/known_hosts' \
+            packaging/aur/publish.sh '$RELEASE' '$dir' --push"

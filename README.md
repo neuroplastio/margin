@@ -221,8 +221,39 @@ release key:
 - **`dev`** — every push to `main` that passes `make check`
   (`26.10.03-dev.5fbd3da`).
 
-Fetch the newest release, check it against that key, and put it on your
-`PATH` (for `dev`, change `stable` in the second line):
+The quickest way in, with no root and no package manager:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/neuroplastio/margin/main/install.sh | sh
+```
+
+It checks the newest release's signed manifest against the release key pinned
+in the script, puts the launcher at `~/.local/bin/margin`, and seeds a complete
+margin in `~/.local/margin`, so the first run needs no network.
+`MARGIN_CHANNEL=dev`, `MARGIN_BINDIR`, `MARGIN_COMMIT` and `MARGIN_FORCE=1`
+(replace a build already in `~/.local/margin`) are read from the environment.
+It needs only `curl`, `ssh-keygen` and `sha256sum` (or `shasum`).
+
+On Arch Linux, `margin-bin` from the AUR, which each release publishes (see
+Releasing):
+
+```sh
+yay -S margin-bin      # or any AUR helper, or makepkg -si in a clone of aur.archlinux.org/margin-bin.git
+```
+
+Both install the same two things: the **launcher** as `margin`, a thin binary
+that runs the margin in `~/.local/margin`, and a complete margin as its
+**seed** — in `~/.local/margin` for the script, in `/usr/lib/margin` for the
+package — so a fresh install runs offline and a channel outage stops only
+updating. `margin update` installs newer builds into `~/.local/margin`, which
+the launcher prefers from then on; it never writes a file the package owns.
+`margin --launcher-version` names the launcher, `margin --version` the build
+running. `ENLAUNCH_FETCH=1 margin` fetches the channel's newest again,
+whatever is installed.
+
+Or, by hand, the complete binary alone — fetch the newest release, check it
+against that key, and put it on your `PATH` (for `dev`, change `stable` in the
+second line):
 
 ```sh
 f=margin_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
@@ -247,18 +278,12 @@ margin update 0d7c52f    # a particular build, older ones included, while the ch
 margin --version         # 26.10.03 for a release, 26.10.02-dev.0d7c52f for a dev build, the short commit for your own
 ```
 
-`margin update` replaces the file you ran (through any symlink), so install it
-somewhere you can write, such as `~/.local/bin`. A margin you built yourself
-updates to the dev channel's newest build, and says so. To move between
-channels, install from the other one as above. Releases stay on `stable` for
-good; a `dev` build stays for 30 days after a newer one replaces it.
-
-A package can install `margin-launcher` as `margin` instead, from either
-channel: a thin binary that runs the margin in `~/.local/margin`, fetching
-the newest from its channel there, checked against the same key, the first
-time it starts. `margin update` then installs into `~/.local/margin` rather
-than replacing a file the package owns. `ENLAUNCH_FETCH=1 margin` fetches
-the newest again, whatever is installed.
+A margin installed by hand replaces the file you ran (through any symlink), so
+install it somewhere you can write, such as `~/.local/bin`. A margin you built
+yourself updates to the dev channel's newest build, and says so. To move
+between channels, install from the other one as above. Releases stay on
+`stable` for good; a `dev` build stays for 30 days after a newer one replaces
+it.
 
 With a Go toolchain you can also build it yourself:
 
@@ -311,8 +336,13 @@ The tag is the whole act. The release workflow builds the tagged commit,
 named after the tag and stamped with the `stable` channel; makes the GitHub
 release with its binaries and the changes since the previous release; then
 publishes the same files to `pkg.neuroplast.io/margin/stable`, reads them back
-against the release key, and attaches the signed manifest to the GitHub
-release. A tag that is not a day, not on `main`, or on a commit already
+against the release key, attaches the signed manifest to the GitHub
+release, and publishes `margin-bin` to the AUR from the release's linux
+files, built with `makepkg` first. The AUR step needs the
+`AUR_SSH_PRIVATE_KEY` repository secret, a key of the AUR account that owns
+`margin-bin`, and skips without it; by hand, on Arch,
+`packaging/aur/publish.sh <tag> <dir with the four linux files> [--push]`
+does the same. A tag that is not a day, not on `main`, or on a commit already
 released is refused before anything is published.
 
 **Replacing a release.** A release that has to be withdrawn is replaced under

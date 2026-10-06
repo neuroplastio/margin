@@ -52,13 +52,25 @@ func Commit(c byte) string { return strings.Repeat(string(c), 40) }
 // release workflow does: a bare file named margin_<os>_<arch>.
 func (c *Channel) Publish(t testing.TB, commit, version string, binary []byte) {
 	t.Helper()
-	local := filepath.Join(t.TempDir(), "margin_"+runtime.GOOS+"_"+runtime.GOARCH)
-	if err := os.WriteFile(local, binary, 0o755); err != nil {
-		t.Fatal(err)
+	c.PublishAll(t, commit, version, map[string][]byte{"margin": binary})
+}
+
+// PublishAll puts one build of several artifacts on the channel, each as this
+// platform's <name>_<os>_<arch>: margin and margin-launcher, as a release
+// publishes them.
+func (c *Channel) PublishAll(t testing.TB, commit, version string, binaries map[string][]byte) {
+	t.Helper()
+	dir := t.TempDir()
+	var up []engram.Upload
+	for name, binary := range binaries {
+		local := filepath.Join(dir, name+"_"+runtime.GOOS+"_"+runtime.GOARCH)
+		if err := os.WriteFile(local, binary, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		up = append(up, engram.Upload{Name: name, OS: runtime.GOOS, Arch: runtime.GOARCH, Local: local})
 	}
 	c.when = c.when.Add(time.Hour)
 	b := engram.Build{Commit: commit, Version: version, Time: c.when, MinEnboot: 1}
-	up := []engram.Upload{{Name: "margin", OS: runtime.GOOS, Arch: runtime.GOARCH, Local: local}}
 	if _, err := c.Pub.Publish(context.Background(), b, up); err != nil {
 		t.Fatal(err)
 	}

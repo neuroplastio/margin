@@ -575,3 +575,47 @@ releases" for releases; the dev channel is unchanged.
   role main-only and having the tag's run dispatch a publish on main (two
   runs for one release, and a trust rule the tag routes around anyway);
   `margin update --channel`.
+
+**D22 — Every install ships a seed beside the launcher: an install script
+and the AUR package.** Maintainer direction (2026-10-06): port kubecom's
+approach (its D295–D297) — "a seed binary that's shipped with the release
+package along with the launcher + bash script that downloads the launcher".
+Extends D20, whose launcher is unchanged in what it does.
+
+- **A launcher alone makes every install depend on the channel**: with
+  `~/.local/margin` empty and pkg.neuroplast.io down, there is nothing to
+  run. So whatever installs the launcher also installs a complete margin
+  as its **seed**, and the launcher runs it while the home has no build.
+  The channel being down then stops only updating.
+- **`install.sh`**, at the repository root, is the no-root path: it reads
+  the channel's head, checks the signed manifest against the release key
+  pinned in the script (`ssh-keygen -Y verify`) and both files against
+  their sha256, then puts `margin-launcher` at `~/.local/bin/margin` and
+  lays the seed out in `~/.local/margin` as enlaunch lays out a build
+  (`builds/<commit>/margin`, `bin` → `builds/<commit>`). A home already
+  holding a build is kept unless `MARGIN_FORCE` is set. Defaults to
+  `stable`; channel, commit, bin directory, server and key are read from
+  `MARGIN_*` so a test or a mirror can point it elsewhere — the key is
+  pinned by default, and the binaries it installs pin theirs regardless.
+  curl, ssh-keygen and sha256sum/shasum only.
+- **`margin-bin` on the AUR** carries the launcher as `/usr/bin/margin`
+  and the seed at `/usr/lib/margin/bin/margin` (enlaunch's default
+  `Seed`). `pkgver` is the release both come from, the floor a user runs
+  out of the box; `margin update` is the ceiling. It depends on `neovim`
+  (the composer). The PKGBUILD is a template in `packaging/aur/`, rendered
+  and built with `makepkg` against the GitHub release before anything is
+  pushed, by `packaging/aur/publish.sh`.
+- **The AUR publish is a job of the release workflow**, on a tag after
+  publish, in `archlinux:base-devel` as a non-root user (makepkg refuses
+  root). Its one credential is the `AUR_SSH_PRIVATE_KEY` repository secret;
+  without it the job skips with a notice rather than failing a release
+  already out.
+- **The launcher is stamped like the release it ships with** (it always
+  was: `make dist` builds both with one set of ldflags), and now says so:
+  `margin --launcher-version` is answered by the launcher, `margin
+  --version` after the hand-over by the build running.
+- **Rejected.** A launcher-only package filled at install time with
+  `ENLAUNCH_PRELOAD` (the install would need the channel, and an AUR
+  build's sha256s cannot name bytes fetched at build time); engram's
+  generic `install.sh` (it installs one artifact from a tarball, and knows
+  nothing of a launcher's home).

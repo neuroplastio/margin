@@ -1,0 +1,42 @@
+# Maintainer: Anatoly Rugalev <anatoly.rugalev@gmail.com>
+#
+# Rendered by margin's packaging/aur/publish.sh from packaging/aur/PKGBUILD in
+# github.com/neuroplastio/margin; change it there.
+#
+# The package carries two files (D22): margin-launcher, installed as
+# /usr/bin/margin, and a complete margin as its seed at
+# /usr/lib/margin/bin/margin. The launcher runs the seed while ~/.local/margin
+# has no build, so a fresh install works with no network and does not depend
+# on the channel being up; `margin update` installs newer builds into
+# ~/.local/margin, which the launcher prefers from then on. pkgver is the
+# release both files come from.
+pkgname=margin-bin
+_pkgname=margin
+pkgver=@PKGVER@
+pkgrel=@PKGREL@
+pkgdesc="Review markdown in the terminal: comments anchored to blocks, composed in nvim (a launcher plus a seed build; margin updates itself in ~/.local/margin)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/neuroplastio/margin"
+license=('Apache-2.0')
+# The composer is a real nvim.
+depends=('neovim')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+# Static Go binaries, stripped when they were built: no debug package, and
+# nothing for strip to change about the bytes the sha256s below name.
+options=('!strip' '!debug')
+
+_release="https://github.com/neuroplastio/margin/releases/download/${pkgver}"
+source_x86_64=("margin-launcher-${pkgver}-x86_64::${_release}/margin-launcher_linux_amd64"
+               "margin-${pkgver}-x86_64::${_release}/margin_linux_amd64")
+source_aarch64=("margin-launcher-${pkgver}-aarch64::${_release}/margin-launcher_linux_arm64"
+                "margin-${pkgver}-aarch64::${_release}/margin_linux_arm64")
+sha256sums_x86_64=('@SHA256_LAUNCHER_X86_64@' '@SHA256_SEED_X86_64@')
+sha256sums_aarch64=('@SHA256_LAUNCHER_AARCH64@' '@SHA256_SEED_AARCH64@')
+
+package() {
+  install -Dm755 "margin-launcher-${pkgver}-${CARCH}" "$pkgdir/usr/bin/$_pkgname"
+  # The seed: enlaunch's default Seed is /usr/lib/<project>, and its bin/<name>
+  # is what the launcher runs while the user's home has no build.
+  install -Dm755 "margin-${pkgver}-${CARCH}" "$pkgdir/usr/lib/$_pkgname/bin/$_pkgname"
+}

@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-10-03 (stable channel, D21)
+Last updated: 2026-10-06 (install.sh and margin-bin, D22)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (install.sh, margin-bin) `curl -fsSL https://raw.githubusercontent.com/neuroplastio/margin/main/install.sh | sh`
+  on a fresh account: the launcher in `~/.local/bin`, margin seeded in
+  `~/.local/margin`, runs offline; then set `AUR_SSH_PRIVATE_KEY` and cut a
+  release — whether `margin-bin` lands on the AUR and `yay -S margin-bin`
+  runs from `/usr/lib/margin` with no home build — journal 2026-10-06.1
 - (mermaid as SVG) on a HOTTY host a mermaid fence is its diagram as SVG
   (D19), in cells for the ~2.5 s the renderer compiles on first use, then
   in place; `testdata/demo/demo.md`'s three diagrams — whether they read at
