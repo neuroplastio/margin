@@ -1,0 +1,40 @@
+# The Homebrew formula's proof, outside a release: when the formula, its
+# scripts or this workflow change, render it for the newest stable release and
+# audit and install it with a real brew on macOS and Linux. A release runs the
+# same check (release.yml) before it pushes to the tap; this one never pushes.
+name: Homebrew
+
+on:
+  pull_request:
+    paths: ['packaging/homebrew/**', '.github/workflows/homebrew.yml']
+  push:
+    branches: [main, homebrew-proof]
+    paths: ['packaging/homebrew/**', '.github/workflows/homebrew.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Homebrew formula (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Put Homebrew on PATH
+        if: ${{ runner.os == 'Linux' }}
+        run: echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+
+      - name: Check the newest stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)"
+          packaging/homebrew/check.sh "$release"

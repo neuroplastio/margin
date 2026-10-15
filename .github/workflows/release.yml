@@ -8,7 +8,7 @@
 #     (D21). `make release` pushes one. The tag is the release's name, and
 #     it gets a GitHub release with the same files.
 #
-# Five jobs:
+# Seven jobs:
 #
 #   • check — `make check`, with a real nvim so the composer tests run instead
 #     of skipping. On pull requests this is all that runs.
@@ -20,6 +20,10 @@
 #     the CDN, the way `margin update` will.
 #   • attach — on a tag, after publish: the build's signed manifest to the
 #     GitHub release.
+#   • homebrew-check, homebrew — on a tag, after attach: the Homebrew formula
+#     rendered from the release's files is audited and installed on macOS and
+#     Linux (packaging/homebrew/check.sh), and only then pushed to the org tap
+#     `neuroplastio/homebrew-tap` with margin's deploy key.
 #
 # margin is a public repository, so every job runs on GitHub's hosted runners:
 # a self-hosted runner would run anyone's pull request on our machine.
@@ -326,3 +330,51 @@ jobs:
           build="$PKG_URL/margin/stable/builds/$GITHUB_SHA"
           curl -fsS -O "$build/manifest" -O "$build/manifest.sig"
           gh release upload "$GITHUB_REF_NAME" manifest manifest.sig --clobber
+
+  # The Homebrew formula, proved before it is pushed: rendered from the
+  # release's files, then audited and installed with a real brew on both
+  # platforms the formula serves. Hosted runners, since margin is public.
+  homebrew-check:
+    name: Homebrew formula (${{ matrix.os }})
+    if: ${{ github.ref_type == 'tag' }}
+    needs: attach
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # All tags, so the release tag resolves to its commit.
+          fetch-depth: 0
+
+      - name: Put Homebrew on PATH
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          # Preinstalled on ubuntu runners; make it visible.
+          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+
+      - run: packaging/homebrew/check.sh "$GITHUB_REF_NAME"
+
+  homebrew:
+    name: push the Homebrew formula
+    if: ${{ github.ref_type == 'tag' }}
+    needs: homebrew-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # HOMEBREW_TAP_DEPLOY_KEY is the private half of margin's deploy key on
+      # the tap. Without it the job skips, as hottyterm's does.
+      - name: Publish
+        env:
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_DEPLOY_KEY:-}" ]; then
+            echo "::notice::HOMEBREW_TAP_DEPLOY_KEY is not set; skipping the Homebrew publish"
+            exit 0
+          fi
+          packaging/homebrew/publish.sh "$GITHUB_REF_NAME" --push

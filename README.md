@@ -253,6 +253,16 @@ updates to the dev channel's newest build, and says so. To move between
 channels, install from the other one as above. Releases stay on `stable` for
 good; a `dev` build stays for 30 days after a newer one replaces it.
 
+On macOS and Linux with Homebrew:
+
+```
+brew install neuroplastio/tap/margin
+```
+
+The formula installs the launcher with the stable release it was cut from, so
+margin runs offline from the first start, and `margin update` moves it forward
+from there.
+
 A package can install `margin-launcher` as `margin` instead, from either
 channel: a thin binary that runs the margin in `~/.local/margin`, fetching
 the newest from its channel there, checked against the same key, the first
