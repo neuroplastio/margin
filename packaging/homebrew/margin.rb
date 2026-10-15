@@ -9,7 +9,6 @@
 class Margin < Formula
   desc "Terminal tool for reviewing markdown and handing the comments back to an agent"
   homepage "https://github.com/neuroplastio/margin"
-  version "@VERSION@"
   license "Apache-2.0"
 
   if OS.mac? && Hardware::CPU.arm?
