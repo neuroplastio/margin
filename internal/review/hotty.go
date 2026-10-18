@@ -107,18 +107,20 @@ type hotBlock struct {
 type hotPane struct {
 	p    *pane
 	rect hottytea.Rect
+	clip hottytea.Rect // what of the screen the pane may show in
 }
 
 // hotPaneName is a pane's surface's name on the host.
 func hotPaneName(p *pane) string { return "margin-" + p.id }
 
-// place puts a pane at r for this frame, if surfaces are in use, and
-// reports whether it did: then its cells are the host's.
-func (h *hotState) place(p *pane, r hottytea.Rect) bool {
+// place puts a pane at r for this frame, shown only inside clip, if
+// surfaces are in use, and reports whether it did: then its cells are the
+// host's.
+func (h *hotState) place(p *pane, r, clip hottytea.Rect) bool {
 	if !h.native() || h.deaf {
 		return false
 	}
-	h.panes = append(h.panes, hotPane{p, r})
+	h.panes = append(h.panes, hotPane{p, r, clip})
 	return true
 }
 
@@ -453,7 +455,7 @@ func (m *model) hotPaneSurfaces() []hottytea.Surface {
 	var out []hottytea.Surface
 	for _, hp := range m.hot.panes {
 		s := hp.p.surface(hotPaneName(hp.p), hp.rect)
-		clip := hottytea.Rect{X: 0, Y: 0, W: m.w, H: m.hot.col.H}
+		clip := hp.clip
 		s.Clip = &clip
 		out = append(out, s)
 	}
@@ -484,6 +486,9 @@ func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
 			p.focus(p.c.FindComponent("field", rootScope))
 		}
 		return m.composerActs()
+	}
+	if p.id == paletteID && m.paletteOpen {
+		m.paletteQueried(p.text("/query"))
 	}
 	return nil
 }

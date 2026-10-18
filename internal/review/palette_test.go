@@ -408,7 +408,13 @@ func TestRenderPaletteShowsKeyBindings(t *testing.T) {
 	m := newTestModel(t)
 	out := m.renderPalette(80)
 	plain := ansiRe.ReplaceAllString(out, "")
+	seen := 0
 	for _, row := range strings.Split(plain, "\n") {
+		// The table's scrollbar may sit past the binding.
+		row = strings.TrimRight(strings.TrimSpace(row), " ┃│▐█")
+		if strings.HasPrefix(row, "move.down") || strings.HasPrefix(row, "app.quit") {
+			seen++
+		}
 		if strings.HasPrefix(row, "move.down") {
 			if !strings.HasSuffix(strings.TrimRight(row, " "), "j") {
 				t.Errorf("move.down row %q does not end with its binding 'j'", row)
@@ -419,6 +425,9 @@ func TestRenderPaletteShowsKeyBindings(t *testing.T) {
 				t.Errorf("app.quit row %q does not end with its binding 'q'", row)
 			}
 		}
+	}
+	if seen == 0 {
+		t.Errorf("no move.down or app.quit row in the palette:\n%s", plain)
 	}
 }
 
@@ -443,3 +452,30 @@ func TestRenderPaletteValueRowsCarryNoBinding(t *testing.T) {
 	}
 }
 
+
+// TestPaletteQueryIsAField: the query is typed in the palette's field, which
+// edits it as a field does — the cursor moves, and a key deletes where it is.
+func TestPaletteQueryIsAField(t *testing.T) {
+	m := newTestModel(t)
+	press(m, tea.Key{Code: ':', Text: ":"})
+	typeText(m, "rwa")
+	press(m, tea.Key{Code: tea.KeyLeft}, tea.Key{Code: tea.KeyLeft}, keyBackspace) // "wa"
+	typeText(m, "a")                                                               // "awa"
+	press(m, tea.Key{Code: tea.KeyEnd})
+	press(m, keyBackspace, keyBackspace) // "a"
+	typeText(m, "")
+	if m.paletteQuery != "a" {
+		t.Fatalf("query = %q after editing, want %q", m.paletteQuery, "a")
+	}
+	press(m, keyBackspace, keyBackspace) // empties it, then closes
+	if m.paletteOpen {
+		t.Fatal("backspace on an empty query left the palette open")
+	}
+
+	press(m, tea.Key{Code: ':', Text: ":"})
+	typeText(m, "quit")
+	press(m, keyEnter)
+	if !m.quitting || m.paletteOpen {
+		t.Fatalf("enter on app.quit: quitting = %v, palette open = %v; want the command run and the palette closed", m.quitting, m.paletteOpen)
+	}
+}

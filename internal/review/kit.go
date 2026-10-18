@@ -206,6 +206,16 @@ func (p *pane) set(path string, v any) {
 	p.dirty = true
 }
 
+// put writes a value to the pane's data model when it is not what the
+// model holds: a pane margin syncs every frame rebuilds only on a change.
+func (p *pane) put(path string, v any) {
+	have, _ := json.Marshal(p.s.Data.Value(path))
+	want, _ := json.Marshal(v)
+	if string(have) != string(want) {
+		p.set(path, v)
+	}
+}
+
 // text is a string in the pane's data model, "" when it holds none.
 func (p *pane) text(path string) string {
 	s, _ := p.s.Data.Value(path).(string)

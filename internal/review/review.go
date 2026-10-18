@@ -1952,8 +1952,7 @@ func (m *model) flushPendingKey() tea.Cmd {
 func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "esc", "ctrl+c":
-		m.paletteOpen = false
-		m.paletteQuery = ""
+		m.closePalette()
 		return nil
 	case "enter":
 		rows := paletteRows(m, commands, m.paletteQuery)
@@ -1961,17 +1960,18 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 			cmd := rows[m.paletteSelected].Command
 			if rows[m.paletteSelected].IsValue {
 				val := rows[m.paletteSelected].Value
-				m.paletteOpen = false
-				m.paletteQuery = ""
+				m.closePalette()
 				return cmd.Run(m, val)
 			}
 			if cmd.Values != nil {
+				// A fresh field for the staged seed: on a host the field
+				// keeps what was typed in it until it loses the keyboard.
+				m.dropPane(paletteID)
 				m.paletteQuery = cmd.ID + " "
 				m.paletteSelected = 0
 				return nil
 			}
-			m.paletteOpen = false
-			m.paletteQuery = ""
+			m.closePalette()
 			return cmd.Run(m, "")
 		}
 		return nil
@@ -2000,23 +2000,18 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 		// Characters actually typed still delete one by one.
 		for _, c := range commands {
 			if c.Values != nil && m.paletteQuery == c.ID+" " {
-				m.paletteOpen = false
-				m.paletteQuery = ""
+				m.closePalette()
 				return nil
 			}
 		}
 		if m.paletteQuery == "" {
-			m.paletteOpen = false
+			m.closePalette()
 			return nil
 		}
-		m.paletteQuery = m.paletteQuery[:len(m.paletteQuery)-1]
-		m.paletteSelected = 0
+		m.paletteTyped(msg.Key())
 		return nil
 	default:
-		if len(msg.String()) == 1 {
-			m.paletteQuery += msg.String()
-			m.paletteSelected = 0
-		}
+		m.paletteTyped(msg.Key())
 		return nil
 	}
 }
@@ -3129,7 +3124,10 @@ func (m *model) view() tea.View {
 
 	var b strings.Builder
 	b.WriteString(strings.Join(visible, "\n"))
-	b.WriteString("\n\n ")
+	b.WriteString("\n\n")
+	if m.comp != nil || !m.paletteOpen {
+		b.WriteString(" ")
+	}
 	if m.comp != nil {
 		what := "new comment"
 		if m.comp.target != newCommentSlot {
@@ -3138,7 +3136,12 @@ func (m *model) view() tea.View {
 		b.WriteString(authorStyle.Render(what) + dimStyle.Render(
 			"  ·  ctrl+s submit · esc keep draft · ctrl+g discard · click away to keep"))
 	} else if m.paletteOpen {
-		b.WriteString(paletteBox)
+		at := hottytea.Rect{X: 0, Y: viewport + 1, W: m.w, H: paletteHeight}
+		if m.hot != nil && m.hot.place(m.palettePane(), at, hottytea.Rect{W: m.w, H: m.h}) {
+			b.WriteString(strings.Repeat("\n", paletteHeight-1))
+		} else {
+			b.WriteString(paletteBox)
+		}
 	} else if m.searchOpen {
 		b.WriteString(searchBox)
 	} else if m.inbox {
@@ -3208,7 +3211,8 @@ func (m *model) view() tea.View {
 	if m.comp != nil && m.paneTop >= 0 && m.hot != nil {
 		// On a host the composer is a surface, the field's caret the host's.
 		top := m.paneTop - m.scroll
-		if m.hot.place(m.comp.p, hottytea.Rect{X: m.docX() + gutterW + borderW, Y: top, W: m.paneW, H: m.paneH}) {
+		at := hottytea.Rect{X: m.docX() + gutterW + borderW, Y: top, W: m.paneW, H: m.paneH}
+		if m.hot.place(m.comp.p, at, hottytea.Rect{W: m.w, H: viewport}) {
 			return v
 		}
 	}
@@ -4238,47 +4242,3 @@ func runModel(m *model, opts RunOptions) error {
 	return nil
 }
 
-func (m *model) renderPalette(w int) string {
-	rows := paletteRows(m, commands, m.paletteQuery)
-
-	if m.paletteSelected >= len(rows) {
-		m.paletteSelected = max(0, len(rows)-1)
-	}
-	if m.paletteSelected < 0 {
-		m.paletteSelected = 0
-	}
-
-	var b strings.Builder
-	b.WriteString(dimStyle.Render(strings.Repeat("─", w)) + "\n")
-
-	showCount := 7
-	start := 0
-	if m.paletteSelected >= showCount {
-		start = m.paletteSelected - showCount + 1
-	}
-	end := start + showCount
-	if end > len(rows) {
-		end = len(rows)
-	}
-
-	for i := start; i < end; i++ {
-		row := rows[i]
-		cursor := "  "
-		style := dimStyle
-		if i == m.paletteSelected {
-			cursor = focusStyle.Render("▌ ")
-			style = textStyle
-		}
-		label := cursor + style.Render(row.Command.ID) + dimStyle.Render(" — "+row.Title)
-		if binding := firstBinding(row.Command.ID); binding != "" && !row.IsValue {
-			gutter := 2
-			pad := max(w-lipgloss.Width(label)-lipgloss.Width(binding)-gutter, 1)
-			label += strings.Repeat(" ", pad) + dimStyle.Render(binding)
-		}
-		b.WriteString(label + "\n")
-	}
-
-	b.WriteString(focusStyle.Render(":") + m.paletteQuery + focusStyle.Render("█"))
-
-	return lipgloss.NewStyle().Width(w).Render(b.String())
-}

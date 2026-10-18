@@ -46,10 +46,11 @@ func open(t *testing.T, m *model, anchor string, target int, expect string) {
 // composed is what the composer's field holds.
 func composed(m *model) string { return m.comp.p.text("/text") }
 
-// press gives the review keys, as the reviewer types them.
+// press gives the review keys, as the reviewer types them: through update,
+// which routes them to whatever has the keyboard.
 func press(m *model, keys ...tea.Key) {
 	for _, k := range keys {
-		m.handleKey(tea.KeyPressMsg(k))
+		m.update(tea.KeyPressMsg(k))
 	}
 }
 

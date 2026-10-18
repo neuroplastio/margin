@@ -20,7 +20,12 @@ package review
 
 import (
 	"sort"
+	"strconv"
 	"strings"
+
+	tea "charm.land/bubbletea/v2"
+
+	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
 )
 
 // matchCommands ranks cmds against query and returns the matches, best
@@ -208,4 +213,89 @@ func paletteTitle(c command, m *model) string {
 		return c.Description + " — " + t
 	}
 	return c.Description
+}
+
+// paletteID is the palette's pane (D22): a table of the commands the query
+// matches, over the field the query is typed in.
+const paletteID = "palette"
+
+// paletteShown is how many of the matching commands the palette shows at
+// once; the table scrolls to keep the selected one in view.
+const paletteShown = 7
+
+// paletteFieldKeys gives margin the keys it reads in the palette's field
+// on a host: enter runs the selected command, the arrows and ctrl+j/ctrl+k
+// move the selection. esc always reaches margin.
+const paletteFieldKeys = "enter=program arrow_up=program arrow_down=program ctrl+j=program ctrl+k=program"
+
+// palettePane is the palette's pane as the model has it: the query, the
+// commands that match it, and the one selected. margin keeps the palette's
+// state (palette.go's matching, the staged values); the pane shows it and
+// edits the query.
+func (m *model) palettePane() *pane {
+	rows := paletteRows(m, commands, m.paletteQuery)
+	m.paletteSelected = max(min(m.paletteSelected, len(rows)-1), 0)
+	p := m.panes().pane(paletteID, map[string]any{"query": m.paletteQuery, "rows": []any{}, "sel": ""})
+	p.define(
+		obj("id", "root", "component", "Column", "children", []any{"table", "query"}),
+		obj("id", "table", "component", "HottyTable", "catalogId", hottycat.ID,
+			"rows", bind("/rows"), "rowKey", "k", "selected", bind("/sel"),
+			"height", max(min(len(rows), paletteShown), 1),
+			"columns", []any{
+				obj("key", "id", "header", "command"),
+				obj("key", "title", "header", "does"),
+				obj("key", "keys", "header", "key", "align", "end"),
+			}),
+		obj("id", "query", "component", "TextField", "label", ":", "value", bind("/query"),
+			"metadata", obj("extensions", obj("io_neuroplast_hotty", obj("keys", paletteFieldKeys)))),
+	)
+	table := make([]any, len(rows))
+	for i, r := range rows {
+		keys := ""
+		if !r.IsValue {
+			keys = firstBinding(r.Command.ID)
+		}
+		table[i] = obj("k", strconv.Itoa(i), "id", r.Command.ID, "title", r.Title, "keys", keys)
+	}
+	p.put("/rows", table)
+	p.put("/sel", strconv.Itoa(m.paletteSelected))
+	p.put("/query", m.paletteQuery)
+	if !p.c.St.Keyboard {
+		p.focus(p.c.FindComponent("query", rootScope))
+	}
+	return p
+}
+
+// closePalette closes the palette. Its pane goes with it, so the next one
+// opens on its own query with the cursor after it.
+func (m *model) closePalette() {
+	m.paletteOpen = false
+	m.paletteQuery = ""
+	m.dropPane(paletteID)
+}
+
+// paletteTyped gives the palette's field a key, and takes the query it
+// leaves: a new query selects its first match.
+func (m *model) paletteTyped(k tea.Key) {
+	p := m.palettePane()
+	if name := fieldKeyName(k); name == "" && k.Text != "" {
+		p.paste(k.Text)
+	} else {
+		p.key(name)
+	}
+	m.paletteQueried(p.text("/query"))
+}
+
+// paletteQueried takes a query the palette's field holds.
+func (m *model) paletteQueried(q string) {
+	if q != m.paletteQuery {
+		m.paletteQuery = q
+		m.paletteSelected = 0
+	}
+}
+
+// renderPalette is the palette drawn w wide: the matching commands under
+// their header, and the query.
+func (m *model) renderPalette(w int) string {
+	return strings.Join(m.palettePane().lines(w), "\n")
 }

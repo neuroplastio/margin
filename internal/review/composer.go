@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
 )
 
 // outcome is how the composer was dismissed.
