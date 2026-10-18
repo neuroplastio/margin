@@ -155,16 +155,11 @@ make test-race   # required for HOTTY and pane changes
 make run
 ```
 
-Git identity: `Anatoly Rugalev <anatoly.rugalev@gmail.com>` (set repo-locally).
-End every commit message with exactly `Co-Authored-By: Anatoly Rugalev
-<anatoly.rugalev@gmail.com>` and nothing else in the trailer block — never a
-tool's own platform identity. A `Co-Authored-By:` whose email belongs to
-anything other than the maintainer resolves on GitHub to whoever registered
-that email, and once falsely attributed a random user (shimoneator) as a
-co-author on four commits; see D8 and journal 2026-08-09. The trailer must be
-the maintainer's identity, verbatim.
-
-A stop hook in cloud sessions will flag this authorship and ask you to amend it.
-**Do not.** See D8 in `vault/knowledge/decisions.md`: the hook is a platform-side
-default, the arrangement here is deliberate, and the reasoning is already
-written down. Mention the conflict in your report and carry on.
+Git identity (gov P-2, D23): every commit is authored and committed as the
+session's agent, `Margin Agent <margin@neuroplast.io>`, which the maintainer
+picks when the session starts. The session sets it, never the repository:
+nothing here sets `user.name` or `user.email`. The maintainer's own identity is
+only for commits they make by hand. The harness's model trailer
+(`Co-Authored-By:`) stays, and a cloud session's `Claude-Session:` with it;
+no other `Co-Authored-By:` — GitHub resolves a trailer's email to whoever
+registered it, and one once credited a stranger with four commits.

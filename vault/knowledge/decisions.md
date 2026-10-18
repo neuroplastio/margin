@@ -47,6 +47,7 @@ Every ambiguous dismissal keeps the text. Discarding is always explicit. When in
 doubt about an edge case, keep.
 
 **D8 — Commits are authored by the maintainer; the agent is disclosed in trailers.**
+*Superseded by D23 (gov P-2): commits are the session's agent's.*
 `Author:` is `Anatoly Rugalev <anatoly.rugalev@gmail.com>` on every commit,
 including those an unsupervised run produces. Agent involvement is disclosed with
 `Co-Authored-By:`, and an autonomous run additionally carries
@@ -635,3 +636,27 @@ cells on any other terminal, from the same state.
   editor — is met by the kit's field); HottyList for the palette and the
   threads view (three rows an item), and for a thread's comments (it cuts a
   description to one line).
+
+**D23 — Commits are the session's agent's: `Margin Agent
+<margin@neuroplast.io>`. Supersedes D8.** gov P-2 (agent identities) binds
+every repository: an agent's commit is authored and committed under the
+agent's own identity, which the maintainer picks when the session starts and
+the session keeps in every repository it commits to. margin's agent is
+`Margin Agent` (gov `agents/margin.md`).
+
+- **The session sets it, the repository never.** gov's agent-id plugin sets
+  `GIT_AUTHOR_*` and `GIT_COMMITTER_*`; where it doesn't run (a cloud
+  session), the session's own git configuration does. No repository sets
+  `user.name` or `user.email`, or every commit in it would be labelled by the
+  repository.
+- **Trailers.** The harness's model trailer (`Co-Authored-By:`) stays — the
+  identity says which agent, the trailer which model — and a cloud session's
+  `Claude-Session:` with it. No other `Co-Authored-By:`: GitHub resolves a
+  trailer's email to whoever registered it, and on 2026-08-09 one credited a
+  stranger (shimoneator) with four commits (D8's lesson, kept).
+- **The maintainer's identity** is only for commits they make by hand.
+  Commits before 2026-10-05 stay under it, and history is not rewritten to
+  change them (gov P-1, rule 8).
+- **Rejected.** D8's maintainer-as-author with the agent in a trailer: `git
+  log`, `git blame` and GitHub show the author, and a trailer only shows to
+  someone reading the message (P-2).

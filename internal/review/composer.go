@@ -18,17 +18,6 @@ const (
 	outcomeDiscard                // throw it away
 )
 
-func (o outcome) String() string {
-	switch o {
-	case outcomeSubmit:
-		return "submitted"
-	case outcomeDraft:
-		return "kept as draft"
-	default:
-		return "discarded"
-	}
-}
-
 // composerID is the composer's pane: there is one composer at a time.
 const composerID = "composer"
 

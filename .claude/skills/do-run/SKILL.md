@@ -31,9 +31,10 @@ a tree that is not green. Everything else, keep going.
 
 ```bash
 git checkout main && git pull --rebase origin main
-git config user.name "Anatoly Rugalev"
-git config user.email "anatoly.rugalev@gmail.com"
 ```
+
+The session commits as its agent, `Margin Agent` (gov P-2, D23); the legs'
+subagents inherit it. Never set `user.name` or `user.email` in the repository.
 
 ### 2. Loop
 
