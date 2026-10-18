@@ -25,7 +25,6 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // matchRange is a query occurrence within one rendered line: lo and hi are the
@@ -281,63 +280,98 @@ func (m *model) gotoMatch(idx int) {
 // edit without committing — the committed query and its highlight are left as
 // they were, vim's behaviour when a search command line is abandoned. enter
 // commits the draft as the active query and jumps forward; an empty draft
-// commits nothing. Backspace deletes a rune, and at an empty draft cancels
-// like the palette's backspace. Any other single character appends.
+// commits nothing. Backspace at an empty draft cancels like the palette's
+// backspace. Every other key is the prompt's field's: it types, and edits
+// the draft as a field does.
 func (m *model) handleSearchKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "esc", "ctrl+c":
-		m.searchOpen = false
-		m.searchDraft = ""
+		m.closeSearch()
 		return nil
 	case "enter":
-		m.searchOpen = false
-		if m.searchDraft == "" {
-			m.searchDraft = ""
+		draft := m.searchDraft
+		m.closeSearch()
+		if draft == "" {
 			return nil
 		}
-		m.searchQuery = m.searchDraft
-		m.searchDraft = ""
+		m.searchQuery = draft
 		m.searchStep(0)
 		return nil
 	case "backspace":
 		if m.searchDraft == "" {
 			// Nothing left to edit — cancel, the palette's own rule.
-			m.searchOpen = false
+			m.closeSearch()
 			return nil
 		}
-		_, size := utf8.DecodeLastRuneInString(m.searchDraft)
-		m.searchDraft = m.searchDraft[:len(m.searchDraft)-size]
+	}
+	p := m.searchPane()
+	k := msg.Key()
+	if name := fieldKeyName(k); name == "" && k.Text != "" {
+		p.paste(k.Text)
+	} else {
+		p.key(name)
+	}
+	m.searchDrafted(p.text("/draft"))
+	return nil
+}
+
+// searchID is the search prompt's pane (D22): the field the draft is typed
+// in, and where the reader is among its matches.
+const searchID = "search"
+
+// searchFieldKeys gives margin enter in the prompt's field on a host, where
+// it commits the draft. esc always reaches margin.
+const searchFieldKeys = "enter=program"
+
+// searchPane is the search prompt's pane as the model has it.
+func (m *model) searchPane() *pane {
+	p := m.panes().pane(searchID, map[string]any{"draft": m.searchDraft, "count": ""})
+	p.define(
+		obj("id", "root", "component", "Column", "children", []any{"rule", "line"}),
+		obj("id", "rule", "component", "Divider"),
+		obj("id", "line", "component", "Row", "children", []any{"draft", "count"}, "align", "center"),
+		obj("id", "draft", "component", "TextField", "label", "/", "value", bind("/draft"), "weight", 1,
+			"metadata", obj("extensions", obj("io_neuroplast_hotty", obj("keys", searchFieldKeys)))),
+		obj("id", "count", "component", "Text", "text", bind("/count"), "variant", "caption"),
+	)
+	p.put("/draft", m.searchDraft)
+	p.put("/count", m.searchPosition())
+	if !p.c.St.Keyboard {
+		p.focus(p.c.FindComponent("draft", rootScope))
+	}
+	return p
+}
+
+// searchDrafted takes a draft the prompt's field holds: a new draft starts
+// from its first match.
+func (m *model) searchDrafted(d string) {
+	if d != m.searchDraft {
+		m.searchDraft = d
 		m.searchCurrent = 0
-		return nil
-	default:
-		if len(msg.String()) == 1 {
-			m.searchDraft += msg.String()
-			m.searchCurrent = 0
-		}
-		return nil
 	}
 }
 
-// renderSearchPrompt draws the open search prompt where the palette sits: a
-// dim rule to separate it from the document, then the `/` prompt, the typed
-// draft, a position count, and a block cursor. The count is the current match
-// over the total, so the reader knows how many hits there are before pressing
-// enter.
-func (m *model) renderSearchPrompt(w int) string {
-	var b strings.Builder
-	b.WriteString(dimStyle.Render(strings.Repeat("─", w)) + "\n")
-	pos := "0/0"
-	if len(m.searchMatches) > 0 {
-		cur := m.searchCurrent + 1
-		if cur < 1 {
-			cur = 1
-		}
-		if cur > len(m.searchMatches) {
-			cur = len(m.searchMatches)
-		}
-		pos = fmt.Sprintf("%d/%d", cur, len(m.searchMatches))
+// closeSearch closes the prompt, dropping its pane: the next one opens
+// empty.
+func (m *model) closeSearch() {
+	m.searchOpen = false
+	m.searchDraft = ""
+	m.dropPane(searchID)
+}
+
+// searchPosition is the current match over the total, so the reader knows
+// how many hits there are before pressing enter.
+func (m *model) searchPosition() string {
+	if len(m.searchMatches) == 0 {
+		return "0/0"
 	}
-	b.WriteString(focusStyle.Render("/") + m.searchDraft + dimStyle.Render("  "+pos))
-	b.WriteString(focusStyle.Render("█"))
-	return lipgloss.NewStyle().Width(w).Render(b.String())
+	cur := min(max(m.searchCurrent+1, 1), len(m.searchMatches))
+	return fmt.Sprintf("%d/%d", cur, len(m.searchMatches))
+}
+
+// renderSearchPrompt draws the open search prompt where the palette sits: a
+// rule to separate it from the document, then the draft's field and the
+// match count.
+func (m *model) renderSearchPrompt(w int) string {
+	return strings.Join(m.searchPane().lines(w), "\n")
 }

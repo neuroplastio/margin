@@ -487,8 +487,11 @@ func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
 		}
 		return m.composerActs()
 	}
-	if p.id == paletteID && m.paletteOpen {
+	switch {
+	case p.id == paletteID && m.paletteOpen:
 		m.paletteQueried(p.text("/query"))
+	case p.id == searchID && m.searchOpen:
+		m.searchDrafted(p.text("/draft"))
 	}
 	return nil
 }

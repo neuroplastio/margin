@@ -3125,7 +3125,7 @@ func (m *model) view() tea.View {
 	var b strings.Builder
 	b.WriteString(strings.Join(visible, "\n"))
 	b.WriteString("\n\n")
-	if m.comp != nil || !m.paletteOpen {
+	if m.comp != nil || !m.paletteOpen && !m.searchOpen {
 		b.WriteString(" ")
 	}
 	if m.comp != nil {
@@ -3143,7 +3143,12 @@ func (m *model) view() tea.View {
 			b.WriteString(paletteBox)
 		}
 	} else if m.searchOpen {
-		b.WriteString(searchBox)
+		at := hottytea.Rect{X: 0, Y: viewport + 1, W: m.w, H: searchHeight}
+		if m.hot != nil && m.hot.place(m.searchPane(), at, hottytea.Rect{W: m.w, H: m.h}) {
+			b.WriteString(strings.Repeat("\n", searchHeight-1))
+		} else {
+			b.WriteString(searchBox)
+		}
 	} else if m.inbox {
 		b.WriteString(dimStyle.Render(fmt.Sprintf(
 			"threads — %d thread(s) · j/k move · enter open · esc close   ", len(m.inboxItems))))

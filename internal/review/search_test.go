@@ -1,6 +1,7 @@
 package review
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -264,8 +265,11 @@ func TestSearchPromptRenders(t *testing.T) {
 	m.render()
 	box := m.renderSearchPrompt(m.w)
 	plain := ansiRe.ReplaceAllString(box, "")
-	if !strings.Contains(plain, "/retry") {
-		t.Errorf("prompt %q does not show the draft", plain)
+	if !regexp.MustCompile(`/\s*retry`).MatchString(plain) {
+		t.Errorf("prompt %q does not show the draft after its slash", plain)
+	}
+	if !strings.Contains(plain, "1/3") {
+		t.Errorf("prompt %q does not show where the reader is among the matches", plain)
 	}
 	if !strings.Contains(plain, "/") {
 		t.Errorf("prompt %q does not show the leading slash", plain)

@@ -526,3 +526,28 @@ func TestHottyPaletteIsASurface(t *testing.T) {
 		t.Error("enter in the palette did not run view.raw")
 	}
 }
+
+// On a host the search prompt is a surface whose field has the keyboard:
+// the draft is typed there, and enter commits it.
+func TestHottySearchIsASurface(t *testing.T) {
+	name := "margin-" + searchID
+	m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		h.Type("/")
+		var s *hottytest.Surface
+		waitFor(t, "the prompt's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == "draft" })
+		if err := h.Fill(name, "draft", "quote"); err != nil {
+			t.Fatal(err)
+		}
+		waitFor(t, "the count of matches", func() bool { return strings.Contains(s.Text(), "1/1") })
+		h.Key("enter")
+		waitFor(t, "the prompt gone", func() bool { s := h.Surface(name); return s == nil || !s.Placed() })
+	})
+	if m.searchQuery != "quote" {
+		t.Errorf("search query = %q, want the draft typed on the host", m.searchQuery)
+	}
+	if got := m.entries[m.at.entry].b; got.kind != blockQuote {
+		t.Errorf("the search landed on %v %q, want the quote", got.kind, got.text)
+	}
+}
