@@ -262,17 +262,18 @@ func TestRenderInboxMarksFocusAndResolved(t *testing.T) {
 	if len(rows) != 20 {
 		t.Fatalf("renderInbox returned %d rows, want 20", len(rows))
 	}
-	if !strings.Contains(rows[0], "▌") {
-		t.Errorf("focused row has no cursor:\n%q", rows[0])
+	// The table's header and its rule come first, then a row a thread.
+	if !strings.Contains(rows[2], "\x1b[0;7") {
+		t.Errorf("focused row is not shown selected (reversed):\n%q", rows[2])
 	}
-	if !strings.Contains(rows[0], "docs/spec.md") {
-		t.Errorf("focused row does not name its document:\n%q", rows[0])
+	if !strings.Contains(rows[2], "docs/spec.md") {
+		t.Errorf("focused row does not name its document:\n%q", rows[2])
 	}
-	if !strings.Contains(rows[1], "✓") {
-		t.Errorf("resolved row has no checkmark:\n%q", rows[1])
+	if !strings.Contains(rows[3], "✓") {
+		t.Errorf("resolved row has no checkmark:\n%q", rows[3])
 	}
-	if !strings.Contains(rows[1], "doc not in tree") {
-		t.Errorf("gone-doc row does not say so:\n%q", rows[1])
+	if !strings.Contains(rows[3], "doc not in tree") {
+		t.Errorf("gone-doc row does not say so:\n%q", rows[3])
 	}
 }
 
@@ -333,11 +334,11 @@ func TestSingleDocumentThreadsView(t *testing.T) {
 
 	m.w, m.h = 100, 30
 	rows := m.renderInbox(10)
-	if !strings.Contains(rows[0], "[block gone]") {
-		t.Errorf("orphaned row does not say [block gone]:\n%q", rows[0])
+	if !strings.Contains(rows[2], "[block gone]") {
+		t.Errorf("orphaned row does not say [block gone]:\n%q", rows[2])
 	}
-	if strings.Contains(rows[1], "document.md  ") {
-		t.Errorf("single-doc row repeats the document name:\n%q", rows[1])
+	if strings.Contains(rows[3], "document.md") {
+		t.Errorf("single-doc row repeats the document name:\n%q", rows[3])
 	}
 }
 
@@ -434,5 +435,23 @@ func TestCommentHopKeysRouteThroughTheRegistry(t *testing.T) {
 	// The palette shows the binding.
 	if got := firstBinding("comment.next"); got != "]" {
 		t.Errorf("firstBinding(comment.next) = %q, want ]", got)
+	}
+}
+
+// TestThreadsViewClickFocusesARow: a click on a row of the threads view
+// focuses it, as j/k would; enter then opens it.
+func TestThreadsViewClickFocusesARow(t *testing.T) {
+	root := inboxFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatalf("newTreeModel: %v", err)
+	}
+	m.w, m.h = 100, 30
+	m.toggleInbox()
+	m.View()
+	// The header and its rule, then the rows: the third thread is row 4.
+	m.handleClick(tea.Mouse{X: m.docX() + 4, Y: 4})
+	if m.inboxAt != 2 {
+		t.Fatalf("a click on the third row focused row %d, want 2", m.inboxAt)
 	}
 }

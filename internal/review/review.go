@@ -139,14 +139,13 @@ type model struct {
 
 	// inbox is the cross-document comment inbox view (inbox.go): `i` in a tree
 	// review swaps the document column for the tree's threads, newest first.
-	// inboxAt is the focused row, inboxScroll the inbox's own scroll offset
-	// (independent of the document's, like the pane's), and inboxItems the
-	// current list, rebuilt every time the view opens so a comment posted in
-	// another document shows up on the next visit.
-	inbox       bool
-	inboxAt     int
-	inboxScroll int
-	inboxItems  []inboxItem
+	// inboxAt is the focused row, and inboxItems the current list, rebuilt
+	// every time the view opens so a comment posted in another document shows
+	// up on the next visit. The view's table (inboxPane) scrolls itself,
+	// independent of the document.
+	inbox      bool
+	inboxAt    int
+	inboxItems []inboxItem
 
 	// raw switches the view to the document's verbatim markdown source — the
 	// 2026-08-09 navigation-feature-requests "rich/raw mode toggle". Rendered
@@ -2152,10 +2151,13 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 		return m.composerActs()
 	}
 
-	// The document column is the inbox list, not the document — a click there
-	// is inert until the inbox learns to select rows. Clicks in the pane
-	// column above already handled the tree.
+	// The document column is the threads view, not the document: a click
+	// there focuses the row it lands on. Clicks in the pane column above
+	// already handled the tree.
 	if m.inbox {
+		p := m.inboxPane(m.h - footerRows)
+		p.click(mo.X-m.docX(), mo.Y)
+		m.inboxClicked(p)
 		return nil
 	}
 
@@ -2266,20 +2268,15 @@ func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
 
-	// The inbox scrolls its own list, like the pane.
+	// The threads view scrolls its own table, like the pane.
 	if m.inbox {
-		delta := m.wheelSpeed
-		if delta < 1 {
-			delta = 1
-		}
+		dy := max(m.wheelSpeed, 1)
 		if mo.Button == uv.MouseWheelUp {
-			m.inboxScroll -= delta
-		} else if mo.Button == uv.MouseWheelDown {
-			m.inboxScroll += delta
+			dy = -dy
 		}
-		if m.inboxScroll < 0 {
-			m.inboxScroll = 0
-		}
+		p := m.inboxPane(m.h - footerRows)
+		p.cr.Wheel(mo.X-m.docX(), mo.Y, 0, dy)
+		p.dirty = true
 		return nil
 	}
 
@@ -3098,6 +3095,12 @@ func (m *model) view() tea.View {
 		// The inbox replaces the document column; it has its own scroll, so
 		// the document's offset is left untouched for when it returns.
 		visible = m.renderInbox(viewport)
+		at := hottytea.Rect{X: m.docX(), Y: 0, W: m.w - m.docX(), H: viewport}
+		if m.hot != nil && m.hot.place(m.inboxPane(viewport), at, hottytea.Rect{W: m.w, H: viewport}) {
+			for i := range visible {
+				visible[i] = ""
+			}
+		}
 	} else {
 		m.scroll = m.clampScroll(len(lines), viewport)
 		visible = lines[min(m.scroll, len(lines)):min(m.scroll+viewport, len(lines))]

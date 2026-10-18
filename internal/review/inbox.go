@@ -22,10 +22,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
 )
 
 // inboxItem is one row of the inbox: a thread, where it lives, and whether
@@ -140,7 +143,7 @@ func (m *model) toggleInbox() {
 	}
 	m.inboxItems = items
 	m.inboxAt = 0
-	m.inboxScroll = 0
+	m.dropPane(inboxID) // a fresh table, scrolled to the top
 	m.inbox = true
 	m.raw = false
 	m.visual = false
@@ -290,62 +293,65 @@ func (m *model) openInboxItem(i int) {
 	m.status = fmt.Sprintf("threads: %s — the thread's block is gone", item.doc)
 }
 
-// renderInbox returns the inbox's rows for one viewport, each padded so the
-// document column stays aligned. The focused row carries the cursor, a
-// resolved thread is dimmed with a checkmark, and a thread whose document is
-// gone from the tree says so. It has its own scroll offset, like the pane —
-// the document's is left alone, so closing the inbox returns the reader to
-// exactly where they were.
-func (m *model) renderInbox(viewport int) []string {
-	rows := make([]string, viewport)
-	w := m.contentWidth()
+// inboxID is the threads view's pane (D22): a table of the threads under
+// review, one row each.
+const inboxID = "threads"
+
+// inboxPane is the threads view's pane, rows tall, as the model has it: the
+// threads, and the one focused. margin keeps the focus and the keys; a click
+// on a row focuses it (inboxClicked).
+func (m *model) inboxPane(rows int) *pane {
+	p := m.panes().pane(inboxID, map[string]any{"rows": []any{}, "sel": ""})
 	if len(m.inboxItems) == 0 {
-		rows[0] = strings.Repeat(" ", gutterW) +
-			dimStyle.Render("no threads yet — comment on any block to start one")
-		return rows
+		p.define(obj("id", "root", "component", "Text", "variant", "caption",
+			"text", "no threads yet — comment on any block to start one"))
+		return p
 	}
-	if m.inboxAt < m.inboxScroll {
-		m.inboxScroll = m.inboxAt
+	cols := []any{obj("key", "state", "header", "")}
+	if m.tree != nil {
+		// In a tree review each row names its document — the threads span
+		// the tree, so a row without its home is unplaceable. In a
+		// single-document review every row is the same document, so the
+		// column would be a wall of identical noise.
+		cols = append(cols, obj("key", "doc", "header", "document"))
 	}
-	if m.inboxAt >= m.inboxScroll+viewport {
-		m.inboxScroll = m.inboxAt - viewport + 1
-	}
-	if m.inboxScroll > len(m.inboxItems)-viewport {
-		m.inboxScroll = max(0, len(m.inboxItems)-viewport)
-	}
-	for i := 0; i < viewport; i++ {
-		idx := m.inboxScroll + i
-		if idx >= len(m.inboxItems) {
-			break
+	cols = append(cols, obj("key", "thread", "header", "thread"))
+	p.define(obj("id", "root", "component", "HottyTable", "catalogId", hottycat.ID,
+		"rows", bind("/rows"), "rowKey", "k", "selected", bind("/sel"),
+		"height", max(rows-2, 1), "columns", cols))
+	table := make([]any, len(m.inboxItems))
+	for i, item := range m.inboxItems {
+		state := ""
+		if item.thread.resolved {
+			state = "✓"
 		}
-		item := m.inboxItems[idx]
 		txt := item.thread.summary(false)
-		// In a tree review each row names its document — the threads span the
-		// tree, so a row without its home is unplaceable. In a single-document
-		// review every row is the same document, so the name would be a
-		// wall of identical noise; the summary alone says which thread it is.
-		if m.tree != nil {
-			txt = item.doc + "  " + txt
-		}
-		style := textStyle
-		if item.thread.resolved {
-			style = dimStyle
-		}
-		marker := "  "
-		if idx == m.inboxAt {
-			marker = focusStyle.Render("▌ ")
-		}
-		resolved := ""
-		if item.thread.resolved {
-			resolved = resolvedTxt.Render("✓ ")
-		}
 		if !item.inTree {
 			txt += "  [doc not in tree]"
 		} else if item.thread.orphaned {
 			txt += "  [block gone]"
 		}
-		txt = truncate(txt, max(0, w-gutterW-4))
-		rows[i] = strings.Repeat(" ", gutterW) + marker + resolved + style.Render(txt)
+		table[i] = obj("k", strconv.Itoa(i), "state", state, "doc", item.doc, "thread", txt)
 	}
+	p.put("/rows", table)
+	p.put("/sel", strconv.Itoa(m.inboxAt))
+	return p
+}
+
+// inboxClicked takes the row a click in the threads view selected.
+func (m *model) inboxClicked(p *pane) {
+	if i, err := strconv.Atoi(p.text("/sel")); err == nil && i >= 0 && i < len(m.inboxItems) {
+		m.inboxAt = i
+	}
+}
+
+// renderInbox returns the threads view's rows for one viewport, in the
+// document's column: its own scroll, like the pane's — the document's is
+// left alone, so closing the view returns the reader to exactly where they
+// were.
+func (m *model) renderInbox(viewport int) []string {
+	lines := m.inboxPane(viewport).lines(m.w - m.docX())
+	rows := make([]string, viewport)
+	copy(rows, lines)
 	return rows
 }
