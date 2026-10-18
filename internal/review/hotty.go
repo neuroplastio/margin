@@ -494,6 +494,8 @@ func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
 		m.searchDrafted(p.text("/draft"))
 	case p.id == inboxID && m.inbox:
 		m.inboxClicked(p)
+	case p.id == treeID && m.tree != nil:
+		m.treeClicked(p)
 	}
 	return nil
 }

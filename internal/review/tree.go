@@ -20,6 +20,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 	tea "charm.land/bubbletea/v2"
+
+	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
 )
 
 // treeEntry is one row of the file-tree pane: either a directory header
@@ -108,7 +110,9 @@ const progW = 7
 func treeWidth(tree []treeEntry) int {
 	w := 0
 	for _, e := range tree {
-		if l := e.depth*2 + len(e.name) + 3; l > w {
+		// The tree's rule and branch glyphs take four columns a level,
+		// the selection bar two, and a progress label rides after the name.
+		if l := e.depth*4 + len(e.name) + 6; l > w {
 			w = l
 		}
 	}
@@ -353,80 +357,124 @@ func (m *model) handlePaneKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// renderTree returns the pane's rows for one viewport, each padded to treeW so
-// the document column stays aligned. The focused row carries the cursor, the
-// open document carries a marker, directories are dimmed headers.
+// treeID is the tree pane's pane (D22): the review's markdown files as a
+// tree of folders.
+const treeID = "tree"
+
+// treePane is the tree pane, rows tall, as the model has it: the files, the
+// one focused (the tree's selection), and the open one marked ▸. Each file
+// carries its reviewed/total once it has marks. margin keeps the focus and
+// the keys; a click on a file focuses it (treeClicked). Folders start open,
+// and stay as the reviewer folds them.
+func (m *model) treePane(rows int) *pane {
+	var open []any
+	for _, e := range m.tree {
+		if e.isDir {
+			open = append(open, e.rel+"/")
+		}
+	}
+	p := m.panes().pane(treeID, map[string]any{"items": []any{}, "sel": "", "open": open})
+	p.define(obj("id", "root", "component", "HottyTree", "catalogId", hottycat.ID,
+		"items", bind("/items"), "selected", bind("/sel"), "expanded", bind("/open"),
+		"height", max(rows, 1)))
+	p.put("/items", m.treeNodes())
+	if m.treeAt >= 0 && m.treeAt < len(m.tree) {
+		p.put("/sel", m.tree[m.treeAt].rel)
+	}
+	return p
+}
+
+// treeNodes is the tree as HottyTree's nodes: a folder's value is its path
+// and a slash, a file's its path.
+func (m *model) treeNodes() []any {
+	nodes, _ := m.treeLevel(0, -1)
+	return nodes
+}
+
+// treeLevel is the nodes of m.tree from i on that are deeper than depth,
+// and the index of the row after them.
+func (m *model) treeLevel(i, depth int) ([]any, int) {
+	nodes := []any{}
+	for i < len(m.tree) && m.tree[i].depth > depth {
+		e := m.tree[i]
+		if e.isDir {
+			kids, next := m.treeLevel(i+1, e.depth)
+			nodes = append(nodes, obj("label", e.name, "value", e.rel+"/", "children", kids))
+			i = next
+			continue
+		}
+		label := e.name
+		if m.store != nil && e.rel == m.store.docPath {
+			label = "▸ " + label
+		}
+		if prog := m.fileProgress(e); prog != "" {
+			label += "  " + prog
+		}
+		nodes = append(nodes, obj("label", label, "value", e.rel))
+		i++
+	}
+	return nodes, i
+}
+
+// treeClicked takes the file a click in the tree pane selected: the pane has
+// the keyboard from then on, as a click on its row always gave it.
+func (m *model) treeClicked(p *pane) {
+	sel := p.text("/sel")
+	for i, e := range m.tree {
+		if !e.isDir && e.rel == sel {
+			m.treeAt = i
+			m.treeFocus = true
+			return
+		}
+	}
+}
+
+// renderTree returns the pane's rows for one viewport, each padded to treeW
+// so the document column stays aligned.
 func (m *model) renderTree(viewport int) []string {
 	rows := make([]string, viewport)
-	if m.tree == nil || len(m.tree) == 0 {
+	if len(m.tree) == 0 {
 		return rows
 	}
-	// Keep the focused row in view: this is the pane's own scroll, separate
-	// from the document's (a long tree and a long document scroll
-	// independently).
-	if m.treeAt < m.treeScroll {
-		m.treeScroll = m.treeAt
-	}
-	if m.treeAt >= m.treeScroll+viewport {
-		m.treeScroll = m.treeAt - viewport + 1
-	}
-	if m.treeScroll < 0 {
-		m.treeScroll = 0
-	}
-	for i := 0; i < viewport; i++ {
-		idx := m.treeScroll + i
-		if idx >= len(m.tree) {
-			break
+	lines := m.treePane(viewport).lines(m.treeW)
+	for i := range rows {
+		l := ""
+		if i < len(lines) {
+			l = lines[i]
 		}
-		e := m.tree[idx]
-		indent := strings.Repeat("  ", e.depth)
-		var name string
-		switch {
-		case e.isDir:
-			name = dimStyle.Render(indent + e.name + "/")
-		case idx == m.treeAt && m.treeFocus:
-			name = focusStyle.Render("▌ ") + textStyle.Render(indent+e.name)
-		case m.store != nil && e.rel == m.store.docPath:
-			name = dimStyle.Render("▸ ") + textStyle.Render(indent+e.name)
-		default:
-			name = "  " + dimStyle.Render(indent+e.name)
-		}
-		rows[i] = lipgloss.NewStyle().Width(m.treeW - progW).Render(name) + m.renderTreeProgress(e)
+		rows[i] = l + strings.Repeat(" ", max(m.treeW-lipgloss.Width(l), 0))
 	}
 	return rows
 }
 
-// renderTreeProgress returns a pane row's right-aligned progress slot: a file
-// with any marks this session shows its reviewed/total — green when the whole
-// file is reviewed, orange with a trailing `!` when any block is flagged, dim
-// otherwise — and a file nobody has touched (or a directory) shows a blank
-// place-holder, keeping every row the same width. `0/n` was rejected as a
-// slot for untouched files: a freshly opened tree would be wall-to-wall zeros,
-// which reads as "nothing", and the tree-wide footer roll-up already carries
-// the untouched denominator.
-func (m *model) renderTreeProgress(e treeEntry) string {
-	slot := ""
-	if !e.isDir {
-		if marks := m.marksForDoc(e.rel); len(marks) > 0 {
-			n, flagged := 0, false
-			for _, mk := range marks {
-				switch mk {
-				case markOK:
-					n++
-				case markFlag:
-					flagged = true
-				}
-			}
-			total := m.markTotals[e.rel]
-			switch {
-			case flagged:
-				slot = flagStyle.Render(fmt.Sprintf("%d/%d!", n, total))
-			case total > 0 && n == total:
-				slot = okStyle.Render(fmt.Sprintf("%d/%d", n, total))
-			case total > 0:
-				slot = dimStyle.Render(fmt.Sprintf("%d/%d", n, total))
-			}
+// fileProgress is a file's reviewed/total once it has marks: with a
+// trailing ! when any block is flagged. A file nobody has touched (or a
+// directory) has none: a freshly opened tree would otherwise be
+// wall-to-wall zeros, which reads as "nothing", and the tree-wide footer
+// roll-up already carries the untouched denominator.
+func (m *model) fileProgress(e treeEntry) string {
+	if e.isDir {
+		return ""
+	}
+	marks := m.marksForDoc(e.rel)
+	if len(marks) == 0 {
+		return ""
+	}
+	n, flagged := 0, false
+	for _, mk := range marks {
+		switch mk {
+		case markOK:
+			n++
+		case markFlag:
+			flagged = true
 		}
 	}
-	return lipgloss.NewStyle().Width(progW).Align(lipgloss.Right).Render(slot)
+	total := m.markTotals[e.rel]
+	switch {
+	case flagged:
+		return fmt.Sprintf("%d/%d!", n, total)
+	case total > 0:
+		return fmt.Sprintf("%d/%d", n, total)
+	}
+	return ""
 }

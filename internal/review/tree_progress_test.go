@@ -85,25 +85,25 @@ func TestPaneShowsPerFileProgress(t *testing.T) {
 		t.Errorf("untouched README row carries progress:\n%q", rows[0])
 	}
 
-	// One of two README blocks reviewed: dim "1/2".
+	// One of two README blocks reviewed: "1/2" after the name.
 	markFocused(t, m, markOK)
 	rows = m.renderTree(30)
-	if !strings.Contains(rows[0], dimStyle.Render("1/2")) {
-		t.Errorf("partially reviewed README row = %q, want dim 1/2", rows[0])
+	if !strings.Contains(rows[0], "README.md  1/2") {
+		t.Errorf("partially reviewed README row = %q, want 1/2", rows[0])
 	}
 
-	// The whole README reviewed: green "2/2".
+	// The whole README reviewed: "2/2".
 	markAllReviewed(m)
 	rows = m.renderTree(30)
-	if !strings.Contains(rows[0], okStyle.Render("2/2")) {
-		t.Errorf("fully reviewed README row = %q, want green 2/2", rows[0])
+	if !strings.Contains(rows[0], "README.md  2/2") {
+		t.Errorf("fully reviewed README row = %q, want 2/2", rows[0])
 	}
 
-	// A flagged block: orange "1/2!" — the `!` signals attention remains.
+	// A flagged block: "1/2!" — the `!` signals attention remains.
 	markFocusedOn(t, m, firstMarkableEntry(m), markFlag)
 	rows = m.renderTree(30)
-	if !strings.Contains(rows[0], flagStyle.Render("1/2!")) {
-		t.Errorf("flagged README row = %q, want orange 1/2!", rows[0])
+	if !strings.Contains(rows[0], "README.md  1/2!") {
+		t.Errorf("flagged README row = %q, want 1/2!", rows[0])
 	}
 
 	// The spec is still untouched, but every non-empty row keeps the same

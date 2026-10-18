@@ -249,12 +249,13 @@ func TestRenderTreeMarksFocusAndOpenDoc(t *testing.T) {
 	if len(rows) != 30 {
 		t.Fatalf("renderTree returned %d rows, want 30", len(rows))
 	}
-	// Row 0 is the open README and the focused row — the cursor glyph.
-	if !strings.Contains(rows[0], "▌") {
-		t.Errorf("focused row has no cursor:\n%q", rows[0])
+	// Row 0 is the open README and the focused row: the tree's selection
+	// bar, and the open document's ▸.
+	if plain := ansiRe.ReplaceAllString(rows[0], ""); !strings.HasPrefix(plain, "│") || !strings.Contains(plain, "▸ README.md") {
+		t.Errorf("focused open row has no selection bar or ▸:\n%q", rows[0])
 	}
-	// Row 1 is the docs/ directory header, dimmed, not a focus stop.
-	if !strings.Contains(rows[1], "docs/") {
+	// Row 1 is the docs directory, open, not a focus stop.
+	if plain := ansiRe.ReplaceAllString(rows[1], ""); !strings.Contains(plain, "▼ docs") {
 		t.Errorf("dir header missing:\n%q", rows[1])
 	}
 }
@@ -298,7 +299,7 @@ func TestViewComposesPaneAndDocumentColumns(t *testing.T) {
 	out := m.View().Content
 	// Both pane rows render: the open file (with its ▸ marker), the dimmed
 	// directory header, and the nested file indented beneath it.
-	for _, want := range []string{"README.md", "docs/", "spec.md", "│"} {
+	for _, want := range []string{"README.md", "docs", "spec.md", "│"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("view does not contain %q:\n%s", want, out)
 		}
@@ -307,5 +308,24 @@ func TestViewComposesPaneAndDocumentColumns(t *testing.T) {
 	// split words, so match a contiguous chunk).
 	if !strings.Contains(out, "prose") {
 		t.Errorf("document column missing:\n%s", out)
+	}
+}
+
+// TestTreePaneClickFocusesAFile: a click on a file's row focuses it and
+// gives the pane the keyboard, as before; it does not open it.
+func TestTreePaneClickFocusesAFile(t *testing.T) {
+	root, _, _ := treeFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatalf("newTreeModel: %v", err)
+	}
+	m.w, m.h = 100, 30
+	m.View()
+	m.handleClick(tea.Mouse{X: 8, Y: 2}) // docs/spec.md, under the docs folder
+	if !m.treeFocus || m.tree[m.treeAt].rel != "docs/spec.md" {
+		t.Fatalf("click focused %q (pane focus %v), want docs/spec.md with the pane focused", m.tree[m.treeAt].rel, m.treeFocus)
+	}
+	if m.store.docPath != "README.md" {
+		t.Errorf("a click opened %s; it only focuses", m.store.docPath)
 	}
 }

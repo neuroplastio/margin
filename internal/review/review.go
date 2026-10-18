@@ -112,14 +112,13 @@ type model struct {
 	// single-document review (`margin FILE.md`), which renders exactly as it
 	// always has. treeAt is the focused file row, treeFocus whether keyboard
 	// focus sits in the pane (the document pane owns the keys otherwise),
-	// treeScroll the pane's own scroll offset (independent of the document's),
-	// and treeW the pane's width in columns. openTreeFile switches the
+	// and treeW the pane's width in columns. The pane's tree (treePane)
+	// scrolls itself, independent of the document. openTreeFile switches the
 	// document under review in place.
-	tree       []treeEntry
-	treeAt     int
-	treeFocus  bool
-	treeScroll int
-	treeW      int
+	tree      []treeEntry
+	treeAt    int
+	treeFocus bool
+	treeW     int
 
 	// markCache and markTotals are the tree-progress session state. A tree
 	// review switches documents in place, and a document's marks are
@@ -2139,9 +2138,10 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	// moves keyboard focus into the pane — the mouse's one job is moving
 	// focus, and this is the tree's focus.
 	if m.tree != nil && mo.X < m.docX() && m.comp == nil {
-		if idx := mo.Y + m.treeScroll; idx >= 0 && idx < len(m.tree) && !m.tree[idx].isDir {
-			m.treeAt = idx
-			m.treeFocus = true
+		if mo.X < m.treeW {
+			p := m.treePane(m.h - footerRows)
+			p.click(mo.X, mo.Y)
+			m.treeClicked(p)
 		}
 		return nil
 	}
@@ -3119,6 +3119,11 @@ func (m *model) view() tea.View {
 	// language the blockquote and gutter already use.
 	if m.tree != nil {
 		pane := m.renderTree(viewport)
+		if m.hot != nil && m.hot.place(m.treePane(viewport), hottytea.Rect{W: m.treeW, H: viewport}, hottytea.Rect{W: m.w, H: viewport}) {
+			for i := range pane {
+				pane[i] = strings.Repeat(" ", m.treeW)
+			}
+		}
 		sep := dimStyle.Render("│")
 		for i, l := range visible {
 			visible[i] = pane[i] + sep + l
