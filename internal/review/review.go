@@ -438,6 +438,15 @@ func (m *model) Init() tea.Cmd {
 	return m.watcher.wait()
 }
 
+// dropPane deletes a pane, and on a host its surface: a pane made again
+// under the same name is a new document there.
+func (m *model) dropPane(id string) {
+	if p := m.panes().panes[id]; p != nil && m.hot != nil {
+		m.hot.s.Delete(hotPaneName(p))
+	}
+	m.panes().drop(id)
+}
+
 // panes is the review's kit, made the first time a pane is wanted.
 func (m *model) panes() *kit {
 	if m.kit == nil {
@@ -1646,7 +1655,7 @@ func (m *model) dismiss(out outcome) tea.Cmd {
 		m.status = "discarded"
 	}
 
-	m.panes().drop(composerID)
+	m.dropPane(composerID)
 	m.comp = nil
 
 	// Cancelling before committing must not leave an empty thread behind
@@ -2060,6 +2069,17 @@ func (m *model) composerKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.dismiss(out)
 	}
 	p := m.comp.p
+	if m.hot.native() && p.hr != nil {
+		// On a host the field is the host's: what reaches margin is a key
+		// the field left, which the pane's buttons may take.
+		cmds, _, err := p.hr.Key(name)
+		if err != nil {
+			m.hot.tracef("composer key %q: %v", name, err)
+		}
+		m.hot.s.Send(cmds...)
+		p.dirty = true
+		return m.composerActs()
+	}
 	if name == "" && k.Text != "" {
 		p.paste(k.Text) // text no key names: an IME's, a compose sequence's
 	} else {
@@ -2936,7 +2956,14 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 			}
 		}
 		m.paneLead = len(lead)
-		body := append(lead, m.comp.p.lines(w-2*borderW)...)
+		pane := m.comp.p.lines(w - 2*borderW)
+		if m.hot.native() && !m.hot.deaf {
+			// On a host the composer is a surface over these rows (view).
+			for j := range pane {
+				pane[j] = ""
+			}
+		}
+		body := append(lead, pane...)
 		return indent(strings.Split(box.Render(strings.Join(body, "\n")), "\n"))
 	}
 
@@ -3052,6 +3079,9 @@ func (m *model) view() tea.View {
 		m.paneTop = m.spans[m.at.entry].start + borderW + m.paneLead
 		m.paneW = m.contentWidth() - 2*borderW
 		m.paneH = m.comp.p.draw(m.paneW).Rows
+	}
+	if m.hot != nil {
+		m.hot.panes = m.hot.panes[:0]
 	}
 
 	var paletteBox string
@@ -3175,6 +3205,13 @@ func (m *model) view() tea.View {
 	// report motion only while a button is held, so hover never fired — the
 	// pointer is not a button.
 	v.MouseMode = tea.MouseModeAllMotion
+	if m.comp != nil && m.paneTop >= 0 && m.hot != nil {
+		// On a host the composer is a surface, the field's caret the host's.
+		top := m.paneTop - m.scroll
+		if m.hot.place(m.comp.p, hottytea.Rect{X: m.docX() + gutterW + borderW, Y: top, W: m.paneW, H: m.paneH}) {
+			return v
+		}
+	}
 	if m.comp != nil && m.paneTop >= 0 {
 		if cx, cy, ok := m.comp.p.cursor(m.paneW); ok {
 			if y := m.paneTop + cy - m.scroll; y >= 0 && y < viewport {

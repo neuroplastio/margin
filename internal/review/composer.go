@@ -61,7 +61,6 @@ type composer struct {
 
 // newComposer opens a composer on seed.
 func newComposer(k *kit, anchor string, target int, seed string) *composer {
-	k.drop(composerID)
 	p := k.pane(composerID, map[string]any{"text": seed})
 	submit := "Submit"
 	if target != newCommentSlot {

@@ -60,6 +60,9 @@ type hotState struct {
 	blocks []hotBlock
 	col    hottytea.Rect
 	shown  bool // the document's column is on screen (not the inbox)
+	// panes are the review's panes this frame gave a rectangle of their own
+	// (D22): HTML surfaces there, their cells left blank.
+	panes []hotPane
 
 	// sent is each surface's document as last sent, so a change of review
 	// state sends the document again; now is this frame's.
@@ -98,6 +101,25 @@ type hotBlock struct {
 	reviewed   bool
 	selected   bool
 	searchText []string // the block's cell rendering, which the search reads
+}
+
+// hotPane is a pane placed as a surface: where, and what shows it.
+type hotPane struct {
+	p    *pane
+	rect hottytea.Rect
+}
+
+// hotPaneName is a pane's surface's name on the host.
+func hotPaneName(p *pane) string { return "margin-" + p.id }
+
+// place puts a pane at r for this frame, if surfaces are in use, and
+// reports whether it did: then its cells are the host's.
+func (h *hotState) place(p *pane, r hottytea.Rect) bool {
+	if !h.native() || h.deaf {
+		return false
+	}
+	h.panes = append(h.panes, hotPane{p, r})
+	return true
 }
 
 // hotSent is a surface's document in this frame.
@@ -236,6 +258,9 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 			}
 			return nil, false
 		}
+		if p := m.hotPaneOf(msg.Event.Surface); p != nil {
+			return m.hotPaneEvent(p, msg.Event), true
+		}
 		return m.hotEvent(msg.Event), true
 	case hottytea.RelayoutMsg:
 		return nil, true
@@ -361,7 +386,12 @@ func (m *model) hotFrame() tea.Cmd {
 	h.want = h.want[:0]
 	v := m.view()
 	h.frame = &v
-	h.s.Layout(m.hotSurfaces())
+	h.s.Layout(append(m.hotSurfaces(), m.hotPaneSurfaces()...))
+	// A pane's document went with the layout; its changes, and the keyboard
+	// where the pane wants it, go after.
+	for _, hp := range h.panes {
+		h.s.Send(hp.p.html(hotPaneName(hp.p)).Update()...)
+	}
 	m.hotResend()
 	measuring := m.hotMeasure()
 	return tea.Batch(h.s.Flush(), measuring, h.draw())
@@ -416,6 +446,46 @@ func (m *model) hotSurfaces() []hottytea.Surface {
 		h.now = append(h.now, hotSent{name, doc})
 	}
 	return out
+}
+
+// hotPaneSurfaces are the panes this frame placed.
+func (m *model) hotPaneSurfaces() []hottytea.Surface {
+	var out []hottytea.Surface
+	for _, hp := range m.hot.panes {
+		s := hp.p.surface(hotPaneName(hp.p), hp.rect)
+		clip := hottytea.Rect{X: 0, Y: 0, W: m.w, H: m.hot.col.H}
+		s.Clip = &clip
+		out = append(out, s)
+	}
+	return out
+}
+
+// hotPaneOf is the pane a surface of the host's is, if any.
+func (m *model) hotPaneOf(surface string) *pane {
+	for _, hp := range m.hot.panes {
+		if hotPaneName(hp.p) == surface {
+			return hp.p
+		}
+	}
+	return nil
+}
+
+// hotPaneEvent is what the user did in a pane on the host: its HTML
+// rendition takes it, and margin hears the actions it sent.
+func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
+	if err := p.html(hotPaneName(p)).Event(ev); err != nil {
+		m.hot.tracef("pane %s: %v", p.id, err)
+	}
+	p.dirty = true
+	if m.comp != nil && p == m.comp.p {
+		if !p.c.St.Keyboard {
+			// Tab past the last button, or before the field: the host gave
+			// the keyboard back. The composer keeps it, as in cells.
+			p.focus(p.c.FindComponent("field", rootScope))
+		}
+		return m.composerActs()
+	}
+	return nil
 }
 
 // hotResend sends again the document of a surface whose review state or

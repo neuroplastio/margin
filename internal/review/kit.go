@@ -155,7 +155,7 @@ type pane struct {
 }
 
 // pane makes the pane id, with its first data model, or returns the one
-// already made.
+// already made: drop it first for a fresh one.
 func (k *kit) pane(id string, data map[string]any) *pane {
 	if p := k.panes[id]; p != nil {
 		return p

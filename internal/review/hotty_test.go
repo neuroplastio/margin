@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -425,5 +426,79 @@ func TestHotWebImage(t *testing.T) {
 	got = d.render("![gone](missing.png)")
 	if !strings.Contains(got, `<a href="missing.png">[image: gone]</a>`) {
 		t.Errorf("missing image: %s", got)
+	}
+}
+
+// On a host the composer is an HTML surface with the keyboard: the reviewer
+// types in its textarea, and ctrl+s, a key the field leaves to margin,
+// submits what the field holds.
+func TestHottyComposerIsASurface(t *testing.T) {
+	name := "margin-" + composerID
+	m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		h.Type("j") // the paragraph
+		h.Type("c")
+		var s *hottytest.Surface
+		waitFor(t, "the composer's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() != "" })
+		if err := h.Fill(name, s.Focused(), "from the host"); err != nil {
+			t.Fatal(err)
+		}
+		if h.Key("ctrl+s") {
+			t.Fatal("the field used ctrl+s; it is margin's")
+		}
+		waitFor(t, "the composer gone", func() bool { s := h.Surface(name); return s == nil || !s.Placed() })
+	})
+	var got []string
+	for _, t := range m.threads {
+		for _, c := range t.posted {
+			got = append(got, c.body)
+		}
+	}
+	if !slices.Contains(got, "from the host") {
+		t.Errorf("posted comments %q, want the one typed on the host", got)
+	}
+}
+
+// On a host esc, which a field never uses, keeps the draft; and the
+// composer's Discard button, clicked on the host, discards.
+func TestHottyComposerEscapeAndDiscard(t *testing.T) {
+	name := "margin-" + composerID
+	open := func(h *hottytest.Host) *hottytest.Surface {
+		var s *hottytest.Surface
+		h.Type("c")
+		waitFor(t, "the composer's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == "field" })
+		return s
+	}
+	gone := func(h *hottytest.Host) bool { s := h.Surface(name); return s == nil || !s.Placed() }
+	m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		h.Type("j")
+		open(h)
+		if err := h.Fill(name, "field", "kept for later"); err != nil {
+			t.Fatal(err)
+		}
+		h.Key("escape")
+		waitFor(t, "esc closing the composer", func() bool { return gone(h) })
+
+		h.Type("jj") // the list's first item
+		open(h)
+		if err := h.Fill(name, "field", "never mind"); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.Click(name, "discard"); err != nil {
+			t.Fatal(err)
+		}
+		waitFor(t, "Discard closing the composer", func() bool { return gone(h) })
+	})
+	var drafts []string
+	for _, t := range m.threads {
+		if d := t.draft(newCommentSlot); d != "" {
+			drafts = append(drafts, d)
+		}
+	}
+	if !slices.Equal(drafts, []string{"kept for later"}) {
+		t.Errorf("drafts %q, want the one esc kept and not the discarded one", drafts)
 	}
 }
