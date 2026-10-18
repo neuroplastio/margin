@@ -1,9 +1,17 @@
 # Board
 
-Last updated: 2026-10-18 (HOTTY 0.4)
+Last updated: 2026-10-18 (D22: margin on hotty-a2ui)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (margin on hotty-a2ui) the composer is hotty-a2ui's text field, nvim gone,
+  and the rest of the screen — palette, search prompt, footer, tree pane,
+  threads view, an open thread's comments — is A2UI panes, HTML on a HOTTY
+  host (D22) — whether the field's keys (esc keeps, ctrl+g discards, tab to
+  the buttons) feel right, whether a 3–8 row field that scrolls sideways in
+  cells is livable, whether the table palette, the help-line footer without
+  colour, the folding tree and the Markdown comments read well, and how the
+  panes look as HTML in hottyterm — journal 2026-10-18.2
 - (mermaid as SVG) on a HOTTY host a mermaid fence is its diagram as SVG
   (D19), in cells for the ~2.5 s the renderer compiles on first use, then
   in place; `testdata/demo/demo.md`'s three diagrams — whether they read at
@@ -67,16 +75,6 @@ Last updated: 2026-10-18 (HOTTY 0.4)
   is the right marker (should the orphan's full text be reachable?), whether
   `]`/`[` are the right hop keys and not-wrapping is right, and whether
   dropping the doc name from single-doc rows is right — journal 2026-08-12.3
-- (composer shift+enter) `shift+enter` inside the composer inserts a line
-  break instead of exiting keeping a draft — the host intercepts
-  `{Code: KeyEnter, Mod: ModShift}` and forwards the same `\r` a bare enter
-  gets (the ctrl+enter-intercept shape), because forwarding the CSI-u `<S-CR>`
-  was unreliable: nvim 0.12.4 dropped it silently and the maintainer's nvim
-  turned it into the draft exit (the sequence's lone ESC in normal mode IS the
-  mapped draft-exit) — whether shift+enter now reads as a line break, whether
-  the exit the maintainer saw is gone on their nvim, and whether
-  `interaction.md`'s "ctrl+\ and ctrl+enter are the only keys the host takes"
-  should name shift+enter too (F26) — journal 2026-08-12.2
 - (dive line marks) `space`/`r`/`f` inside a block dive now mark the focused
   source line, not the whole block — a diveable block's (table, raw) review
   state IS the roll-up of its lines, so each marked line renders its own

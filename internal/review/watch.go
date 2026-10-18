@@ -34,8 +34,7 @@ type threadsChangedMsg struct{}
 type docChangedMsg struct{}
 
 // threadWatcher watches the on-disk directories for one document's threads
-// and its document file, turning filesystem events into messages. It follows
-// the same shape waitForDamage uses for the composer's pty output: a channel
+// and its document file, turning filesystem events into messages: a channel
 // wrapped in a tea.Cmd that blocks until there is something worth a redraw
 // over.
 type threadWatcher struct {

@@ -1,14 +1,17 @@
 # Findings
 
 Hard-won technical facts. Every entry here cost real debugging, and most were
-found by a human looking at a screen, not by a test. **Read F1–F4 before touching
-the composer.**
+found by a human looking at a screen, not by a test. **Read F29–F33 before
+touching the panes (D22).** F1–F4, F7, F8, F19–F22 and F26 are about the nvim
+composer D22 removed, and stand as history.
 
 Append only. Do not delete an entry because you think it is fixed — add a note.
 
 ---
 
 ## F1 — `x/vt` silently drops keys with modifiers
+
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
 
 `vt.Emulator.SendKey`'s fallback branch is:
 
@@ -45,6 +48,8 @@ the real terminal produces. A human pressing `shift+O` found it in seconds.
 
 ## F2 — An nvim init script runs *before* the file argument is opened
 
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
+
 Anything in `-u <init>` that inspects the buffer sees an **empty** buffer, because
 nvim has not loaded the file yet.
 
@@ -55,6 +60,8 @@ it empty, so editing an existing comment always opened in insert mode.
 
 ## F3 — `vt.Emulator` has no lock; use `vt.SafeEmulator`
 
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
+
 The pty reader goroutine writes into the cell grid while `View()` reads it from
 the Bubble Tea goroutine. The plain `Emulator` has no synchronisation, and the
 resulting torn reads show up as screen flicker.
@@ -64,6 +71,8 @@ resulting torn reads show up as screen flicker.
 otherwise.
 
 ## F4 — Redraws must be damage-driven, not polled
+
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
 
 Bubble Tea's renderer already caps at `defaultFPS = 60` (~16.7ms). Putting a
 polling ticker on top of that adds a **second, unsynchronised** frame quantum:
@@ -109,6 +118,8 @@ first.
 
 ## F7 — `:cquit N` is the whole IPC
 
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
+
 The composer reports its outcome purely through the child's exit code: 0 submit,
 2 keep as draft, 1 discard. No socket, no protocol, no temp-file handshake. git
 has used the same channel to abort commits for decades.
@@ -119,6 +130,8 @@ The corollary is that **blur is not a separate mechanism**: the host sends
 its own code path.
 
 ## F8 — Without nvim the test suite lies
+
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
 
 Roughly two thirds of the tests call `requireNvim(t)`, which is `t.Skip()`. On a
 machine with no nvim the suite still reports `ok`. A green run in an
@@ -414,6 +427,8 @@ chroma's own output, which resets per token.
 
 ## F19 — what a child nvim decodes, and the meta-key catch
 
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
+
 Verified against nvim 0.12 on a pty, `TERM=xterm-256color`, no kitty
 advertisement, by feeding bytes and watching mapped callbacks fire
 (2026-08-09.19):
@@ -448,6 +463,8 @@ consumed, which reads as if the bytes never arrived.
 
 ## F20 — the emulator's output is a synchronous io.Pipe
 
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
+
 `vt.Emulator`'s `SendText`/`SendKey` write into an `io.Pipe`: the call blocks
 until something Reads. The composer never notices because its
 `io.Copy(ptmx, c.em)` goroutine is always reading. A test that calls
@@ -455,6 +472,8 @@ until something Reads. The composer never notices because its
 *before* the send (see `sendKeyBytes` in composer_keys_test.go).
 
 ## F21 — nvim paints the pane with its own background unless told not to
+
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
 
 Even stripped to a textarea (`-u composerInit`, no colorscheme loaded), nvim
 paints the whole pane with the default colorscheme's `Normal` background —
@@ -478,6 +497,8 @@ selection wants one. `set_hl`'s valid keys are `bg`/`fg`, not `guibg`/`guifg`
 `nvim_set_hl` errors `E5113: invalid key: guibg`.
 
 ## F22 — you cannot put the cursor past the end of a line; `startinsert!` is how you append
+
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
 
 `nvim_win_set_cursor` (0-based column) and Vimscript's `cursor()` (1-based)
 both **clamp onto the last character** of the line — there is no column that
@@ -584,6 +605,8 @@ provides — there is no built-in per-message-type rate limit.
 
 ## F26 — shift+enter does not survive the trip to nvim; fold it onto a newline at the host
 
+*Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
+
 The feedback that shift+enter "exits the nvim editor, keeping the draft"
 (2026-08-12) looked like a nvim mapping bug but is a decode trap. The host
 sees the key as `{Code: KeyEnter, Mod: ModShift}` (only when the terminal
@@ -650,3 +673,50 @@ its shapes cost a probe to get right:
   comment sits on. `--paginate repos/{o}/{r}/pulls/N/comments` (review
   comments) is separate from `issues/N/comments` (the PR's general
   conversation, which has no line and nothing to attach to).
+
+## F29 — the kit's Text folds a typed line break and sets paragraphs flush
+
+A hotty-a2ui Text is Markdown, and in cells it sets it as Markdown does: a
+single newline is a soft break, folded into a space (`"one\ntwo"` draws `one
+two`), and consecutive blocks — paragraphs, a list after a paragraph — draw
+on consecutive rows, with no blank row between them. A backslash escape is
+drawn as written (`\_` shows the backslash), so escaping text to keep it
+from being Markdown makes it worse. A two-space hard break (`"three  \nfour"`)
+holds. A comment, whose every typed line break is meant (journal
+2026-08-10.16), goes to the kit as its paragraphs, each its own Text with a
+blank row between, each line but the last ending in a hard break
+(`commentParagraphs`).
+
+## F30 — a kept surface keeps its document by name
+
+`hottytea.Session.Layout` sends a surface's document only when the name is
+new to it; a surface with `Keep: true` that drops out of the layout is hidden,
+not deleted, and keeps its document. A pane dropped and made again under the
+same name (the composer, each time a comment opens) is then never sent: its
+fresh `html.Rendition` has sent no document, so its `Update` is nothing, and
+the field never gets the host's keyboard. Dropping a pane deletes its surface
+(`model.dropPane` → `Session.Delete`).
+
+## F31 — an HTML rendition says nothing until its document is out
+
+`html.Rendition.Update` returns nothing until `Doc` has been called — which
+`Session.Layout` does for a new surface. The `a=focus` that gives a field the
+host's keyboard comes from `Update`, so it must be called after `Layout`, in
+the same frame (`hotFrame`), as the storybook's `LaidOut` does; called before,
+it is lost until something else redraws.
+
+## F32 — tab in cells always "handles"; the keyboard is what tells
+
+`cells.Rendition.Key("tab")` reports the key handled whether or not focus
+moved: past the last focusable (or before the first) the surface simply loses
+the keyboard (`Controller.St.Keyboard` false), as a host's surface does
+(SPEC §10.1). To keep the keyboard in a pane — the composer — check
+`St.Keyboard` after the key, not what `Key` returned.
+
+## F33 — `KeyName` reads a capital without shift as Caps Lock
+
+`hottytea.KeyName` names `tea.Key{Code: 'M', Text: "M"}` (no shift) `m`: "a
+capital without shift is its small letter, as Caps Lock makes it". A
+terminal or a test that reports a capital that way would type a small letter
+into a field. margin names a typed character by its text (`fieldKeyName`): a
+capital is `shift+` its letter, and text no key names (an IME's) is pasted.

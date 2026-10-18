@@ -1808,8 +1808,8 @@ func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.handleInboxKey(msg)
 	}
 
-	// esc cancels an active selection first — vim's rule, the composer's own
-	// esc (owned by the child while it is open) is untouched. Outside visual
+	// esc cancels an active selection first — vim's rule; the composer's own
+	// esc (the composer's while it is open) is untouched. Outside visual
 	// mode esc is move.surface: the undive key, a no-op where there is no
 	// dive.
 	if m.visual && msg.String() == "esc" {
@@ -2973,9 +2973,9 @@ func commentParagraphs(text string) []string {
 func (m *model) threadLines(i int, t *thread, w, base int) []string {
 	focused := m.at.entry == i
 	// Width includes the border, so the content area is w-2*borderW — which is
-	// exactly the width the composer emulator was created at. Making it any
-	// narrower would let lipgloss re-wrap the emulator's already-wrapped lines,
-	// orphaning words and pulling the cursor off the text.
+	// exactly the width the composer's pane is drawn at. Making it any narrower
+	// would let lipgloss re-wrap the pane's already-laid-out lines, orphaning
+	// words and pulling the cursor off the text (F15).
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
@@ -2997,9 +2997,9 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		// thread (2026-08-09 todo-review feedback). The conversation renders
 		// through the same appendComments the expanded view uses, a dim rule
 		// marks where reading stops and writing starts, and paneLead tells
-		// View how far down the emulator's first row moved. An edit keeps
-		// the composer-only box: the text being edited is already live in
-		// the emulator, so the want the feedback names — seeing what you are
+		// View how far down the composer's first row moved. An edit keeps
+		// the composer-only box: the text being edited is already in the
+		// field, so the want the feedback names — seeing what you are
 		// replying to — does not apply to it.
 		var lead []string
 		if m.comp.target == newCommentSlot {
@@ -3128,7 +3128,7 @@ func (m *model) view() tea.View {
 		}
 		m.hot.anchor = nil
 	}
-	// The emulator's first row sits one line below the focused thread's box
+	// The composer's first row sits one line below the focused thread's box
 	// border, past whatever conversation render() drew ahead of it — both
 	// measured by the render pass that just ran.
 	m.paneTop = -1

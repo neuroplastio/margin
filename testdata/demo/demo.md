@@ -35,7 +35,7 @@ sequenceDiagram
     participant L as events.log
     participant A as Agent
     R->>M: c on a paragraph
-    M->>M: nvim opens in the margin
+    M->>M: the composer opens in the margin
     R->>M: write, then esc
     M->>L: comment.posted
     L-->>A: margin comments wait returns

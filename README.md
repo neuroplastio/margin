@@ -32,15 +32,16 @@ an export the agent can act on.
 
 ## What makes it different
 
-**The composer is a real nvim.** Not a text box that imitates one. Pressing `c`
-splices a live `nvim` into the document at the block you're commenting on, with
-your motions, your registers, your muscle memory. It's stripped to a textarea —
-no statusline, no line numbers, no `~` filler — so all ten rows are your words.
+**The composer opens where you're reading.** Pressing `c` opens a text field in
+the document, at the block you're commenting on, under the conversation it
+joins. It's [hotty-a2ui](https://github.com/neuroplastio/hotty-a2ui)'s field:
+the cursor, selection, word moves, undo and the clipboard all work as they do
+in any text box, and on a HOTTY terminal it's a real HTML textarea.
 
-**The editor is disposable.** Losing focus kills the child process, and the text
-survives as a draft keyed to the block. Focus it again and nvim respawns exactly
-where you left off, mid-sentence. Blur and `esc` are the same code path, so
-there is only ever one way for work to persist.
+**The editor is disposable.** Losing focus closes it, and the text survives as
+a draft keyed to the block. Open it again and you're back where you left off,
+the cursor after your text. Blur and `esc` are the same code path, so there is
+only ever one way for work to persist.
 
 **Comments anchor to blocks, not lines.** Line numbers do not survive an agent
 rewriting a document. Blocks carry a stable id, so a paragraph can be completely
@@ -51,9 +52,11 @@ detectably orphaned rather than silently misplaced.
 (a [HOTTY](https://github.com/neuroplastio/hotty) host, such as hottyterm),
 margin sets headings, paragraphs, lists and quotes in a proportional reading
 font, with real heading sizes, links you can click, images inline and
-mermaid diagrams drawn as SVG. The review itself stays in cells beside them:
-the gutter, threads, the nvim composer, code blocks and tables. Every other terminal gets the cell rendering
-as before, and `--no-hotty` asks for it on a HOTTY host too.
+mermaid diagrams drawn as SVG. The rest of the screen — the composer, the
+palette, the search prompt, the footer, the file tree and the threads view —
+is built with hotty-a2ui, so on a HOTTY host those are HTML too; the gutter,
+code blocks and tables stay in cells. Every other terminal gets all of it in
+cells, and `--no-hotty` asks for that on a HOTTY host too.
 `MARGIN_HOTTY_LOG=/tmp/hotty.log` records what margin and the terminal said to
 each other, for when a HOTTY terminal still gets cells.
 
@@ -197,17 +200,17 @@ needs doing, not a transcript of everything ever said. Pass `--include-resolved`
 (with `Y` or `--stdout` alike) to get the full history back, including what
 was already addressed.
 
-Inside the composer, every key belongs to nvim. Dismissal is nvim's too:
+Inside the composer, keys type. `enter` and `shift+enter` are line breaks, and
+`tab` reaches the Submit, Keep draft and Discard buttons beneath the field:
 
 | Key | Does |
 | --- | --- |
-| `ctrl+s` / `ctrl+enter` / `ZZ` / `:wq` / `SPC c c` | Submit |
-| `esc` (`esc esc` for a new comment) / `:q` / `SPC c d` | Close, keeping a draft — unless nothing changed: editing a comment and closing without editing it keeps no draft |
-| `:q!` / `SPC c k` | Discard |
+| `ctrl+s` / `ctrl+enter` | Submit |
+| `esc` / a click outside | Close, keeping a draft — unless nothing changed: editing a comment and closing without editing it keeps no draft |
+| `ctrl+g` | Discard |
 
-`ctrl+\`, `ctrl+enter` and `shift+enter` are the only keys the host intercepts.
-`ctrl+enter` submits; `shift+enter` is a line break (terminal-prompt muscle
-memory), folded onto the same newline a bare `enter` gets.
+`ctrl+enter` needs a terminal that tells it from `enter` (Ghostty and hottyterm
+do); `ctrl+s` works everywhere.
 
 ## Install
 
@@ -293,20 +296,13 @@ margin --version
 
 ```
 make check              # build + test + vet
-make doctor             # prove this machine can run the composer tests
+make test-race          # the suite under the race detector
 make run FILE=doc.md
 make dist               # the dev binaries, dist/margin{,-launcher}_<os>_<arch>
 ```
 
-Requires Go 1.24+ and `nvim` 0.8+ on `PATH`. `./scripts/setup-env.sh` provisions
-a fresh machine; it is idempotent and safe to re-run.
-
-Note that the composer tests **skip** rather than fail when nvim is absent, so a
-green suite on an unprovisioned machine is misleading — `make doctor` is what
-catches that.
-
-`MARGIN_NVIM_CONFIG=user` runs the composer with your own nvim config instead
-of the stripped one, for comparison.
+Requires Go 1.26. Nothing else: the composer is a library, and every test
+runs everywhere.
 
 ## Releasing
 
@@ -339,7 +335,7 @@ git tag -fa 26.10.03 -m "margin 26.10.03" <fix> && git push -f origin refs/tags/
 
 ## Roadmap
 
-- [x] nvim-in-a-pane composer, with blur/resume drafts
+- [x] An in-document composer, with blur/resume drafts (nvim at first; hotty-a2ui's field since D22)
 - [x] Block-anchored threads, replies, in-place editing
 - [x] Review marks with section roll-up
 - [x] Real markdown parsing (goldmark, keeping source offsets per block)

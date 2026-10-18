@@ -22,7 +22,7 @@ Read, in this order: `vault/goals.md`, the active milestone in
 `vault/roadmap.md`, `vault/tasks/board.md`, the last two or three entries in
 `vault/journal/`. Then list `vault/feedback/` and `vault/questions/`.
 
-If the leg will touch the composer or the emulator, read
+If the leg will touch rendering, the panes (D22) or HOTTY, read
 `vault/knowledge/findings.md` **first**. Every entry there cost real debugging and
 several are invisible to tests.
 
@@ -73,14 +73,14 @@ binding — but its silence is permission, not a blocker.
 make check
 ```
 
-Composer or emulator changes additionally require:
+HOTTY or pane changes additionally require:
 
 ```bash
 make test-race
 ```
 
-The emulator is written from the pty goroutine and read from the render
-goroutine; that class of bug appears only under `-race`.
+The HOTTY tests run a real Bubble Tea program against a test host on goroutines
+of its own; that class of bug appears only under `-race`.
 
 **What you cannot verify:** anything visual, and anything about how fast it
 feels. You have no screen and no sense of latency. Never write that something

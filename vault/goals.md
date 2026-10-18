@@ -27,8 +27,8 @@ A reviewer can:
 1. Open a markdown file or directory and read it comfortably — real measure,
    real block spacing, real heading hierarchy.
 2. Move through it entirely from the keyboard, vim-style.
-3. Leave a comment on any block, in a real nvim, and have it survive losing
-   focus.
+3. Leave a comment on any block, in a real text field, and have it survive
+   losing focus.
 4. Reply to and edit existing comments, including an agent's.
 5. Mark blocks and whole sections reviewed or flagged, and see progress.
 6. Export the whole review in a form an agent acts on directly.
@@ -37,7 +37,8 @@ A reviewer can:
 
 ## Non-goals
 
-- **Not a markdown editor.** margin reviews documents; nvim edits them.
+- **Not a markdown editor.** margin reviews documents; the reviewer's editor
+  edits them.
 - **Not a code review tool.** That is a solved and crowded space.
 - **Not a GitHub client** in v1. Local loop first. Platform sync may come later,
   and it must not shape the local design.
@@ -51,8 +52,9 @@ A reviewer can:
 
 1. **Reading comes first.** If the document is not pleasant to read, nothing else
    matters. Every feature competes for rows against the prose and usually loses.
-2. **Delegate editing to nvim.** Never build a text editor. The composer is a real
-   child process with the user's own muscle memory.
+2. **Delegate editing to the kit.** Never build a text editor. The composer is
+   hotty-a2ui's text field — the same field as HTML on a HOTTY host and in cells
+   everywhere else (D22, which replaced the nvim child of D2).
 3. **Never lose the user's words.** Losing focus, quitting, crashing — the default
    outcome is always that the text is kept. Discarding is explicit.
 4. **Anchor to meaning, not position.** Blocks carry stable ids because an agent

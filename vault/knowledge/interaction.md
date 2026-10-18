@@ -59,39 +59,29 @@ On a heading, the mark keys apply to the whole section.
 
 ### The composer
 
-- It is a real `nvim` child, stripped to a textarea: no statusline, ruler, line
-  numbers, sign column, `~` filler, or `cmdheight`. In a ten-row pane that chrome
-  costs a third of the visible text.
-- The buffer holds **the comment text and nothing else** — no instructions, no
+The maintainer replaced the nvim composer with hotty-a2ui's text field
+(2026-10-18, D22). What carried over from the nvim composer, and stays
+settled:
+
+- The field holds **the comment text and nothing else** — no instructions, no
   quoted context. The block is already on screen above the pane and the keys are
   in the footer.
-- **Insert mode iff the buffer is empty.** A new comment wants typing; existing
-  text — an edit, or a resumed draft — wants normal mode, so the first keystroke
-  is a motion.
-- The mode indicator lives in the host footer, inferred from the cursor shape the
-  child reports via DECSCUSR. nvim's own `-- INSERT --` is off to save a row.
-- Resuming a draft puts the cursor **after** the existing text, not before it.
+- Resuming a draft, or editing a comment, puts the cursor **after** the existing
+  text, not before it.
 
 ### Dismissal
 
 | Gesture | Outcome |
 | --- | --- |
-| `ctrl+s` · `ctrl+enter` · `ZZ` · `:wq` · `:x` · `SPC c c` | Submit |
-| `esc esc` · `:q` · `SPC c d` · losing focus | Keep as a draft |
-| `:q!` · `SPC c k` | Discard |
+| `ctrl+s` · `ctrl+enter` | Submit |
+| losing focus (a click away) | Keep as a draft |
 
 - **Keeping is the default.** Walking away from half-written text keeps it;
   discarding must be asked for. This mirrors the GitHub review model.
-- Nothing ever prompts. `:q` on a modified buffer must not error or ask —
-  `cnoreabbrev` maps it onto the draft path.
-- Every one of these is an nvim mapping or ex command, **not** a key the host
-  intercepts. The pane keeps sole ownership of input, so there is no prefix key.
-- `ctrl+\` and `ctrl+enter` are the only keys the host takes. `ctrl+\` exists so
-  a wedged child cannot trap the user. `ctrl+enter` is there because it cannot
-  work any other way: a terminal sends CR for both enter and ctrl+enter, so nvim
-  cannot distinguish them — we only can because Ghostty speaks the Kitty
-  keyboard protocol. It resolves to the same ex command as every other submit
-  gesture, so there is still one submit path.
+- Nothing ever prompts.
+- `ctrl+enter` needs a terminal that tells it from enter (the Kitty keyboard
+  protocol, as Ghostty speaks it); a plain terminal sends CR for both, and
+  there `ctrl+s` is the submit key. Every submit gesture is one submit path.
 - A plain `enter` is always a newline.
 
 ### Export
@@ -134,6 +124,22 @@ On a heading, the mark keys apply to the whole section.
 ## Not settled — do not guess
 
 These have been raised but not judged. Each needs a felt leg and a review.
+
+- **The A2UI composer's own keys and look** (D22, built 2026-10-18, journal
+  2026-10-18.2): a single `esc` keeps a draft (there is no insert mode to
+  leave first), `ctrl+g` discards (`ctrl+d` and `ctrl+k` edit text on macOS),
+  `shift+enter` is a newline like `enter`, `tab` walks to the Submit / Keep
+  draft / Discard buttons and round again, and the field is 3–8 rows. In
+  cells the field does not soft-wrap a long line — it scrolls sideways (a kit
+  gap); on a HOTTY host it is an HTML textarea, which wraps.
+- **The rest of the screen as A2UI panes** (D22): the palette as a table under
+  a `command · does · key` header, the query's field below it; the search
+  prompt's field; the footer's help line (`j move • c comment • …`) with the
+  progress and status in caption text, without the old green and orange; the
+  tree pane as a folding tree with `▸` on the open file and the progress after
+  the name; the threads view as a table whose selected row is reversed, a
+  click selecting a row; a thread's comments drawn as Markdown, a head line
+  over each.
 
 - What a collapsed thread line should carry. Currently author, truncated first
   line, `(+N)`. Reply count? Unresolved state? Nothing at all?

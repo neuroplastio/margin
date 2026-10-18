@@ -95,8 +95,8 @@ revisited.
 - [`vault/knowledge/decisions.md`](vault/knowledge/decisions.md) — binding `Dn`
   architecture decisions.
 - [`vault/knowledge/findings.md`](vault/knowledge/findings.md) — hard-won technical
-  facts, mostly about the embedded terminal. **Read this before touching the
-  composer**; every entry cost real debugging.
+  facts. **Read this before touching rendering, the panes or HOTTY**; every
+  entry cost real debugging.
 - [`vault/journal/`](vault/journal/) — one file per leg, `YYYY-MM-DD.N.md`.
 
 ## Two entry points
@@ -119,10 +119,10 @@ revisited.
 3. **Claim** it on the board and commit that immediately (`chore(board): claim
    <id>`) so concurrent agents see the lock.
 4. **Implement** — small. Roughly ≤300 lines of diff.
-5. **Verify** — `make check` (build + test + vet). For anything touching the
-   composer, also `make test-race`: the emulator is written from the pty goroutine
-   and read from the render goroutine, and that class of bug only shows under
-   `-race`.
+5. **Verify** — `make check` (build + test + vet). For anything touching HOTTY
+   or the panes on a host, also `make test-race`: the HOTTY tests run a real
+   Bubble Tea program against a test host on goroutines of its own, and that
+   class of bug only shows under `-race`.
 6. **Record** — durable learnings to `vault/knowledge/`; any binding choice to
    `decisions.md`; any newly settled interaction to `interaction.md`.
 7. **Journal + board** — add the journal entry, move the task to done. If the leg
@@ -151,7 +151,7 @@ revisited.
 
 ```
 make check       # build + test + vet — the gate
-make test-race   # required for composer changes
+make test-race   # required for HOTTY and pane changes
 make run
 ```
 

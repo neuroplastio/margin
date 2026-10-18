@@ -19,10 +19,12 @@ language's emulator library would bring. The emulator is display-only — the ch
 writes the file — so its bugs are cosmetic rather than data loss.
 
 **D2 — The composer is a real `nvim` child process, never a built-in editor.**
+*Superseded by D22: the composer is hotty-a2ui's text field.*
 margin does not implement text editing. Anything that looks like it needs a text
 widget is a sign the boundary is in the wrong place.
 
 **D3 — The composer reports its outcome as an exit code, via `:cquit N`.**
+*Superseded by D22: the outcomes stand, applied at once, with no exit code.*
 0 submit, 2 keep as draft, 1 discard. No socket, no protocol, no handshake file.
 Blur uses the same path — see F7 in `findings.md`.
 
@@ -331,7 +333,8 @@ diagrams).
   to plain source), so the fallback contract needs no carve-out.
 
 **D17 — On a HOTTY host, prose blocks are HTML surfaces and the review stays
-in cells.** Maintainer direction (2026-10-02): "Let's implement hotty support
+in cells.** *Amended by D22: the review's panes are hotty-a2ui surfaces, HTML
+on a host.* Maintainer direction (2026-10-02): "Let's implement hotty support
 in margin", with `neuroplastio/hotty-go` (now public) as the dependency. HOTTY
 is "HTML over the TTY" (`neuroplastio/hotty`, SPEC.md): a terminal that is a
 HOTTY host places HTML documents (surfaces) over cell rectangles.
@@ -575,3 +578,60 @@ releases" for releases; the dev channel is unchanged.
   role main-only and having the tag's run dispatch a publish on main (two
   runs for one release, and a trust rule the tag routes around anyway);
   `margin update --channel`.
+
+**D22 — The review's panes are hotty-a2ui surfaces; the composer is its text
+field. Supersedes D2 and D3; amends D17.** Maintainer direction (2026-10-18):
+"replace nvim with a2ui input component, and in general use hotty-a2ui for
+margin", the whole screen in one go. hotty-a2ui (`neuroplastio/hotty-a2ui`)
+renders an A2UI tree of components as HTML surfaces on a HOTTY host and as
+cells on any other terminal, from the same state.
+
+- **What is a pane.** Everything on the screen besides the document column
+  is an A2UI surface margin is the agent of (`internal/review/kit.go`): the
+  composer (a `longText` TextField and Submit/Keep draft/Discard buttons),
+  an open thread's conversation (a comment's head over its text as
+  Markdown), the palette (a HottyTable of commands over the query's field),
+  the search prompt (the draft's field and the match count), the footer (the
+  mode, a HottyKeyHints help line built from a labelled HottyShortcut a key,
+  the progress, the status), the tree pane (a HottyTree) and the threads
+  view (a HottyTable). margin defines each pane's components, writes its
+  data model, and hears its actions; margin's state (the palette's matching
+  and staging, the threads view's focus, the tree's focus) stays margin's,
+  and the pane shows it.
+- **What stays margin's.** The document column: its blocks, the gutter (focus,
+  marks, roll-ups) and the one-line collapsed threads. The kit cannot draw
+  them without losing what is settled — a mark's colour, the gutter, the
+  horizontal scroll, the anchored selection — and lays out a long document
+  in cells too slowly to redraw on every key. On a host its prose blocks are
+  HTML surfaces as before (D17). margin also keeps the two columns beside an
+  open thread's comments, for the focus bar.
+- **Cells and HTML.** On a terminal that is not a host, every pane is the
+  kit's cells rendition, drawn into margin's frame. On a host, a pane margin
+  gives a rectangle of its own is an HTML surface there, its cells left
+  blank (`hotState.place`): the composer, the palette, the search prompt,
+  the footer, the tree pane and the threads view. An open thread's
+  conversation, whose height is its content's, stays cells. A dropped pane
+  deletes its surface, so the next is a new document.
+- **Keys.** margin reads every key first, as before. While the composer is
+  open its keys are the composer's: ctrl+s and ctrl+enter submit, esc keeps a
+  draft, ctrl+g discards, and every other key is the field's (enter and
+  shift+enter are line breaks; tab walks to the buttons and round again).
+  The palette's and search's fields take typing; their navigation keys stay
+  margin's. On a host a field with the keyboard is the host's, and the keys
+  margin answers are given to it (`=program`, SPEC §10.2) or, like esc, reach
+  it anyway. A typed character is named by its text (`fieldKeyName`), so a
+  capital a legacy terminal sends without shift still types one.
+- **Dismissal is synchronous.** There is no child to exit: dismiss applies
+  the outcome the key or button asked for at once, and blur is dismiss with
+  the draft outcome. The outcomes, the draft rules (D7, keep is the default)
+  and the cancel-early drop are D3's, unchanged; the exit codes are gone.
+- **Gone with nvim:** the pty, the vt emulator, the key encoders,
+  `scripts/setup-env.sh`, `make doctor`, CI's nvim install, `$EDITOR` and
+  `MARGIN_NVIM_CONFIG`, and the creack/pty and x/vt dependencies. The suite
+  no longer skips anything for want of a tool.
+- **Rejected.** One surface for the whole screen, the document included (the
+  reasons above); keeping nvim beside the field as an option (two composers
+  is two persistence stories, and D2's reason for nvim — never build an
+  editor — is met by the kit's field); HottyList for the palette and the
+  threads view (three rows an item), and for a thread's comments (it cuts a
+  description to one line).
