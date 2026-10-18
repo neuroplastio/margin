@@ -8,7 +8,7 @@
 #     (D21). `make release` pushes one. The tag is the release's name, and
 #     it gets a GitHub release with the same files.
 #
-# Seven jobs:
+# Eight jobs:
 #
 #   • check — `make check`. On pull requests this is all that runs.
 #   • build — on main or a tag, beside check: `make dist`, the eight binaries,
@@ -23,17 +23,22 @@
 #     rendered from the release's files is audited and installed on macOS and
 #     Linux (packaging/homebrew/check.sh), and only then pushed to the org tap
 #     `neuroplastio/homebrew-tap` with margin's deploy key.
+#   • aur — on a tag, after attach: margin-bin, the launcher and the release's
+#     margin as its seed, built with makepkg from the release's files and its
+#     seed run (packaging/aur/publish.sh), then pushed to the AUR.
 #
 # margin is a public repository, so every job runs on GitHub's hosted runners:
 # a self-hosted runner would run anyone's pull request on our machine.
 #
 # Builds are addressed by full commit. Nothing here creates a tag.
 #
-# There are no secrets. The publish job signs in to AWS with GitHub's OIDC
-# token, as a role that may write under margin/ in the bucket and sign with the
-# release key, and nothing else; it trusts main and YY.MM.DD tags
-# (neuroplastio/infra, release_tags). The role, bucket, key and distribution
-# are not secret, so they are written here, not kept in repository variables.
+# The only secrets are the two package keys, HOMEBREW_TAP_DEPLOY_KEY and
+# AUR_SSH_PRIVATE_KEY; a job whose key is not set skips. The publish job signs
+# in to AWS with GitHub's OIDC token, as a role that may write under margin/ in
+# the bucket and sign with the release key, and nothing else; it trusts main
+# and YY.MM.DD tags (neuroplastio/infra, release_tags). The role, bucket, key
+# and distribution are not secret, so they are written here, not kept in
+# repository variables.
 name: Release
 
 on:
@@ -359,3 +364,37 @@ jobs:
             exit 0
           fi
           packaging/homebrew/publish.sh "$GITHUB_REF_NAME" --push
+
+  # margin-bin on the AUR: the launcher as margin, and the release's margin as
+  # its seed (D20), as the Homebrew formula carries them. publish.sh builds
+  # the package with makepkg from the release's files and runs the seed before
+  # it pushes. makepkg refuses root, so the publish runs as a user of its own.
+  aur:
+    name: publish margin-bin to the AUR
+    if: ${{ github.ref_type == 'tag' }}
+    needs: attach
+    runs-on: ubuntu-latest
+    container: ghcr.io/archlinux/archlinux:base-devel
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Packages
+        run: pacman -Syu --noconfirm --needed git openssh curl libarchive zstd
+
+      - uses: actions/checkout@v7
+
+      # AUR_SSH_PRIVATE_KEY is a key of the AUR account margin-bin belongs to.
+      # Without it the job skips, as hottyterm's and kubecom's do.
+      - name: Publish
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
+            echo "::notice::AUR_SSH_PRIVATE_KEY is not set; skipping the AUR publish"
+            exit 0
+          fi
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          su builder -c "packaging/aur/publish.sh '$GITHUB_REF_NAME' --push"

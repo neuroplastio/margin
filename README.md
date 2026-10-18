@@ -266,6 +266,12 @@ The formula installs the launcher with the stable release it was cut from, so
 margin runs offline from the first start, and `margin update` moves it forward
 from there.
 
+On Arch Linux, from the AUR, with the same launcher and release:
+
+```
+paru -S margin-bin
+```
+
 A package can install `margin-launcher` as `margin` instead, from either
 channel: a thin binary that runs the margin in `~/.local/margin`, fetching
 the newest from its channel there, checked against the same key, the first
