@@ -3136,14 +3136,7 @@ func (m *model) view() tea.View {
 	if m.comp != nil || !m.paletteOpen && !m.searchOpen {
 		b.WriteString(" ")
 	}
-	if m.comp != nil {
-		what := "new comment"
-		if m.comp.target != newCommentSlot {
-			what = "editing comment"
-		}
-		b.WriteString(authorStyle.Render(what) + dimStyle.Render(
-			"  ·  ctrl+s submit · esc keep draft · ctrl+g discard · click away to keep"))
-	} else if m.paletteOpen {
+	if m.paletteOpen && m.comp == nil {
 		at := hottytea.Rect{X: 0, Y: viewport + 1, W: m.w, H: paletteHeight}
 		if m.hot != nil && m.hot.place(m.palettePane(), at, hottytea.Rect{W: m.w, H: m.h}) {
 			b.WriteString(strings.Repeat("\n", paletteHeight-1))
@@ -3157,56 +3150,10 @@ func (m *model) view() tea.View {
 		} else {
 			b.WriteString(searchBox)
 		}
-	} else if m.inbox {
-		b.WriteString(dimStyle.Render(fmt.Sprintf(
-			"threads — %d thread(s) · j/k move · enter open · esc close   ", len(m.inboxItems))))
-		if m.status != "" {
-			b.WriteString(dimStyle.Render(m.status))
-		}
-	} else if m.visual {
-		n := 0
-		if lo, hi, ok := m.selectionRange(); ok {
-			for i := lo; i <= hi; i++ {
-				if m.entries[i].thread == nil {
-					n++
-				}
-			}
-		}
-		b.WriteString(selStyle.Render("-- VISUAL --") + dimStyle.Render(fmt.Sprintf(
-			"  %d block(s)  ·  j/k extend · y yank · V/esc cancel", n)))
-		if m.status != "" {
-			b.WriteString(dimStyle.Render("   " + m.status))
-		}
 	} else {
-		done, flagged, total := m.reviewProgress()
-		progress := fmt.Sprintf("%d/%d reviewed", done, total)
-		if flagged > 0 {
-			progress += fmt.Sprintf(" · %s", flagStyle.Render(fmt.Sprintf("%d flagged", flagged)))
-		}
-		// A tree review's footer rolls the whole tree up, not just the open
-		// document — the open document's own numbers sit on its pane row, so
-		// the footer is where the tree-wide answer lives.
-		if m.tree != nil {
-			td, tf, tt := m.treeProgress()
-			progress = fmt.Sprintf("tree %d/%d reviewed", td, tt)
-			if tf > 0 {
-				progress += fmt.Sprintf(" · %s", flagStyle.Render(fmt.Sprintf("%d flagged", tf)))
-			}
-		}
-		hint := "j/k move · c comment · e edit · space mark · Y copy review · q quit   "
-		if m.raw {
-			hint = "\\ rendered · j/k move · c comment · space mark · Y copy · q quit   "
-		}
-		if m.docChanged {
-			// The persistent half of the change notice: a status line alone is
-			// overwritten by the next verb, so the footer keeps "the document
-			// moved, ctrl+r reloads" in view until the reviewer acts on it.
-			b.WriteString(flagStyle.Render("●") + dimStyle.Render(" file changed — ctrl+r reload   "))
-		}
-		b.WriteString(dimStyle.Render(hint) +
-			dimStyle.Render(progress))
-		if m.status != "" {
-			b.WriteString(dimStyle.Render("   " + m.status))
+		at := hottytea.Rect{X: 1, Y: viewport + 1, W: m.w - 1, H: 1}
+		if m.hot == nil || !m.hot.place(m.footerPane(), at, hottytea.Rect{W: m.w, H: m.h}) {
+			b.WriteString(m.renderFooter(m.w - 1))
 		}
 	}
 
