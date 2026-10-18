@@ -63,10 +63,10 @@ Gutter (the column beside each block):
 
 On a heading, the mark keys apply to the whole section.
 
-The comment composer is a real nvim, so every key inside it belongs to nvim:
-  ctrl+s / ctrl+enter / :wq   submit
-  esc / :q                    close, keeping a draft
-  :q!                         discard
+In the comment composer, keys type; enter is a new line:
+  ctrl+s / ctrl+enter   submit
+  esc / click away      close, keeping a draft
+  ctrl+g                discard
 
 --stdout runs the review as usual, but writes it to stdout on quit instead of
 requiring Y — the same content Y produces — so it can be piped straight into

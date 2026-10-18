@@ -1,15 +1,12 @@
 package review
 
 import (
-	"os/exec"
-	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/charmbracelet/x/vt"
 )
 
 const (
@@ -18,13 +15,6 @@ const (
 	soloAnchor  = "^d4" // seeded thread with one posted comment
 	freshAnchor = "^a1" // paragraph with no thread yet
 )
-
-func requireNvim(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("nvim"); err != nil {
-		t.Skip("nvim not installed")
-	}
-}
 
 // isolateDrafts points the draft cache at a temp dir so tests never touch the
 // real one and never see each other's leftovers.
@@ -41,95 +31,52 @@ func newTestModel(t *testing.T) *model {
 	return m
 }
 
-// plainScreen strips styling before matching. The emulator renders styled runs,
-// and nvim's spell checker splits words with underline codes mid-token, so a
-// naive Contains on the raw output misses text that is plainly on screen.
-func plainScreen(em *vt.SafeEmulator) string {
-	return ansiRe.ReplaceAllString(em.Render(), "")
-}
-
-func waitForScreen(t *testing.T, em *vt.SafeEmulator, want string, timeout time.Duration) string {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	var screen string
-	for time.Now().Before(deadline) {
-		screen = plainScreen(em)
-		if strings.Contains(screen, want) {
-			return screen
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	return screen
-}
-
-func waitForMode(t *testing.T, c *composer, want string, timeout time.Duration) bool {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if c.mode() == want {
-			return true
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	return false
-}
-
-// open spawns an editor and waits for it to be ready: either the seeded text is
-// on screen, or — for an empty buffer — nvim has asked for an insert cursor.
+// open opens the composer, as c or e does, and checks it holds expect.
 func open(t *testing.T, m *model, anchor string, target int, expect string) {
 	t.Helper()
-	requireNvim(t)
-	if cmd := m.openComposer(anchor, target); cmd == nil {
-		t.Fatalf("openComposer(%s, %d) returned no command: %s", anchor, target, m.status)
+	m.openComposer(anchor, target)
+	if m.comp == nil {
+		t.Fatalf("openComposer(%s, %d) opened nothing: %s", anchor, target, m.status)
 	}
-	t.Cleanup(func() {
-		if m.comp != nil {
-			m.comp.close()
-		}
-	})
-	if expect == "" {
-		if !waitForMode(t, m.comp, "INSERT", 10*time.Second) {
-			t.Fatalf("editor never became ready; screen was:\n%s", plainScreen(m.comp.em))
-		}
-		return
-	}
-	if s := waitForScreen(t, m.comp.em, expect, 10*time.Second); !strings.Contains(s, expect) {
-		t.Fatalf("editor never showed %q; screen was:\n%s", expect, s)
+	if got := composed(m); !strings.Contains(got, expect) {
+		t.Fatalf("the composer holds %q, want %q in it", got, expect)
 	}
 }
 
-// typeKeys sends keys with a gap short enough to stay inside nvim's timeoutlen,
-// so multi-key mappings like <leader>ck actually resolve.
-func typeKeys(c *composer, keys ...tea.Key) {
+// composed is what the composer's field holds.
+func composed(m *model) string { return m.comp.p.text("/text") }
+
+// press gives the review keys, as the reviewer types them.
+func press(m *model, keys ...tea.Key) {
 	for _, k := range keys {
-		c.sendKey(k)
-		time.Sleep(60 * time.Millisecond)
+		m.handleKey(tea.KeyPressMsg(k))
 	}
 }
 
-func typeText(c *composer, s string) {
+// typeText types s, a key a character.
+func typeText(m *model, s string) {
 	for _, r := range s {
-		typeKeys(c, tea.Key{Code: r, Text: string(r)})
-	}
-}
-
-func waitExit(t *testing.T, c *composer, timeout time.Duration) error {
-	t.Helper()
-	select {
-	case err := <-c.wait():
-		return err
-	case <-time.After(timeout):
-		t.Fatalf("editor did not exit; screen was:\n%s", plainScreen(c.em))
-		return nil
+		k := tea.Key{Code: r, Text: string(r)}
+		switch r {
+		case ' ':
+			k = keySpace
+		case '\n':
+			k = keyEnter
+		}
+		press(m, k)
 	}
 }
 
 var (
-	keyEsc       = tea.Key{Code: uv.KeyEscape}
-	keyEnter     = tea.Key{Code: uv.KeyEnter}
-	keyCtrlS     = tea.Key{Code: 's', Mod: uv.ModCtrl}
-	keySpace     = tea.Key{Code: uv.KeySpace, Text: " "}
-	keyBackspace = tea.Key{Code: uv.KeyBackspace}
+	keyEsc        = tea.Key{Code: uv.KeyEscape}
+	keyEnter      = tea.Key{Code: uv.KeyEnter}
+	keyCtrlS      = tea.Key{Code: 's', Mod: uv.ModCtrl}
+	keyCtrlG      = tea.Key{Code: 'g', Mod: uv.ModCtrl}
+	keyCtrlEnter  = tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl}
+	keyShiftEnter = tea.Key{Code: uv.KeyEnter, Mod: uv.ModShift}
+	keyTab        = tea.Key{Code: uv.KeyTab}
+	keySpace      = tea.Key{Code: uv.KeySpace, Text: " "}
+	keyBackspace  = tea.Key{Code: uv.KeyBackspace}
 )
 
 func entryFor(t *testing.T, m *model, anchor string) int {
@@ -160,30 +107,24 @@ func blockEntryFor(t *testing.T, m *model, anchor string) int {
 // used to open an empty composer and append a reply instead of editing.
 func TestEditPostedCommentReplacesIt(t *testing.T) {
 	m := newTestModel(t)
-	requireNvim(t)
-
 	i := entryFor(t, m, convoAnchor)
 	m.at = cursor{entry: i, comment: 0}
 	before := len(m.threads[convoAnchor].posted)
 
-	if cmd := m.editFocused(); cmd == nil {
+	m.editFocused()
+	if m.comp == nil {
 		t.Fatalf("e on a posted comment did nothing: %s", m.status)
 	}
-	t.Cleanup(func() {
-		if m.comp != nil {
-			m.comp.close()
-		}
-	})
 	if m.comp.target != 0 {
 		t.Fatalf("composer target = %d, want comment 0", m.comp.target)
 	}
-	// The existing text must be in the buffer, not an empty reply.
-	waitForScreen(t, m.comp.em, "noisy neighbour", 10*time.Second)
+	// The existing text must be in the field, not an empty reply.
+	if got := composed(m); !strings.Contains(got, "noisy neighbour") {
+		t.Fatalf("the composer holds %q, want the comment being edited", got)
+	}
 
-	typeKeys(m.comp, tea.Key{Code: 'A', Mod: uv.ModShift, Text: "A"})
-	typeText(m.comp, " Still true.")
-	typeKeys(m.comp, keyEsc, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, " Still true.")
+	press(m, keyCtrlS)
 
 	posted := m.threads[convoAnchor].posted
 	if len(posted) != before {
@@ -205,9 +146,8 @@ func TestNewCommentAppends(t *testing.T) {
 	before := len(m.threads[soloAnchor].posted)
 
 	open(t, m, soloAnchor, newCommentSlot, "")
-	typeText(m.comp, "March incident, ticket 4412.")
-	typeKeys(m.comp, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "March incident, ticket 4412.")
+	press(m, keyCtrlS)
 
 	posted := m.threads[soloAnchor].posted
 	if len(posted) != before+1 {
@@ -215,6 +155,9 @@ func TestNewCommentAppends(t *testing.T) {
 	}
 	if got := posted[len(posted)-1].body; got != "March incident, ticket 4412." {
 		t.Fatalf("new comment = %q", got)
+	}
+	if m.comp != nil {
+		t.Fatal("the composer is still open after submitting")
 	}
 }
 
@@ -227,9 +170,8 @@ func TestSubmitPersistsThroughTheStore(t *testing.T) {
 	m.store = &threadStore{root: root, docPath: "document.md"}
 
 	open(t, m, soloAnchor, newCommentSlot, "")
-	typeText(m.comp, "Persisted reply.")
-	typeKeys(m.comp, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "Persisted reply.")
+	press(m, keyCtrlS)
 
 	if strings.Contains(m.status, "not saved") {
 		t.Fatalf("status = %q, want no persistence error", m.status)
@@ -260,9 +202,8 @@ func TestSubmitEmitsAnEvent(t *testing.T) {
 	m.store = &threadStore{root: root, docPath: "document.md"}
 
 	open(t, m, soloAnchor, newCommentSlot, "")
-	typeText(m.comp, "Notify the agent.")
-	typeKeys(m.comp, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "Notify the agent.")
+	press(m, keyCtrlS)
 
 	events, err := readEvents(root)
 	if err != nil {
@@ -291,9 +232,8 @@ func TestSubmitWithoutAStoreDoesNotTouchDisk(t *testing.T) {
 	}
 
 	open(t, m, soloAnchor, newCommentSlot, "")
-	typeText(m.comp, "In memory only.")
-	typeKeys(m.comp, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "In memory only.")
+	press(m, keyCtrlS)
 
 	if strings.Contains(m.status, "not saved") {
 		t.Fatalf("status = %q, a nil store should be a silent no-op", m.status)
@@ -312,212 +252,230 @@ func TestEditOnEmptyThreadDoesNotOpen(t *testing.T) {
 	}
 }
 
-// --- modes ------------------------------------------------------------------
-
-// TestNewCommentStartsInInsertMode: an empty buffer wants to be typed into.
-func TestNewCommentStartsInInsertMode(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	if !waitForMode(t, m.comp, "INSERT", 5*time.Second) {
-		t.Fatalf("new comment opened in %s, want INSERT", m.comp.mode())
-	}
-}
-
-// TestEditStartsInNormalMode: existing text wants motions, not insertions.
-func TestEditStartsInNormalMode(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, convoAnchor, 0, "noisy neighbour")
-	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
-		t.Fatalf("editing opened in %s, want NORMAL", m.comp.mode())
-	}
-}
-
-// TestResumedDraftStartsInNormalMode: a resumed draft is existing text too.
-func TestResumedDraftStartsInNormalMode(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, draftAnchor, newCommentSlot, "contradicts")
-	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
-		t.Fatalf("resumed draft opened in %s, want NORMAL", m.comp.mode())
-	}
-}
+// --- the cursor -------------------------------------------------------------
 
 // TestEditPlacesCursorAtTheEnd is the 2026-08-09 composer feedback's
 // "editing a comment should place the cursor at the end" item: `e` on a posted
-// comment must open with the cursor on the last character of the comment text,
-// so an append (`a`) lands at the end rather than after the first character.
-// Asserted through the submitted body — if the cursor sat at {1,0}, `a` would
-// insert " tail" after the opening "S" and the body would come out
-// "S tailhouldn't be global...".
+// comment opens with the cursor after the comment's text, so typing appends.
 func TestEditPlacesCursorAtTheEnd(t *testing.T) {
 	m := newTestModel(t)
 	original := m.threads[convoAnchor].posted[0].body
 
 	open(t, m, convoAnchor, 0, "Shouldn't be global")
-	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
-		t.Fatalf("editing opened in %s, want NORMAL", m.comp.mode())
-	}
+	typeText(m, " tail")
+	press(m, keyCtrlS)
 
-	typeKeys(m.comp, tea.Key{Code: 'a', Text: "a"})
-	typeText(m.comp, " tail")
-	typeKeys(m.comp, keyEsc, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
-
-	got := m.threads[convoAnchor].posted[0].body
-	if !strings.HasSuffix(got, " tail") {
-		t.Fatalf("edited comment = %q, want %q — `a` must have appended at the very end, so the cursor was on the last character", got, original+" tail")
-	}
-	if !strings.HasPrefix(got, original) {
-		t.Fatalf("edited comment = %q, want the original text preserved at the start", got)
+	if got := m.threads[convoAnchor].posted[0].body; got != original+" tail" {
+		t.Fatalf("edited comment = %q, want %q — typing must append at the very end", got, original+" tail")
 	}
 }
 
 // TestResumedDraftPlacesCursorAtTheEnd pins the settled contract
 // (interaction.md) that a resumed draft puts the cursor after the existing
-// text — the same {1,0} → end-of-text fix as the edit path, since both open a
-// non-empty buffer through the same VimEnter branch. Submitting the resumed
-// draft posts it, so the assertion reads the posted comment's body.
+// text. Submitting the resumed draft posts it.
 func TestResumedDraftPlacesCursorAtTheEnd(t *testing.T) {
 	m := newTestModel(t)
 	original := m.threads[draftAnchor].draft(newCommentSlot)
 
 	open(t, m, draftAnchor, newCommentSlot, "contradicts")
-	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
-		t.Fatalf("resumed draft opened in %s, want NORMAL", m.comp.mode())
-	}
-
-	typeKeys(m.comp, tea.Key{Code: 'a', Text: "a"})
-	typeText(m.comp, " tail")
-	typeKeys(m.comp, keyEsc, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, " tail")
+	press(m, keyCtrlS)
 
 	posted := m.threads[draftAnchor].posted
 	if len(posted) != 1 {
 		t.Fatalf("posted %d comments, want 1 — the resumed draft should submit as a new comment", len(posted))
 	}
-	got := posted[0].body
-	if !strings.HasSuffix(got, " tail") {
-		t.Fatalf("resumed draft = %q, want %q — `a` must have appended at the very end, so the cursor was on the last character", got, original+" tail")
-	}
-	if !strings.HasPrefix(got, original) {
-		t.Fatalf("resumed draft = %q, want the original text preserved at the start", got)
+	if got := posted[0].body; got != parseComment(original)+" tail" {
+		t.Fatalf("resumed draft = %q, want %q — typing must append at the very end", got, parseComment(original)+" tail")
 	}
 }
 
-// --- the buffer is only the comment -----------------------------------------
-
-// TestBufferHoldsOnlyTheComment: no instruction comments, no quoted context.
-// The block is on screen above the pane and the keys are in the footer.
-func TestBufferHoldsOnlyTheComment(t *testing.T) {
+// TestComposerShowsTheCursor: the terminal's cursor sits in the field while a
+// composer is open, after the text.
+func TestComposerShowsTheCursor(t *testing.T) {
 	m := newTestModel(t)
-	open(t, m, convoAnchor, 0, "noisy neighbour")
-	screen := plainScreen(m.comp.em)
+	m.View()
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m, "abc")
+	v := m.View()
+	if v.Cursor == nil {
+		t.Fatal("no cursor while a composer is open")
+	}
+	if want := m.docX() + gutterW + borderW + len("abc"); v.Cursor.X < want {
+		t.Errorf("cursor at column %d, want it after the text (%d or past)", v.Cursor.X, want)
+	}
+}
 
-	for _, unwanted := range []string{"<!--", ">8", "submit", "discard", "~", "COMMENT_EDITMSG"} {
-		if strings.Contains(screen, unwanted) {
-			t.Errorf("buffer still shows %q:\n%s", unwanted, screen)
-		}
+// --- the field is only the comment ------------------------------------------
+
+// TestFieldHoldsOnlyTheComment: no instructions, no quoted context. The block
+// is on screen above the pane and the keys are in the footer.
+func TestFieldHoldsOnlyTheComment(t *testing.T) {
+	m := newTestModel(t)
+	before := m.threads[convoAnchor].posted[0].body
+	open(t, m, convoAnchor, 0, "noisy neighbour")
+	if got := composed(m); got != before {
+		t.Fatalf("the field holds %q, want the comment's text and nothing else (%q)", got, before)
 	}
 }
 
 // --- dismissal --------------------------------------------------------------
 
-// TestColonQClosesWithoutPrompting: ':q' is muscle memory and must not stop to
-// ask, in a pane too small to read a prompt in.
-func TestColonQClosesWithoutPrompting(t *testing.T) {
+// TestEnterIsANewline: a plain enter, and shift+enter, break the line; only the
+// submit keys submit.
+func TestEnterIsANewline(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "something unsaved")
-	typeKeys(m.comp, keyEsc)
-	typeText(m.comp, ":q")
-	typeKeys(m.comp, keyEnter)
-
-	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeDraft {
-		t.Fatalf(":q gave outcome %v, want draft", got)
+	typeText(m, "one")
+	press(m, keyEnter)
+	typeText(m, "two")
+	press(m, keyShiftEnter)
+	typeText(m, "three")
+	if m.comp == nil {
+		t.Fatal("enter closed the composer")
 	}
-	if body := m.comp.body(); !strings.Contains(body, "something unsaved") {
-		t.Fatalf(":q lost the text; body = %q", body)
+	if got := composed(m); got != "one\ntwo\nthree" {
+		t.Fatalf("field = %q, want three lines", got)
+	}
+	press(m, keyCtrlS)
+	if got := m.threads[freshAnchor].posted[0].body; got != "one\ntwo\nthree" {
+		t.Fatalf("posted %q, want the three lines", got)
 	}
 }
 
-// TestColonQBangDiscards: ':q!' throws the text away.
-func TestColonQBangDiscards(t *testing.T) {
+// TestCtrlEnterSubmits: ctrl+enter is a submit gesture beside ctrl+s.
+func TestCtrlEnterSubmits(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "never mind")
-	typeKeys(m.comp, keyEsc)
-	typeText(m.comp, ":q!")
-	typeKeys(m.comp, keyEnter)
-
-	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeDiscard {
-		t.Fatalf(":q! gave outcome %v, want discard", got)
+	typeText(m, "ship it")
+	press(m, keyCtrlEnter)
+	if m.comp != nil {
+		t.Fatal("ctrl+enter left the composer open")
+	}
+	tr := m.threads[freshAnchor]
+	if tr == nil || len(tr.posted) != 1 || tr.posted[0].body != "ship it" {
+		t.Fatalf("ctrl+enter did not post the comment: %+v", tr)
 	}
 }
 
-// TestDoubleEscapeKeepsDraft: a new comment opens in insert mode, so leaving it
-// takes two <Esc> — the first exits insert mode, the second is the exit itself
-// — and the unfinished text survives as a draft.
-func TestDoubleEscapeKeepsDraft(t *testing.T) {
+// TestEscapeKeepsDraft: esc closes the composer keeping what was written, so
+// walking away never loses it.
+func TestEscapeKeepsDraft(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "half a thought")
-	typeKeys(m.comp, keyEsc, keyEsc)
+	typeText(m, "half a thought")
+	press(m, keyEsc)
 
-	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeDraft {
-		t.Fatalf("outcome = %v, want draft", got)
-	}
-	if body := m.comp.body(); body != "half a thought" {
-		t.Fatalf("body = %q, want the unfinished text preserved", body)
-	}
-}
-
-// TestSingleEscapeDoesNotExitNewComment: one <Esc> from a new comment only
-// leaves insert mode. The composer must stay open — typing and reviewing is not
-// one keypress from closing — and a second <Esc> exits keeping the draft.
-func TestSingleEscapeDoesNotExitNewComment(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "half a thought")
-
-	done := make(chan error, 1)
-	go func() { done <- m.comp.cmd.Wait() }()
-	typeKeys(m.comp, keyEsc)
-	select {
-	case err := <-done:
-		t.Fatalf("a single <Esc> exited the composer (%v); a new comment needs two", err)
-	case <-time.After(700 * time.Millisecond):
-	}
-	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
-		t.Fatalf("after one <Esc> the composer is in %s, want NORMAL", m.comp.mode())
-	}
-
-	typeKeys(m.comp, keyEsc)
-	select {
-	case err := <-done:
-		m.dismiss(err)
-	case <-time.After(10 * time.Second):
-		t.Fatalf("double <Esc> did not exit; screen:\n%s", plainScreen(m.comp.em))
+	if m.comp != nil {
+		t.Fatal("esc left the composer open")
 	}
 	if got := m.threads[freshAnchor].draft(newCommentSlot); got != "half a thought" {
 		t.Fatalf("draft = %q, want the unfinished text preserved", got)
 	}
+	if persisted, _ := loadDraft(freshAnchor, newCommentSlot); persisted != "half a thought" {
+		t.Fatalf("draft was not persisted; got %q", persisted)
+	}
 }
 
-// TestSingleEscapeExitsEdit: an edit opens in normal mode with the comment
-// already on screen, so there is nothing to finish — a single <Esc> exits,
-// keeping the change as a draft and leaving the posted comment untouched.
-func TestSingleEscapeExitsEdit(t *testing.T) {
+// TestEscapeExitsEdit: esc on an edit keeps the change as a draft, leaving the
+// posted comment untouched.
+func TestEscapeExitsEdit(t *testing.T) {
 	m := newTestModel(t)
 	original := m.threads[convoAnchor].posted[0].body
 
 	open(t, m, convoAnchor, 0, "noisy neighbour")
-	typeKeys(m.comp, keyEsc)
+	typeText(m, " WIP")
+	press(m, keyEsc)
 
-	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeDraft {
-		t.Fatalf("single <Esc> on an edit gave outcome %v, want draft", got)
-	}
-	if got := m.threads[convoAnchor].posted[0].body; got != original {
+	tr := m.threads[convoAnchor]
+	if got := tr.posted[0].body; got != original {
 		t.Fatalf("posted comment was mutated by an esc-exited edit: %q", got)
 	}
+	if got := tr.draft(0); got != original+" WIP" {
+		t.Fatalf("edit draft = %q, want the unsaved edit kept", got)
+	}
+}
+
+// TestCtrlGDiscards: ctrl+g throws the text away; discarding has to be asked
+// for.
+func TestCtrlGDiscards(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, draftAnchor, newCommentSlot, "contradicts")
+	press(m, keyCtrlG)
+
+	if m.comp != nil {
+		t.Fatal("ctrl+g left the composer open")
+	}
+	if got := m.threads[draftAnchor].draft(newCommentSlot); got != "" {
+		t.Fatalf("draft = %q, want it thrown away by ctrl+g", got)
+	}
+}
+
+// TestComposerButtons: the pane's buttons do what the keys do — tab reaches
+// them, enter presses the focused one, and a click presses the one under it.
+func TestComposerButtons(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m, "by button")
+	press(m, keyTab, keyEnter) // Submit
+	tr := m.threads[freshAnchor]
+	if m.comp != nil || tr == nil || len(tr.posted) != 1 {
+		t.Fatalf("tab, enter did not submit: comp %v, thread %+v", m.comp, tr)
+	}
+
+	m.View()
+	open(t, m, soloAnchor, newCommentSlot, "")
+	typeText(m, "kept")
+	m.View()
+	x, y, _, _, ok := m.comp.p.box("draft")
+	if !ok {
+		t.Fatal("no Keep draft button in the composer")
+	}
+	m.handleClick(tea.Mouse{X: m.docX() + gutterW + borderW + x, Y: m.paneTop + y - m.scroll})
+	if m.comp != nil {
+		t.Fatal("clicking Keep draft left the composer open")
+	}
+	if got := m.threads[soloAnchor].draft(newCommentSlot); got != "kept" {
+		t.Fatalf("draft = %q, want the text kept by the button", got)
+	}
+}
+
+// TestTabStaysInTheComposer: tab walks the field and the buttons and comes
+// back round, never leaving the composer without the keyboard.
+func TestTabStaysInTheComposer(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	press(m, keyTab, keyTab, keyTab, keyTab) // Submit, Keep draft, Discard, the field
+	typeText(m, "back in the field")
+	if got := composed(m); got != "back in the field" {
+		t.Fatalf("field = %q after tabbing round, want the typing in it", got)
+	}
+}
+
+// TestPasteIntoTheComposer: a paste lands in the field.
+func TestPasteIntoTheComposer(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	m.update(tea.PasteMsg{Content: "pasted\ntext"})
+	if got := composed(m); got != "pasted\ntext" {
+		t.Fatalf("field = %q, want the paste", got)
+	}
+}
+
+// TestComposerKeepsKeysFromTheReview: while a composer is open, single-letter
+// review keys type, they do not act.
+func TestComposerKeepsKeysFromTheReview(t *testing.T) {
+	m := newTestModel(t)
+	at := m.at
+	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m, "jkqrf")
+	if m.quitting {
+		t.Fatal("q quit while typing a comment")
+	}
+	if got := composed(m); got != "jkqrf" {
+		t.Fatalf("field = %q, want the letters typed", got)
+	}
+	_ = at
 }
 
 // TestUnchangedEditCreatesNoDraft pins the "no diff, no draft" rule: editing a
@@ -530,13 +488,8 @@ func TestUnchangedEditCreatesNoDraft(t *testing.T) {
 	original := m.threads[convoAnchor].posted[0].body
 
 	open(t, m, convoAnchor, 0, "noisy neighbour")
-	typeKeys(m.comp, keyEsc)
+	press(m, keyEsc)
 
-	err := waitExit(t, m.comp, 10*time.Second)
-	if got := outcomeFromExit(err); got != outcomeDraft {
-		t.Fatalf("single <Esc> on an edit gave outcome %v, want draft", got)
-	}
-	m.dismiss(err)
 	tr := m.threads[convoAnchor]
 	if tr.posted[0].body != original {
 		t.Fatalf("posted comment was mutated by an unchanged edit: %q", tr.posted[0].body)
@@ -553,10 +506,7 @@ func TestUnchangedEditCreatesNoDraft(t *testing.T) {
 }
 
 // TestUnchangedEditClearsStaleDraft: an edit that reverts to exactly the posted
-// text clears whatever draft the target held. The old behaviour could leave a
-// draft whose text was identical to the comment it shadowed; resuming it and
-// exiting unchanged now recognises there is no diff and drops it, in the thread
-// and on disk alike.
+// text clears whatever draft the target held, in the thread and on disk alike.
 func TestUnchangedEditClearsStaleDraft(t *testing.T) {
 	m := newTestModel(t)
 	original := m.threads[convoAnchor].posted[0].body
@@ -567,8 +517,7 @@ func TestUnchangedEditClearsStaleDraft(t *testing.T) {
 	}
 
 	open(t, m, convoAnchor, 0, "noisy neighbour")
-	typeKeys(m.comp, keyEsc)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	press(m, keyEsc)
 
 	if got := tr.draft(0); got != "" {
 		t.Fatalf("a revert-to-posted edit left draft %q behind", got)
@@ -581,30 +530,16 @@ func TestUnchangedEditClearsStaleDraft(t *testing.T) {
 	}
 }
 
-func TestSpacemacsDiscard(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, draftAnchor, newCommentSlot, "contradicts")
-	typeKeys(m.comp, keySpace,
-		tea.Key{Code: 'c', Text: "c"},
-		tea.Key{Code: 'k', Text: "k"})
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
-
-	if got := m.threads[draftAnchor].draft(newCommentSlot); got != "" {
-		t.Fatalf("draft = %q, want it thrown away by SPC c k", got)
-	}
-}
-
 // --- cancel-early must not leave an empty thread ---------------------------
 
 // TestCancelNewCommentCreatesNoThread: `c` on a block with no thread and an
-// immediate double-<Esc> cancel (nothing typed, so nothing to keep) must not
-// leave a "no comments yet" thread behind — the feedback's whole point. Focus
-// goes back to the block the aborted comment was about.
+// immediate esc (nothing typed, so nothing to keep) must not leave a "no
+// comments yet" thread behind. Focus goes back to the block the aborted
+// comment was about.
 func TestCancelNewCommentCreatesNoThread(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeKeys(m.comp, keyEsc, keyEsc)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	press(m, keyEsc)
 
 	if _, ok := m.threads[freshAnchor]; ok {
 		t.Fatalf("cancel left an empty thread for %s behind", freshAnchor)
@@ -619,16 +554,15 @@ func TestCancelNewCommentCreatesNoThread(t *testing.T) {
 	}
 }
 
-// TestSubmitEmptyNewCommentCreatesNoThread: submitting an empty buffer says
+// TestSubmitEmptyNewCommentCreatesNoThread: submitting an empty field says
 // "nothing to submit" and must be as thread-free as a cancel.
 func TestSubmitEmptyNewCommentCreatesNoThread(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeKeys(m.comp, tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl})
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	press(m, keyCtrlEnter)
 
 	if _, ok := m.threads[freshAnchor]; ok {
-		t.Fatalf("submitting an empty buffer left a thread for %s behind", freshAnchor)
+		t.Fatalf("submitting an empty field left a thread for %s behind", freshAnchor)
 	}
 }
 
@@ -637,10 +571,8 @@ func TestSubmitEmptyNewCommentCreatesNoThread(t *testing.T) {
 func TestDiscardNewCommentCreatesNoThread(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeKeys(m.comp, keyEsc)
-	typeText(m.comp, ":q!")
-	typeKeys(m.comp, keyEnter)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "never mind")
+	press(m, keyCtrlG)
 
 	if _, ok := m.threads[freshAnchor]; ok {
 		t.Fatalf("discard left a thread for %s behind", freshAnchor)
@@ -652,9 +584,8 @@ func TestDiscardNewCommentCreatesNoThread(t *testing.T) {
 func TestDraftKeepsFreshThread(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "half a thought")
-	typeKeys(m.comp, keyEsc, keyEsc)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "half a thought")
+	press(m, keyEsc)
 
 	tr := m.threads[freshAnchor]
 	if tr == nil {
@@ -672,8 +603,7 @@ func TestCancelEditKeepsThread(t *testing.T) {
 	original := m.threads[soloAnchor].posted[0].body
 
 	open(t, m, soloAnchor, 0, "Where does thirty")
-	typeKeys(m.comp, keyEsc)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	press(m, keyEsc)
 
 	if m.threads[soloAnchor] == nil {
 		t.Fatal("a cancelled edit dropped its thread")
@@ -683,18 +613,15 @@ func TestCancelEditKeepsThread(t *testing.T) {
 	}
 }
 
-
 // --- blur -------------------------------------------------------------------
 
-// TestBlurKeepsDraft is the core bet: losing focus tears down a live editor and
-// the half-written text survives it.
+// TestBlurKeepsDraft is the core bet: losing focus drops the editor and the
+// half-written text survives it.
 func TestBlurKeepsDraft(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, draftAnchor, newCommentSlot, "contradicts")
-	typeKeys(m.comp, tea.Key{Code: 'A', Mod: uv.ModShift, Text: "A"})
-	typeText(m.comp, " and the breaker section too")
+	typeText(m, " and the breaker section too")
 	m.blur(nil)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
 
 	if m.comp != nil {
 		t.Fatal("composer still open after blur")
@@ -716,10 +643,8 @@ func TestBlurredEditIsKeptSeparately(t *testing.T) {
 	original := m.threads[convoAnchor].posted[0].body
 
 	open(t, m, convoAnchor, 0, "noisy neighbour")
-	typeKeys(m.comp, tea.Key{Code: 'A', Mod: uv.ModShift, Text: "A"})
-	typeText(m.comp, " WIP")
+	typeText(m, " WIP")
 	m.blur(nil)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
 
 	tr := m.threads[convoAnchor]
 	if tr.posted[0].body != original {
@@ -771,7 +696,8 @@ func TestClickSelectsAComment(t *testing.T) {
 	}
 }
 
-// TestClickAwayBlurs covers the mouse path out of a live editor.
+// TestClickAwayBlurs covers the mouse path out of a live editor: the text is
+// kept and the click's spot takes focus.
 func TestClickAwayBlurs(t *testing.T) {
 	m := newTestModel(t)
 	m.View()
@@ -779,7 +705,6 @@ func TestClickAwayBlurs(t *testing.T) {
 	m.View()
 
 	m.handleClick(tea.Mouse{X: 4, Y: 0})
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
 	if m.comp != nil {
 		t.Fatal("composer still open after clicking away")
 	}
@@ -788,19 +713,26 @@ func TestClickAwayBlurs(t *testing.T) {
 	}
 }
 
-// TestClickInsidePaneDoesNotBlur: clicks in the editor belong to the editor.
+// TestClickInsidePaneDoesNotBlur: clicks in the editor belong to the editor —
+// they place its cursor.
 func TestClickInsidePaneDoesNotBlur(t *testing.T) {
 	m := newTestModel(t)
 	m.View()
 	open(t, m, draftAnchor, newCommentSlot, "contradicts")
 	m.View()
 
-	m.handleClick(tea.Mouse{X: gutterW + borderW + 2, Y: m.paneTop + 1 - m.scroll})
+	m.handleClick(tea.Mouse{X: m.docX() + gutterW + borderW + 2, Y: m.paneTop - m.scroll})
 	if m.pendingOpen != nil {
 		t.Fatalf("a click inside the pane queued a focus change to %+v", m.pendingOpen)
 	}
 	if m.comp == nil {
 		t.Fatal("a click inside the pane closed the editor")
+	}
+	// The click put the cursor near the start of the field's first line:
+	// typing lands there, not at the end.
+	typeText(m, "X")
+	if got := composed(m); strings.HasSuffix(got, "X") || !strings.Contains(got, "X") {
+		t.Fatalf("field = %q, want the X typed where the click put the cursor", got)
 	}
 }
 
@@ -1964,22 +1896,6 @@ func TestClampScrollFollowsFocusOnceItMoves(t *testing.T) {
 
 // --- unit-level rules -------------------------------------------------------
 
-func TestOutcomeFromExit(t *testing.T) {
-	for _, tc := range []struct {
-		script string
-		want   outcome
-	}{
-		{"exit 0", outcomeSubmit},
-		{"exit 1", outcomeDiscard},
-		{"exit 2", outcomeDraft},
-		{"exit 7", outcomeDiscard},
-	} {
-		if got := outcomeFromExit(exec.Command("sh", "-c", tc.script).Run()); got != tc.want {
-			t.Errorf("%s -> %v, want %v", tc.script, got, tc.want)
-		}
-	}
-}
-
 func TestDraftsAreKeyedByAnchorAndTarget(t *testing.T) {
 	isolateDrafts(t)
 	if err := saveDraft("^a1", newCommentSlot, "a reply"); err != nil {
@@ -2011,29 +1927,14 @@ func TestEmptyDraftIsCleared(t *testing.T) {
 
 // --- plumbing ---------------------------------------------------------------
 
-// TestModeFollowsCursorShape: nvim's own mode indicator is off, so the host
-// infers it from the cursor shape the child reports via DECSCUSR.
-func TestModeFollowsCursorShape(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	if !waitForMode(t, m.comp, "INSERT", 3*time.Second) {
-		t.Fatalf("mode = %q on an empty buffer, want INSERT", m.comp.mode())
-	}
-	typeKeys(m.comp, keyEsc)
-	if !waitForMode(t, m.comp, "NORMAL", 3*time.Second) {
-		t.Fatalf("mode = %q after escape, want NORMAL", m.comp.mode())
-	}
-}
-
-// TestLineRefPrefixOpensInInsertModeAfterThePrefix: the 2026-08-09 composer
-// feedback asked that commenting with a visual selection (or a line dive)
-// start typing immediately after the auto-appended L12-18: reference, with no
-// intermediate mode-switch step. The whole path is exercised: V then j selects
-// a range, c prepends the reference and opens the composer, which must come up
-// in INSERT mode with the cursor past the prefix — asserted by the body: the
-// typed text lands after the reference, not before it.
-func TestLineRefPrefixOpensInInsertModeAfterThePrefix(t *testing.T) {
+// TestLineRefPrefixTypesAfterThePrefix: the 2026-08-09 composer feedback
+// asked that commenting with a visual selection (or a line dive) start typing
+// immediately after the auto-appended L12-18: reference. V then j selects a
+// range, c prepends the reference and opens the composer with the cursor past
+// it — asserted by the body: the typed text lands after the reference.
+func TestLineRefPrefixTypesAfterThePrefix(t *testing.T) {
 	m := newModelAt("sample.md", parseDoc([]byte(sampleDoc)), nil)
+	isolateDrafts(t)
 	m.w, m.h = 100, 60
 	m.at = cursor{entry: 1, comment: commentNone} // paragraph at line 3
 
@@ -2046,183 +1947,61 @@ func TestLineRefPrefixOpensInInsertModeAfterThePrefix(t *testing.T) {
 	}
 
 	pressKey(m, "c")
-	t.Cleanup(func() {
-		if m.comp != nil {
-			m.comp.close()
-		}
-	})
-	if !waitForMode(t, m.comp, "INSERT", 10*time.Second) {
-		t.Fatalf("mode = %s after c with a selection, want INSERT past the prefix; screen:\n%s", m.comp.mode(), plainScreen(m.comp.em))
+	if m.comp == nil {
+		t.Fatalf("c with a selection opened nothing: %s", m.status)
 	}
-
-	typeText(m.comp, "ship it")
-	done := make(chan error, 1)
-	go func() { done <- m.comp.cmd.Wait() }()
-	typeKeys(m.comp, keyCtrlS)
-	select {
-	case err := <-done:
-		m.dismiss(err)
-	case <-time.After(10 * time.Second):
-		t.Fatalf("submit did not exit; screen:\n%s", plainScreen(m.comp.em))
-	}
+	typeText(m, "ship it")
+	press(m, keyCtrlS)
 
 	posted := m.threads[a].posted
 	if len(posted) != 1 {
 		t.Fatalf("posted %d comments, want 1", len(posted))
 	}
-	if want := wantPrefix + "ship it"; posted[0].body != want {
+	if want := strings.TrimSpace(wantPrefix + "ship it"); posted[0].body != want {
 		t.Errorf("comment body = %q, want %q — the cursor must have sat past the prefix", posted[0].body, want)
 	}
 }
 
-// TestLineRefPrefixWithTextStillOpensNormalMode: the insert-after-prefix carve
-// out is exact — a buffer that is nothing but the reference. A draft carrying
-// real text behind the prefix (a resumed draft, or a comment being edited)
-// keeps the settled rule: normal mode, so a single <Esc> exits keeping the
-// draft.
-func TestLineRefPrefixWithTextStillOpensNormalMode(t *testing.T) {
-	m := newTestModel(t)
-	tr := m.ensureThread(freshAnchor)
-	tr.setDraft(newCommentSlot, "L12-18: the sharing claim looks wrong")
-
-	open(t, m, freshAnchor, newCommentSlot, "the sharing claim looks wrong")
-	if !waitForMode(t, m.comp, "NORMAL", 5*time.Second) {
-		t.Fatalf("mode = %s, want NORMAL for a prefixed draft with text", m.comp.mode())
-	}
-
-	done := make(chan error, 1)
-	go func() { done <- m.comp.cmd.Wait() }()
-	typeKeys(m.comp, keyEsc)
-	select {
-	case err := <-done:
-		if got := outcomeFromExit(err); got != outcomeDraft {
-			t.Fatalf("single <Esc> from normal mode gave %v, want draft", got)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatalf("single <Esc> did not exit normal mode; screen:\n%s", plainScreen(m.comp.em))
-	}
-}
-
-// TestVtDropsModifiedKeys pins the upstream behaviour the workaround exists for.
-// vt.SendKey's fallback is `if key.Mod == 0 { seq += string(key.Code) }`, so a
-// shifted printable is silently dropped. Under Ghostty's Kitty keyboard protocol
-// that is every capital letter. If this ever starts skipping, vt has been fixed
-// and composer.sendKey's Text fast-path can be reconsidered.
-func TestVtDropsModifiedKeys(t *testing.T) {
+// TestShiftedKeysReachTheField is the regression for capitals vanishing: a
+// shifted key, as the Kitty keyboard protocol reports it, types its character.
+func TestShiftedKeysReachTheField(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	m.comp.em.SendKey(uv.KeyPressEvent(uv.Key{Code: 'q', Mod: uv.ModShift, Text: "Q"}))
-	time.Sleep(300 * time.Millisecond)
-	if strings.Contains(plainScreen(m.comp.em), "Q") {
-		t.Skip("vt now encodes modified keys; the Text fast-path may be redundant")
-	}
-}
-
-// TestShiftedKeysReachChild is the regression for capitals silently vanishing.
-func TestShiftedKeysReachChild(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	typeKeys(m.comp,
+	press(m,
 		tea.Key{Code: 'o', Mod: uv.ModShift, Text: "O"},
 		tea.Key{Code: 'd', Mod: uv.ModShift, Text: "D"},
-		tea.Key{Code: '1', Mod: uv.ModShift, Text: "!"})
-	if s := waitForScreen(t, m.comp.em, "OD!", 3*time.Second); !strings.Contains(s, "OD!") {
-		t.Fatalf("shifted keys did not reach the child; screen was:\n%s", s)
+		tea.Key{Code: '1', Mod: uv.ModShift, ShiftedCode: '!', Text: "!"})
+	if got := composed(m); got != "OD!" {
+		t.Fatalf("field = %q, want the shifted characters", got)
 	}
 }
 
-// TestDamageArrivesPromptly measures the part of the round trip the host owns.
-// It excludes Bubble Tea's frame quantum, so it is a floor rather than perceived
-// latency — but if this is already tens of milliseconds, no amount of render
-// tuning will help.
-func TestDamageArrivesPromptly(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	select {
-	case <-m.comp.damage:
-	default:
-	}
-
-	var samples []time.Duration
-	for i := 0; i < 20; i++ {
-		start := time.Now()
-		m.comp.sendKey(tea.Key{Code: 'x', Text: "x"})
-		select {
-		case <-m.comp.damage:
-			samples = append(samples, time.Since(start))
-		case <-time.After(2 * time.Second):
-			t.Fatalf("no damage signal after keystroke %d", i)
-		}
-	}
-	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
-	median, worst := samples[len(samples)/2], samples[len(samples)-1]
-	t.Logf("key→damage round trip over 20 keystrokes: median %v · worst %v",
-		median.Round(10*time.Microsecond), worst.Round(10*time.Microsecond))
-
-	// Assert on the median, not the worst: a single scheduler hiccup — or the
-	// race detector's instrumentation — should not fail a latency floor. What
-	// matters is whether the plumbing is in the sub-millisecond range or the
-	// tens of milliseconds the renderer was once blamed for.
-	if median > 5*time.Millisecond {
-		t.Errorf("host round trip median is %v, too slow to blame the renderer", median)
-	}
-}
-
-func TestPaneResize(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	m.comp.resize(72, 12)
-	if m.comp.em.Width() != 72 || m.comp.em.Height() != 12 {
-		t.Fatalf("emulator did not resize: got %dx%d, want 72x12",
-			m.comp.em.Width(), m.comp.em.Height())
-	}
-}
-
-// TestComposerBoxDoesNotRewrap is the regression for the composer wrapping
-// feedback: the box rendering the emulator used to be built with
-// Width(w-2*borderW), but lipgloss's Width includes the border, so the box's
-// content area was w-4 — two columns narrower than the emulator. The
-// emulator's already-wrapped lines were then re-wrapped by the box, orphaning
-// single words on their own line and shifting every row so the cursor no longer
-// matched the text. The box must be sized so its content area is exactly the
-// emulator's width, and then the emulator's rows must land in the box verbatim.
+// TestComposerBoxDoesNotRewrap: the box around the composer is sized so its
+// content area is exactly the pane's width, and the pane's rows land in it
+// verbatim — lipgloss must not re-wrap them, or the cursor would sit off the
+// text.
 func TestComposerBoxDoesNotRewrap(t *testing.T) {
-	requireNvim(t)
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
+	typeText(m, "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen")
+	m.View()
 
-	// A line long enough that nvim soft-wraps it inside the pane, with a word
-	// parked in the emulator's final two columns — exactly where the old box
-	// used to snap it onto its own line.
-	typeText(m.comp, "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen")
-	time.Sleep(300 * time.Millisecond)
-	m.render()
-
-	// The composer's span is the focused entry: top border, paneRows emulator
-	// rows, bottom border, then the thread's trailing blank line. Any
-	// re-wrapping by the box would add rows.
 	span := m.spans[m.at.entry]
-	if got := span.end - span.start + 1; got != paneRows+3 {
-		t.Fatalf("composer box occupies %d rows, want %d — the box is re-wrapping the emulator's lines", got, paneRows+3)
+	if got, want := span.end-span.start+1, m.paneH+3; got != want {
+		t.Fatalf("composer box occupies %d rows, want %d — the box is re-wrapping the pane's lines", got, want)
 	}
-
-	// The box's top border's dash count is its content width. It must be the
-	// emulator's width: narrower and lipgloss re-wraps, wider and the pane
-	// bleeds past the frame.
-	top := ansiRe.ReplaceAllString(m.render()[span.start], "")
-	if inner := strings.Count(top, "─"); inner != m.comp.em.Width() {
-		t.Fatalf("box content area is %d columns, emulator is %d — the box re-wraps the emulator's lines", inner, m.comp.em.Width())
+	lines := m.render()
+	top := ansiRe.ReplaceAllString(lines[span.start], "")
+	if inner := strings.Count(top, "─"); inner != m.paneW {
+		t.Fatalf("box content area is %d columns, the pane is %d", inner, m.paneW)
 	}
-
-	// And the emulator's rows must appear in the box unchanged, not re-flowed.
-	// Each content row is gutterW spaces, the │ border, the emulator row, │.
-	em := strings.Split(plainScreen(m.comp.em), "\n")
-	for j := 0; j < paneRows; j++ {
-		row := ansiRe.ReplaceAllString(m.render()[span.start+1+j], "")
+	pane := strings.Split(m.comp.p.draw(m.paneW).Plain(), "\n")
+	for j := 0; j < m.paneH; j++ {
+		row := ansiRe.ReplaceAllString(lines[span.start+1+j], "")
 		row = strings.TrimPrefix(row, strings.Repeat(" ", gutterW)+"│")
 		row = strings.TrimSuffix(row, "│")
-		if got := strings.TrimRight(row, " "); got != strings.TrimRight(em[j], " ") {
-			t.Errorf("box row %d = %q, emulator row = %q", j, got, em[j])
+		if got := strings.TrimRight(row, " "); got != strings.TrimRight(pane[j], " ") {
+			t.Errorf("box row %d = %q, pane row = %q", j, got, pane[j])
 		}
 	}
 }
@@ -2230,14 +2009,12 @@ func TestComposerBoxDoesNotRewrap(t *testing.T) {
 // TestComposerShowsConversationOnNewComment pins the 2026-08-09 feedback:
 // adding a comment to a thread that already has one shows the conversation
 // above the editor, so the reply reads as a reply rather than a parallel
-// thread. The emulator's rows, the mouse routing (paneTop) and the comments'
+// thread. The pane's rows, the mouse routing (paneTop) and the comments'
 // click targets (subspans) must all agree on where the editor starts.
 func TestComposerShowsConversationOnNewComment(t *testing.T) {
-	requireNvim(t)
 	m := newTestModel(t)
 	open(t, m, convoAnchor, newCommentSlot, "")
-	typeText(m.comp, "replying with the thread on screen")
-	time.Sleep(300 * time.Millisecond)
+	typeText(m, "replying with the thread on screen")
 
 	m.View()
 	if m.paneLead == 0 {
@@ -2249,8 +2026,6 @@ func TestComposerShowsConversationOnNewComment(t *testing.T) {
 		plain[i] = ansiRe.ReplaceAllString(l, "")
 	}
 
-	// Both seeded comments render inside the thread's box, above the
-	// emulator's first row.
 	span := m.spans[m.at.entry]
 	above := strings.Join(plain[span.start:m.paneTop], "\n")
 	for _, want := range []string{"Shouldn't be global", "Changed to per-endpoint budgets"} {
@@ -2258,24 +2033,18 @@ func TestComposerShowsConversationOnNewComment(t *testing.T) {
 			t.Errorf("conversation above the composer is missing %q:\n%s", want, above)
 		}
 	}
-
-	// A rule marks where reading stops and writing starts, on the line
-	// directly above the emulator.
 	if rule := strings.Trim(plain[m.paneTop-1], " │"); !strings.Contains(rule, "───") {
 		t.Errorf("no separator rule ahead of the composer, got %q", plain[m.paneTop-1])
 	}
 
-	// paneTop still points at the emulator's first row, past the
-	// conversation.
-	em := strings.Split(plainScreen(m.comp.em), "\n")
+	// paneTop points at the pane's first row, past the conversation.
+	pane := strings.Split(m.comp.p.draw(m.paneW).Plain(), "\n")
 	row := strings.TrimPrefix(plain[m.paneTop], strings.Repeat(" ", gutterW)+"│")
 	row = strings.TrimSuffix(row, "│")
-	if got, want := strings.TrimRight(row, " "), strings.TrimRight(em[0], " "); got != want {
-		t.Errorf("paneTop row = %q, emulator row 0 = %q — mouse routing would land off the text", got, want)
+	if got, want := strings.TrimRight(row, " "), strings.TrimRight(pane[0], " "); got != want {
+		t.Errorf("paneTop row = %q, pane row 0 = %q — mouse routing would land off the text", got, want)
 	}
 
-	// The comments on screen keep their click targets, and those targets
-	// cover the lines the comments actually render on.
 	for j, author := range []string{"toly", "agent"} {
 		s, ok := m.subspans[cursor{entry: m.at.entry, comment: j}]
 		if !ok {
@@ -2291,10 +2060,9 @@ func TestComposerShowsConversationOnNewComment(t *testing.T) {
 }
 
 // TestComposerBoxStaysSoloWhenEditing pins the other half of the split: an
-// edit's text is already live in the emulator, so the box stays composer-only
-// and the conversation does not render twice.
+// edit's text is already in the field, so the box stays composer-only and the
+// conversation does not render twice.
 func TestComposerBoxStaysSoloWhenEditing(t *testing.T) {
-	requireNvim(t)
 	m := newTestModel(t)
 	open(t, m, convoAnchor, 0, "Shouldn't be global")
 
@@ -2303,15 +2071,14 @@ func TestComposerBoxStaysSoloWhenEditing(t *testing.T) {
 		t.Fatalf("editing renders %d lead lines, want the composer-only box", m.paneLead)
 	}
 	span := m.spans[m.at.entry]
-	if got := span.end - span.start + 1; got != paneRows+3 {
-		t.Fatalf("edit box occupies %d rows, want %d", got, paneRows+3)
+	if got, want := span.end-span.start+1, m.paneH+3; got != want {
+		t.Fatalf("edit box occupies %d rows, want %d (borders, the pane, the blank after)", got, want)
 	}
 }
 
 // TestComposerBoxStaysSoloOnFreshThread: with no conversation to show, a new
-// comment's box is exactly what it was before the conversation landed.
+// comment's box holds the composer alone.
 func TestComposerBoxStaysSoloOnFreshThread(t *testing.T) {
-	requireNvim(t)
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
 
@@ -2375,25 +2142,23 @@ func TestFirstPaintBeforeSizeIsKnownDoesNotPoisonScroll(t *testing.T) {
 func TestFocusRetainedOnCommentExit(t *testing.T) {
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "fresh comment body")
-	typeKeys(m.comp, keyEsc, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, "fresh comment body")
+	press(m, keyCtrlS)
 
 	if m.at.comment != 0 {
 		t.Fatalf("focus after submitting new comment = %d, want 0", m.at.comment)
 	}
 
-	cmd := m.editFocused()
-	if cmd == nil || m.comp == nil {
+	m.editFocused()
+	if m.comp == nil {
 		t.Fatal("editFocused() after comment exit did not open composer")
 	}
 	if m.comp.target != 0 {
 		t.Fatalf("composer target = %d, want 0", m.comp.target)
 	}
 
-	typeText(m.comp, " updated")
-	typeKeys(m.comp, keyEsc, keyCtrlS)
-	m.dismiss(waitExit(t, m.comp, 10*time.Second))
+	typeText(m, " updated")
+	press(m, keyCtrlS)
 
 	if m.at.comment != 0 {
 		t.Fatalf("focus after updating comment = %d, want 0", m.at.comment)

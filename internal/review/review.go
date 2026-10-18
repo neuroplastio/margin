@@ -1,13 +1,13 @@
 // Package review implements margin's document review model: a markdown
-// document whose blocks carry anchored comment threads, where focusing a thread
-// splices a real nvim in as the composer and blurring it collapses back to a
-// one-line draft.
+// document whose blocks carry anchored comment threads, where a comment is
+// written in a composer opened inside its thread and blurring it collapses
+// back to a one-line draft.
 //
-// The load-bearing bet is that the editor is disposable. A composer is a live
-// child process; losing focus kills it, and the text survives as a draft keyed
-// by anchor and target. Regaining focus respawns nvim with the draft restored.
-// Blur and pressing "esc" are therefore the same code path, so there is only
-// ever one persistence story.
+// The editor is disposable. A composer is an A2UI text field in a pane of its
+// own (D22); losing focus drops it, and the text survives as a draft keyed by
+// anchor and target. Opening it again makes a fresh one with the draft
+// restored. Blur and pressing "esc" are therefore the same code path, so there
+// is only ever one persistence story.
 package review
 
 import (
@@ -18,11 +18,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/alecthomas/chroma/v2/quick"
@@ -34,7 +33,6 @@ import (
 )
 
 const (
-	paneRows   = 10 // composer height; nvim gets cramped below ~8
 	minPaneCol = 40
 	gutterW    = 3 // focus bar + mark rule + space
 	borderW    = 1
@@ -56,18 +54,6 @@ const (
 	motionFramePeriod = time.Second / 120
 )
 
-// damageMsg says the child wrote something, so the grid may have changed. It is
-// the only thing that triggers a redraw: polling on a ticker adds a full tick of
-// latency to every keystroke and burns frames when nothing moved.
-type damageMsg struct{ gen int }
-
-type heartbeatMsg time.Time
-
-type childExitMsg struct {
-	gen int
-	err error
-}
-
 // importPRMsg carries the outcome of a background `:import-pr` run: the
 // import report on success, or the error the CLI would have printed. The
 // gh CLI call must not run on the render goroutine, so the command performs
@@ -75,34 +61,6 @@ type childExitMsg struct {
 type importPRMsg struct {
 	rep ImportReport
 	err error
-}
-
-// cursorState mirrors the child's cursor. The emulator reports style and
-// visibility through callbacks, which fire on the pty reader goroutine, so it
-// needs its own lock — View() reads it from the Bubble Tea goroutine.
-type cursorState struct {
-	mu      sync.RWMutex
-	shape   tea.CursorShape
-	blink   bool
-	visible bool
-}
-
-func (c *cursorState) set(shape tea.CursorShape, blink bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.shape, c.blink = shape, blink
-}
-
-func (c *cursorState) setVisible(v bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.visible = v
-}
-
-func (c *cursorState) get() (tea.CursorShape, bool, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.shape, c.blink, c.visible
 }
 
 // entry is one row of the flattened block list: either a document block or the
@@ -254,11 +212,11 @@ type model struct {
 	at           cursor
 	hoveredEntry int
 	comp         *composer
-	gen          int
+	// kit is the review's panes (D22, kit.go), made when the first is.
+	kit *kit
 
-	// pendingOpen is queued when a click lands on another thread while an
-	// editor is open. Blur is asynchronous — nvim has to write its buffer and
-	// exit — so the new focus has to wait its turn.
+	// pendingOpen is where focus goes once a blur has dismissed the composer:
+	// a click that lands on another thread while an editor is open.
 	pendingOpen *cursor
 
 	w, h   int
@@ -331,14 +289,15 @@ type model struct {
 
 	spans    []span
 	subspans map[cursor]span // comment-level spans of the expanded thread
-	paneTop  int             // line index of the first emulator row; -1 when idle
+	paneTop  int             // line index of the composer's first row; -1 when idle
 	paneW    int
+	paneH    int // the composer's rows
 	// paneLead counts the box content lines rendered ahead of the composer
-	// emulator — the thread's existing conversation, shown while a new
-	// comment is being written into it. render() resets it and threadLines
-	// sets it, the same render-pass side channel spans and subspans use, and
-	// View folds it into paneTop so mouse routing and cursor placement keep
-	// pointing at the emulator's first row.
+	// — the thread's existing conversation, shown while a new comment is
+	// being written into it. render() resets it and threadLines sets it, the
+	// same render-pass side channel spans and subspans use, and View folds it
+	// into paneTop so mouse routing and cursor placement keep pointing at the
+	// composer's first row.
 	paneLead int
 
 	// jumps is the jumplist (jump.go): the positions each jump — following a
@@ -359,13 +318,6 @@ type model struct {
 	// surfaces. nil with --no-hotty, and on every model a test builds unless
 	// it asks for one.
 	hot *hotState
-
-	// Latency instrumentation: keyAt is stamped when a keypress is forwarded
-	// and sampled on the first frame the child's response reaches, so samples
-	// measure the whole round trip — host key, pty, nvim, emulator, our frame.
-	keyAt     time.Time
-	sawDamage bool
-	samples   []time.Duration
 }
 
 // seedModel builds a model over the document seeded in code. Tests use it so
@@ -481,32 +433,17 @@ func (m *model) Init() tea.Cmd {
 	if m.hot != nil {
 		// Whether the terminal is a HOTTY host (D17): until it answers, and
 		// wherever it is not, margin draws in cells as it always has.
-		return tea.Batch(m.heartbeat(), m.watcher.wait(), m.hot.s.Detect())
+		return tea.Batch(m.watcher.wait(), m.hot.s.Detect())
 	}
-	return tea.Batch(m.heartbeat(), m.watcher.wait())
+	return m.watcher.wait()
 }
 
-func (m *model) heartbeat() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg { return heartbeatMsg(t) })
-}
-
-func (m *model) waitForDamage() tea.Cmd {
-	if m.comp == nil {
-		return nil
+// panes is the review's kit, made the first time a pane is wanted.
+func (m *model) panes() *kit {
+	if m.kit == nil {
+		m.kit = newKit()
 	}
-	c := m.comp
-	return func() tea.Msg {
-		<-c.damage
-		return damageMsg{gen: c.gen}
-	}
-}
-
-func (m *model) waitForChild() tea.Cmd {
-	if m.comp == nil {
-		return nil
-	}
-	c := m.comp
-	return func() tea.Msg { return childExitMsg{gen: c.gen, err: <-c.wait()} }
+	return m.kit
 }
 
 // contentWidth is the reading measure: the width the document's prose wraps
@@ -1602,17 +1539,7 @@ func (m *model) treeProgress() (done, flagged, total int) {
 
 // --- composing --------------------------------------------------------------
 
-// escHint names the exit gesture in the composer footer. A new comment opens in
-// insert mode, so it takes double <Esc> — the first leaves insert mode, the
-// second exits; an edit opens in normal mode, so a single <Esc> exits.
-func escHint(target int) string {
-	if target == newCommentSlot {
-		return "esc esc keep"
-	}
-	return "esc keep"
-}
-
-// openComposer splices a live editor into a thread. target selects what is being
+// openComposer opens the composer in a thread. target selects what is being
 // written: newCommentSlot for a reply, or the index of a posted comment to edit.
 func (m *model) openComposer(anchor string, target int) tea.Cmd {
 	t := m.ensureThread(anchor)
@@ -1627,22 +1554,7 @@ func (m *model) openComposer(anchor string, target int) tea.Cmd {
 		seed = t.posted[target].body
 	}
 
-	m.gen++
-	c, err := newComposer(m.gen, anchor, target, seed, m.contentWidth()-2*borderW, paneRows)
-	if err != nil {
-		m.status = "could not open editor: " + err.Error()
-		// A thread ensureThread just created for this open would linger as an
-		// empty "no comments yet" row with nothing ever committed to it — the
-		// same situation dismiss's cancel-early drop handles, minus the
-		// composer to dismiss.
-		if m.freshAnchor == anchor && len(t.posted) == 0 && len(t.drafts) == 0 && !t.resolved {
-			delete(m.threads, anchor)
-			m.rebuild()
-		}
-		m.freshAnchor = ""
-		return nil
-	}
-	m.comp = c
+	m.comp = newComposer(m.panes(), anchor, target, seed)
 	m.status = ""
 	// Focus follows the composer so scrolling keeps the pane on screen.
 	for i, e := range m.entries {
@@ -1650,23 +1562,21 @@ func (m *model) openComposer(anchor string, target int) tea.Cmd {
 			m.at = cursor{entry: i, comment: commentNone}
 		}
 	}
-	return tea.Batch(m.waitForDamage(), m.waitForChild())
+	return nil
 }
 
-// blur asks the composer to shut down, optionally queueing a position to focus
-// once it has. Nothing is torn down here: the child has to write its buffer
-// first, and childExitMsg is where the outcome gets applied.
+// blur dismisses the composer keeping a draft, as esc does, then focuses
+// then, if it is set.
 func (m *model) blur(then *cursor) {
 	if m.comp == nil {
 		return
 	}
 	m.pendingOpen = then
-	m.comp.requestDraft()
+	m.dismiss(outcomeDraft)
 }
 
-// dismiss applies the outcome the child signalled through its exit code.
-func (m *model) dismiss(err error) tea.Cmd {
-	out := outcomeFromExit(err)
+// dismiss applies the outcome the reviewer asked the composer for.
+func (m *model) dismiss(out outcome) tea.Cmd {
 	body := m.comp.body()
 	t := m.threads[m.comp.anchor]
 	target := m.comp.target
@@ -1736,7 +1646,7 @@ func (m *model) dismiss(err error) tea.Cmd {
 		m.status = "discarded"
 	}
 
-	m.comp.close()
+	m.panes().drop(composerID)
 	m.comp = nil
 
 	// Cancelling before committing must not leave an empty thread behind
@@ -1777,29 +1687,13 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-		if m.comp != nil {
-			m.comp.resize(m.contentWidth()-2*borderW, paneRows)
-		}
 		return m, nil
 
-	case damageMsg:
-		if m.quitting || m.comp == nil || msg.gen != m.comp.gen {
-			return m, nil
+	case tea.PasteMsg:
+		if m.comp != nil {
+			m.comp.p.paste(msg.Content)
 		}
-		m.sawDamage = true
-		return m, m.waitForDamage()
-
-	case heartbeatMsg:
-		if m.quitting {
-			return m, nil
-		}
-		return m, m.heartbeat()
-
-	case childExitMsg:
-		if m.comp == nil || msg.gen != m.comp.gen {
-			return m, nil
-		}
-		return m, m.dismiss(msg.err)
+		return m, nil
 
 	case docChangedMsg:
 		if m.quitting {
@@ -1883,22 +1777,13 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
-	// ctrl+\ is the only key the host ever intercepts while a composer has
-	// focus, and it exists purely so a wedged child cannot trap you. Submit,
-	// draft and discard are all nvim mappings — see composerInit.
+	// ctrl+\ quits from anywhere, the composer included.
 	if msg.String() == "ctrl+\\" {
 		m.quitting = true
-		if m.comp != nil {
-			m.comp.close()
-		}
 		return tea.Quit
 	}
 	if m.comp != nil {
-		if m.keyAt.IsZero() {
-			m.keyAt = time.Now()
-		}
-		m.comp.sendKey(msg.Key())
-		return nil
+		return m.composerKey(msg)
 	}
 
 	// While focus sits in the tree pane it owns the keyboard: j/k move
@@ -2155,6 +2040,81 @@ func (m *model) editFocused() tea.Cmd {
 	return nil
 }
 
+// inComposer reports whether the screen column x of document line line is in
+// the composer, and where in its pane.
+func (m *model) inComposer(x, line int) (relX, relY int, ok bool) {
+	if m.comp == nil || m.paneTop < 0 {
+		return 0, 0, false
+	}
+	relY, relX = line-m.paneTop, x-(m.docX()+gutterW+borderW)
+	return relX, relY, relY >= 0 && relY < m.paneH && relX >= 0 && relX < m.paneW
+}
+
+// composerKey gives the composer a key. Submit, keep and discard are its own
+// (composer.go); every other key is the field's, or the pane's: tab walks
+// to its buttons and back, and enter presses the one focused.
+func (m *model) composerKey(msg tea.KeyPressMsg) tea.Cmd {
+	k := msg.Key()
+	name := fieldKeyName(k)
+	if out, ok := keyOutcome(name); ok {
+		return m.dismiss(out)
+	}
+	p := m.comp.p
+	if name == "" && k.Text != "" {
+		p.paste(k.Text) // text no key names: an IME's, a compose sequence's
+	} else {
+		p.key(name)
+	}
+	if !p.c.St.Keyboard {
+		// Tab past the last button, or shift+tab before the field: round
+		// again, so the keyboard never leaves the composer for nothing.
+		if name == "shift+tab" {
+			p.focus(p.c.FindComponent("discard", rootScope))
+		} else {
+			p.focus(p.c.FindComponent("field", rootScope))
+		}
+	}
+	return m.composerActs()
+}
+
+// fieldKeyName is a key's name as the composer's field takes it (SPEC
+// §10.4). A typed character is named by the character it types — a capital
+// as shift with its letter — whatever modifiers the terminal reported with
+// it, so a capital a legacy terminal sends without shift still types as
+// one. shift+enter is a line break, as enter is. It is "" for text that no
+// key names, which is typed as it is.
+func fieldKeyName(k tea.Key) string {
+	if k.Code == tea.KeyEnter && k.Mod == tea.ModShift {
+		return "enter"
+	}
+	if locks := tea.ModCapsLock | tea.ModNumLock | tea.ModScrollLock; k.Text == "" || k.Mod&^(tea.ModShift|locks) != 0 {
+		return hottytea.KeyName(k)
+	}
+	r, n := utf8.DecodeRuneInString(k.Text)
+	switch {
+	case n != len(k.Text) || !unicode.IsPrint(r):
+		return ""
+	case r == ' ':
+		return "space"
+	case unicode.IsUpper(r) && unicode.ToUpper(unicode.ToLower(r)) == r:
+		return "shift+" + string(unicode.ToLower(r))
+	}
+	return string(r)
+}
+
+// composerActs applies what the composer's buttons asked for.
+func (m *model) composerActs() tea.Cmd {
+	for _, a := range m.panes().take() {
+		if m.comp == nil || a.SurfaceID != composerID {
+			continue
+		}
+		if out, ok := actionOutcome(a.Name); ok {
+			return m.dismiss(out)
+		}
+	}
+	return nil
+}
+
 // handleClick routes a click. Inside a live composer it positions the cursor;
 // everywhere else it only moves focus — opening an editor is always an explicit
 // c or e, never a side effect of clicking.
@@ -2172,12 +2132,9 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 		return nil
 	}
 
-	if m.comp != nil && m.paneTop >= 0 {
-		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
-		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
-			m.comp.sendMouse(relX, relY, mo.Button, false)
-			return nil
-		}
+	if relX, relY, ok := m.inComposer(mo.X, line); ok {
+		m.comp.p.click(relX, relY)
+		return m.composerActs()
 	}
 
 	// The document column is the inbox list, not the document — a click there
@@ -2268,12 +2225,9 @@ func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 		return nil
 	}
 
-	if m.comp != nil && m.paneTop >= 0 {
-		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
-		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
-			m.hoveredEntry = -1
-			return nil
-		}
+	if _, _, ok := m.inComposer(mo.X, line); ok {
+		m.hoveredEntry = -1
+		return nil
 	}
 
 	// The inbox column is not the document — hovering it clears any document
@@ -2314,12 +2268,14 @@ func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
 		return nil
 	}
 
-	if m.comp != nil && m.paneTop >= 0 {
-		relY, relX := line-m.paneTop, mo.X-(m.docX()+gutterW+borderW)
-		if relY >= 0 && relY < paneRows && relX >= 0 && relX < m.paneW {
-			m.comp.sendMouse(relX, relY, mo.Button, false)
-			return nil
+	if relX, relY, ok := m.inComposer(mo.X, line); ok {
+		dy := 1
+		if mo.Button == uv.MouseWheelUp {
+			dy = -1
 		}
+		m.comp.p.cr.Wheel(relX, relY, 0, dy)
+		m.comp.p.dirty = true
+		return nil
 	}
 
 	delta := m.wheelSpeed
@@ -2980,7 +2936,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 			}
 		}
 		m.paneLead = len(lead)
-		body := append(lead, strings.Split(m.comp.em.Render(), "\n")...)
+		body := append(lead, m.comp.p.lines(w-2*borderW)...)
 		return indent(strings.Split(box.Render(strings.Join(body, "\n")), "\n"))
 	}
 
@@ -3077,13 +3033,6 @@ func (m *model) view() tea.View {
 		v.AltScreen = true
 		return v
 	}
-	// Sample only on a frame the child's output actually triggered. Bubble Tea
-	// also renders immediately after the keypress itself, and counting that
-	// frame would report a latency of roughly zero.
-	if m.sawDamage && !m.keyAt.IsZero() {
-		m.samples = append(m.samples, time.Since(m.keyAt))
-		m.keyAt, m.sawDamage = time.Time{}, false
-	}
 
 	lines := m.render()
 	if m.hot != nil && m.hot.anchor != nil {
@@ -3102,6 +3051,7 @@ func (m *model) view() tea.View {
 	if m.comp != nil && m.at.entry < len(m.spans) {
 		m.paneTop = m.spans[m.at.entry].start + borderW + m.paneLead
 		m.paneW = m.contentWidth() - 2*borderW
+		m.paneH = m.comp.p.draw(m.paneW).Rows
 	}
 
 	var paletteBox string
@@ -3155,8 +3105,8 @@ func (m *model) view() tea.View {
 		if m.comp.target != newCommentSlot {
 			what = "editing comment"
 		}
-		b.WriteString(authorStyle.Render(m.comp.mode()) + dimStyle.Render(
-			"  "+what+"  ·  ctrl+s save · "+escHint(m.comp.target)+" · SPC c k discard · click away to blur"))
+		b.WriteString(authorStyle.Render(what) + dimStyle.Render(
+			"  ·  ctrl+s submit · esc keep draft · ctrl+g discard · click away to keep"))
 	} else if m.paletteOpen {
 		b.WriteString(paletteBox)
 	} else if m.searchOpen {
@@ -3226,11 +3176,13 @@ func (m *model) view() tea.View {
 	// pointer is not a button.
 	v.MouseMode = tea.MouseModeAllMotion
 	if m.comp != nil && m.paneTop >= 0 {
-		if shape, blink, shown := m.comp.cur.get(); shown {
-			cp := m.comp.em.CursorPosition()
-			if y := m.paneTop + cp.Y - m.scroll; y >= 0 && y < viewport {
-				c := tea.NewCursor(m.docX()+gutterW+borderW+cp.X, y)
-				c.Shape, c.Blink = shape, blink
+		if cx, cy, ok := m.comp.p.cursor(m.paneW); ok {
+			if y := m.paneTop + cy - m.scroll; y >= 0 && y < viewport {
+				c := tea.NewCursor(m.docX()+gutterW+borderW+cx, y)
+				c.Shape, c.Blink = tea.CursorBar, false
+				if m.comp.p.draw(m.paneW).BlockCursor() {
+					c.Shape = tea.CursorBlock
+				}
 				v.Cursor = c
 			}
 		}
@@ -4016,21 +3968,6 @@ func tableRuleLine(widths []int) string {
 	return strings.Join(cells, tableColumnSpacing)
 }
 
-// reportLatency prints the keypress-to-frame round trip, so "feels sluggish"
-// becomes a number that can be compared across changes.
-func reportLatency(samples []time.Duration) {
-	if len(samples) == 0 {
-		return
-	}
-	sorted := append([]time.Duration(nil), samples...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-	at := func(q float64) time.Duration {
-		return sorted[int(q*float64(len(sorted)-1))].Round(100 * time.Microsecond)
-	}
-	fmt.Fprintf(os.Stderr, "\nkey → frame latency over %d keystrokes: p50 %v · p90 %v · p99 %v · max %v\n",
-		len(sorted), at(0.5), at(0.9), at(0.99), at(1))
-}
-
 // RunOptions controls how Run behaves, beyond which file it opens.
 type RunOptions struct {
 	// Stdout, when set, writes the review to stdout on quit instead of
@@ -4237,7 +4174,6 @@ func runModel(m *model, opts RunOptions) error {
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
-	reportLatency(m.samples)
 
 	if opts.Stdout {
 		fmt.Print(exportReview(m.path, m.doc, m.threads, m.effectiveMarks(), m.includeResolved, m.ephemeral))

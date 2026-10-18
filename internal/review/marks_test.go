@@ -227,42 +227,16 @@ func TestExportIsBoundToShiftY(t *testing.T) {
 	}
 }
 
-// TestCtrlEnterSubmits: a plain terminal sends CR for both enter and
-// ctrl+enter, so nvim cannot tell them apart and the host has to. This asserts
-// our half — that the key resolves to the same submit path as every other
-// gesture.
-func TestCtrlEnterSubmits(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "ship it")
-	typeKeys(m.comp, tea.Key{Code: uv.KeyEnter, Mod: uv.ModCtrl})
-
-	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeSubmit {
-		t.Fatalf("ctrl+enter gave outcome %v, want submit", got)
-	}
-	if body := m.comp.body(); body != "ship it" {
-		t.Fatalf("body = %q, want the text saved on submit", body)
-	}
-}
-
 // TestCtrlEnterDecodesThroughRealReader pins the whole real path for ctrl+enter
-// in the composer, not just our half of it. TestCtrlEnterSubmits above builds
-// the key by hand, which validates the composer's handling but skips the decode
-// the real terminal produces. Ghostty (which margin is built against, see F1)
-// reports ctrl+enter under the kitty keyboard protocol as CSI 13;5u; feeding
-// those exact bytes through the same uv terminal reader bubbletea v2 uses must
-// come out as a KeyPressMsg the model routes to the composer, which must submit.
-//
-// What this does NOT prove is that the maintainer's terminal actually reports
-// the modifier — the journal 2026-08-06.3 flagged that as unverifiable, and a
-// plain terminal sends plain CR for both enter and ctrl+enter, so the intercept
-// can never fire there. This pins our side of that contract: a kitty-speaking
-// terminal's ctrl+enter reaches the submit path untouched.
+// in the composer. Ghostty reports ctrl+enter under the kitty keyboard protocol
+// as CSI 13;5u; feeding those exact bytes through the same uv terminal reader
+// bubbletea v2 uses must come out as a KeyPressMsg the model routes to the
+// composer, which must submit. A plain terminal sends CR for both enter and
+// ctrl+enter, so there ctrl+s is the submit key.
 func TestCtrlEnterDecodesThroughRealReader(t *testing.T) {
-	requireNvim(t)
 	m := newTestModel(t)
 	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "ship it")
+	typeText(m, "ship it")
 
 	tr := uv.NewTerminalReader(strings.NewReader("\x1b[13;5u"), "xterm-256color")
 	evc := make(chan uv.Event, 1)
@@ -287,28 +261,10 @@ func TestCtrlEnterDecodesThroughRealReader(t *testing.T) {
 		t.Fatal("timed out waiting for the reader to decode")
 	}
 
-	if got := outcomeFromExit(waitExit(t, m.comp, 10*time.Second)); got != outcomeSubmit {
-		t.Fatalf("ctrl+enter gave outcome %v, want submit", got)
+	if m.comp != nil {
+		t.Fatal("ctrl+enter left the composer open")
 	}
-	if body := m.comp.body(); body != "ship it" {
-		t.Fatalf("body = %q, want the text saved on submit", body)
-	}
-}
-
-// A bare enter must still be a newline, not a submit.
-func TestPlainEnterIsANewline(t *testing.T) {
-	m := newTestModel(t)
-	open(t, m, freshAnchor, newCommentSlot, "")
-	typeText(m.comp, "first")
-	typeKeys(m.comp, tea.Key{Code: uv.KeyEnter})
-	typeText(m.comp, "second")
-
-	if m.comp.cmd.ProcessState != nil {
-		t.Fatal("plain enter exited the editor; it must insert a newline")
-	}
-	typeKeys(m.comp, keyCtrlS)
-	waitExit(t, m.comp, 10*time.Second)
-	if body := m.comp.body(); !strings.Contains(body, "first\nsecond") {
-		t.Errorf("body = %q, want enter to have inserted a line break", body)
+	if tr := m.threads[freshAnchor]; tr == nil || len(tr.posted) != 1 || tr.posted[0].body != "ship it" {
+		t.Fatalf("ctrl+enter did not post the comment: %+v", tr)
 	}
 }

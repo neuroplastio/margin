@@ -35,17 +35,6 @@ git config user.name "Anatoly Rugalev"
 git config user.email "anatoly.rugalev@gmail.com"
 ```
 
-Then confirm the environment can actually verify the composer:
-
-```bash
-make doctor
-```
-
-If `make doctor` fails, **stop the run immediately** and report it. Roughly two
-thirds of the tests skip without a usable nvim, so a run in a broken environment
-produces green commits that prove nothing. Do not proceed and do not "work around
-it".
-
 ### 2. Loop
 
 For each leg, spawn a **fresh subagent** whose entire instruction is:

@@ -21,7 +21,7 @@ DIST_LDFLAGS := -s -w -X $(VERSION_PKG).Commit=$(COMMIT) \
 	-X $(VERSION_PKG).Version=$(DIST_VERSION) -X $(VERSION_PKG).Channel=$(CHANNEL)
 DIST_PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
-.PHONY: check build dist release test test-race vet fmt run doctor clean mermaid-wasm mermaid-metrics
+.PHONY: check build dist release test test-race vet fmt run clean mermaid-wasm mermaid-metrics
 
 # The canonical gate. Keep the tree green.
 check: build test vet
@@ -73,20 +73,14 @@ release:
 test:
 	go test ./...
 
-# The pty-backed tests spawn real nvim children; -race is where the interesting
-# failures live, since the emulator is written from one goroutine and read from
-# another.
+# The HOTTY tests run a real Bubble Tea program against a test host, whose
+# output and input are on goroutines of their own: -race is where their
+# failures live.
 test-race:
 	go test -race ./...
 
 vet:
 	go vet ./...
-
-# Prove the machine can actually run the composer tests. Without nvim they
-# t.Skip() and the suite still reports ok, so a green `make check` on an
-# unprovisioned box proves much less than it appears to.
-doctor:
-	./scripts/setup-env.sh --verify
 
 fmt:
 	gofmt -l -w .

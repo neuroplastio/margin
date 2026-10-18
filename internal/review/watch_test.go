@@ -392,7 +392,6 @@ func TestReloadDocWithoutAStoreIsANoop(t *testing.T) {
 // read, so a reload must refuse rather than swap the document out from under a
 // live edit (D7).
 func TestReloadDocRefusesWhileComposerOpen(t *testing.T) {
-	requireNvim(t)
 	root := t.TempDir()
 	docPath := "doc.md"
 	path := filepath.Join(root, docPath)

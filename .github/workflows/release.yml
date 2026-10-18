@@ -10,8 +10,7 @@
 #
 # Seven jobs:
 #
-#   • check — `make check`, with a real nvim so the composer tests run instead
-#     of skipping. On pull requests this is all that runs.
+#   • check — `make check`. On pull requests this is all that runs.
 #   • build — on main or a tag, beside check: `make dist`, the eight binaries,
 #     as a job artifact. Building needs no gate; publishing does.
 #   • release — on a tag, after both: the GitHub release, with the binaries.
@@ -58,11 +57,6 @@ env:
   # back against. A key fetched from the server it vouches for would prove
   # nothing. margin pins the same key in internal/update.
   ENGRAM_SIGNERS: release@neuroplast.io namespaces="engram" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDCsEZcn1tiubvKQzEVs5pJ4QVXoFmSDtO+k6SdetUdf
-  # The composer is a real nvim, and its tests skip without one. The official
-  # tarball, pinned with its digest: Ubuntu's nvim lags far behind the 0.12
-  # the composer is developed against (vault/knowledge/findings.md).
-  NVIM_VERSION: v0.12.5
-  NVIM_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
   # The channel a build goes to, and how long a superseded build stays on it:
   # a dev build for 30 days, a release for good.
   CHANNEL: ${{ github.ref_type == 'tag' && 'stable' || 'dev' }}
@@ -84,19 +78,6 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-
-      - name: Install nvim
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/nvim.tar.gz" \
-            "https://github.com/neovim/neovim/releases/download/$NVIM_VERSION/nvim-linux-x86_64.tar.gz"
-          echo "$NVIM_SHA256  $RUNNER_TEMP/nvim.tar.gz" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/nvim"
-          tar -xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP/nvim" --strip-components=1
-          echo "$RUNNER_TEMP/nvim/bin" >> "$GITHUB_PATH"
-
-      # A suite whose composer tests skipped would still report ok; this
-      # demands one of them pass.
-      - run: make doctor
 
       - run: make check
 
