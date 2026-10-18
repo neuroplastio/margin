@@ -144,7 +144,7 @@ func TestHottyProseIsSurfaces(t *testing.T) {
 	}
 	measured := false
 	for _, c := range h.Commands() {
-		if c.Get("a") == "place" && strings.HasPrefix(c.Get("s"), hotMeasureName+"-") && c.Get("r") == "auto" && c.Get("n") != "" {
+		if hotty.Get(c.Control, "a") == "place" && strings.HasPrefix(hotty.Get(c.Control, "s"), hotMeasureName+"-") && hotty.Get(c.Control, "r") == "auto" && hotty.Get(c.Control, "n") != "" {
 			measured = true
 		}
 	}
@@ -269,7 +269,7 @@ func TestHottyFitGrowsABlock(t *testing.T) {
 	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
 		quote := surfaceWith(t, h, "a quote")
 		second := surfaceWith(t, h, "Second")
-		if p := quote.Placement(); !p.Fit || p.Rows != 2 {
+		if p := quote.Placement(); p.Fit != hotty.On || p.Rows != 2 {
 			t.Fatalf("the quote is placed %+v, want fit and its measured 2 rows", p)
 		}
 		_, below := second.At()
@@ -343,7 +343,7 @@ func TestHottyTextTerminal(t *testing.T) {
 		waitFor(t, "the paragraph in cells", func() bool { return strings.Contains(h.Screen(), "A paragraph with") })
 	}, hottytest.Text())
 	for _, c := range h.Commands() {
-		if c.Get("a") != "q" {
+		if hotty.Get(c.Control, "a") != "q" {
 			t.Errorf("a HOTTY command went to a terminal that is not a host: %v", c.Control)
 		}
 	}

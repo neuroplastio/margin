@@ -53,7 +53,6 @@ type hotState struct {
 	wave    int  // the measuring wave the timeout belongs to
 	deaf    bool // a host that never answered a measure: everything in cells
 	want    []hotWant
-	fit     bool // the host sends fit: blocks are placed asking for it
 
 	// The frame: what View returns on a host, the blocks render placed in
 	// it, and where the document's column is.
@@ -214,7 +213,6 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		h.tracef("ready: mode %v, caps %+v", msg.Mode, msg.Caps)
 		if msg.Mode == hottytea.Native {
 			h.docs.net = msg.Caps.Net["img-src"]
-			h.fit = msg.Caps.Sends(hotty.EventFit)
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 		}
 		return nil, true
@@ -229,7 +227,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		if h.measured(msg.Reply) {
 			return h.relayoutSoon(), false
 		}
-		m.status = "hotty: " + msg.Err().Error()
+		m.status = "hotty: " + hotty.Err(msg.Reply).Error()
 		return nil, true
 	case hottytea.EventMsg:
 		if msg.Event.Kind == hotty.EventFit {
@@ -291,8 +289,8 @@ func (h *hotState) measured(r hotty.Reply) bool {
 // rows at this width, and it reports whether they changed anything.
 func (m *model) hotFit(ev hotty.Event) bool {
 	h := m.hot
-	rows, ok := ev.FitRows()
-	if !ok {
+	rows := ev.FitRows
+	if rows <= 0 {
 		return false
 	}
 	for _, b := range h.blocks {
@@ -409,7 +407,7 @@ func (m *model) hotSurfaces() []hottytea.Surface {
 			Clip:  &clip,
 			Keep:  true,
 			Press: true,
-			Fit:   h.fit,
+			Fit:   true, // every 0.3 host sends fit (SPEC §4)
 			Doc: func() string {
 				h.sent[name] = doc
 				return doc
@@ -507,10 +505,10 @@ func (m *model) hotEvent(ev hotty.Event) tea.Cmd {
 		}
 		m.at = target
 	case hotty.EventClick:
-		href, _, ok := ev.Link()
-		if !ok {
+		if ev.Link == nil {
 			return nil
 		}
+		href := ev.Link.Href
 		m.at = cursor{entry: entry, comment: commentNone}
 		if !m.followHref(href) {
 			m.status = href + " is outside this review"

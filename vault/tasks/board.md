@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-03 (stable channel, D21)
+Last updated: 2026-10-18 (HOTTY 0.4)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
