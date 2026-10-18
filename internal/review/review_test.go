@@ -2346,3 +2346,20 @@ func TestWheelSpeedZeroMeansDefault(t *testing.T) {
 		t.Errorf("wheel down with wheelSpeed 0: scroll = %d, want %d (clamped to 1)", m.scroll, start+1)
 	}
 }
+
+// TestCommentKeepsTypedLineBreaks: a line break the reviewer typed inside a
+// paragraph stays one in the thread (journal 2026-08-10.16), where Markdown
+// would fold it into a space; a list stays a list.
+func TestCommentKeepsTypedLineBreaks(t *testing.T) {
+	m := seedModel()
+	m.subspans = make(map[cursor]span)
+	i := entryFor(t, m, convoAnchor)
+	thr := m.threads[convoAnchor]
+	thr.posted[0].body = "line one\nline two\n\n- a\n- b"
+	plain := ansiRe.ReplaceAllString(strings.Join(m.appendComments(nil, i, thr, 80, 0, 0), "\n"), "")
+	for _, want := range []string{"  line one\n", "  line two\n", "• a", "• b"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("thread does not show %q:\n%s", want, plain)
+		}
+	}
+}

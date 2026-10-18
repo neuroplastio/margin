@@ -2832,73 +2832,138 @@ func (m *model) render() []string {
 	return lines
 }
 
-// appendComments renders the thread's visible posted comments onto body — a
-// head line (focus mark, author, age, unsaved-edit/deleted marker) over the
-// wrapped text, a blank line between comments — registering each comment's
-// subspan as it goes. off is how many content lines will sit ahead of the
-// comments in the final box (the resolved badge's two lines when it shows);
-// base is the absolute line the box starts at, so the subspans come out in
-// the same coordinates as everything else. Both views that show the
-// conversation — the expanded thread, and the composer box of a new reply —
-// render it through here, so a comment reads and hit-tests the same whether
-// you are reading the thread or writing into it.
+// threadID is the open thread's pane (D22): its conversation, a comment
+// each — who and when, over what they said as Markdown.
+const threadID = "thread"
+
+// appendComments renders the thread's visible posted comments onto body —
+// each a head line (author, age, unsaved-edit/deleted marker) over its text,
+// a blank line between comments — registering each comment's subspan as it
+// goes. The comments are the thread pane's, drawn by the kit; margin keeps
+// the two columns beside them, where the focused comment's text carries the
+// focus bar. off is how many content lines will sit ahead of the comments in
+// the final box (the resolved badge's two lines when it shows); base is the
+// absolute line the box starts at, so the subspans come out in the same
+// coordinates as everything else. Both views that show the conversation —
+// the expanded thread, and the composer box of a new reply — render it
+// through here, so a comment reads and hit-tests the same whether you are
+// reading the thread or writing into it.
 func (m *model) appendComments(body []string, i int, t *thread, w, base, off int) []string {
 	visible := m.visibleComments(t)
+	if len(visible) == 0 {
+		return body
+	}
+	p := m.panes().pane(threadID, nil)
+	var children []any
+	comps := []map[string]any{nil}
 	for vi, j := range visible {
 		c := t.posted[j]
-		focused := m.at.comment == j
+		head := "**" + c.author + "** · " + humanAge(c.at)
+		text, variant := c.body, "body"
+		switch d := t.draft(j); {
+		case d != "":
+			head += "  ✎ edited, unsaved"
+			text = d
+		case c.deleted:
+			head += "  [deleted]"
+			variant = "caption"
+			if text == "" {
+				text = "[deleted]"
+			}
+		}
+		id := strconv.Itoa(j)
+		children = append(children, "c"+id)
+		// The text is a Column of its paragraphs, a blank row between them:
+		// the kit sets paragraphs one under the next.
+		var paras []any
+		for pi, para := range commentParagraphs(text) {
+			pid := fmt.Sprintf("b%s.%d", id, pi)
+			if pi > 0 {
+				paras = append(paras, pid+"gap")
+				comps = append(comps, obj("id", pid+"gap", "component", "Text", "text", "\u00a0"))
+			}
+			paras = append(paras, pid)
+			comps = append(comps, obj("id", pid, "component", "Text", "variant", variant, "text", para))
+		}
+		comps = append(comps,
+			obj("id", "c"+id, "component", "Column", "children", []any{"h" + id, "b" + id}),
+			obj("id", "h"+id, "component", "Text", "variant", "caption", "text", head),
+			obj("id", "b"+id, "component", "Column", "children", paras))
+		if vi < len(visible)-1 {
+			children = append(children, "gap"+id)
+			comps = append(comps, obj("id", "gap"+id, "component", "Text", "text", "\u00a0"))
+		}
+	}
+	comps[0] = obj("id", "root", "component", "Column", "children", children)
+	p.define(comps...)
+
+	inner := max(w-2*borderW-2, 1)
+	lines := p.lines(inner)
+	at := len(body)
+	bar := [2]int{-1, -1} // the focused comment's text, by row
+	if m.at.comment >= 0 {
+		if _, r, _, h, ok := p.box("b" + strconv.Itoa(m.at.comment)); ok {
+			bar = [2]int{r, r + h - 1}
+		}
+	}
+	for r, l := range lines {
+		prefix := "  "
+		if r >= bar[0] && r <= bar[1] {
+			prefix = focusStyle.Render("▌ ")
+		}
+		body = append(body, prefix+l)
+	}
+	if m.subspans != nil {
 		// +borderW for the box's top border, which Render adds around this
 		// content.
-		commentStart := base + borderW + off + len(body)
-		head := "  " + authorStyle.Render(c.author) + dimStyle.Render(" · "+humanAge(c.at))
-		if d := t.draft(j); d != "" {
-			head += draftStyle.Render("  ✎ edited, unsaved")
-		} else if c.deleted {
-			head += dimStyle.Render("  [deleted]")
-		}
-		body = append(body, head)
-
-		bodyPrefix := "  "
-		if focused {
-			bodyPrefix = focusStyle.Render("▌ ")
-		}
-
-		if d := t.draft(j); d != "" {
-			base := lipgloss.Style{}
-			if focused {
-				base = focusStyle
+		top := base + borderW + off + at
+		for _, j := range visible {
+			if _, r, _, h, ok := p.box("c" + strconv.Itoa(j)); ok {
+				m.subspans[cursor{entry: i, comment: j}] = span{start: top + r, end: top + r + h - 1}
 			}
-			for _, l := range wrapComment(d, w-6, base) {
-				body = append(body, bodyPrefix+l)
-			}
-		} else if c.deleted {
-			bodyText := c.body
-			if bodyText == "" {
-				bodyText = "[deleted]"
-			}
-			for _, l := range wrapComment(bodyText, w-6, dimStyle) {
-				body = append(body, bodyPrefix+l)
-			}
-		} else {
-			base := lipgloss.Style{}
-			if focused {
-				base = focusStyle
-			}
-			for _, l := range wrapComment(c.body, w-6, base) {
-				body = append(body, bodyPrefix+l)
-			}
-		}
-
-		if m.subspans != nil {
-			m.subspans[cursor{entry: i, comment: j}] = span{
-				start: commentStart, end: base + borderW + off + len(body) - 1,
-			}
-		}
-		if vi < len(visible)-1 {
-			body = append(body, "")
 		}
 	}
 	return body
+}
+
+// commentParagraphs is a comment's text as the kit is to set it: its
+// paragraphs, each a line of Markdown a line the reviewer typed. A line
+// break they pressed is a break they meant (journal 2026-08-10.16), so each
+// line but a paragraph's last ends in a hard break, which Markdown would
+// otherwise fold into a space; a fenced block is left as it was written.
+func commentParagraphs(text string) []string {
+	var paras []string
+	var cur []string
+	fenced := false
+	flush := func() {
+		if len(cur) > 0 {
+			paras = append(paras, strings.Join(cur, "\n"))
+			cur = nil
+		}
+	}
+	for _, l := range strings.Split(strings.TrimSpace(text), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "```") {
+			fenced = !fenced
+			cur = append(cur, l)
+			continue
+		}
+		switch {
+		case fenced:
+			cur = append(cur, l)
+		case strings.TrimSpace(l) == "":
+			flush()
+		default:
+			if n := len(cur); n > 0 && !strings.HasPrefix(strings.TrimSpace(cur[n-1]), "```") {
+				cur[n-1] += "  "
+			}
+			cur = append(cur, l)
+		}
+	}
+	flush()
+	if len(paras) == 0 {
+		paras = []string{""}
+	}
+	return paras
 }
 
 // threadLines renders a thread in whichever of the three states it is in:
