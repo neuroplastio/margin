@@ -73,6 +73,7 @@ func (m *model) footerState() (mode string, hints []hint, progress string) {
 func (m *model) footerPane() *pane {
 	mode, hints, progress := m.footerState()
 	p := m.panes().pane(footerID, map[string]any{"mode": "", "progress": "", "status": ""})
+	p.bar = true
 	children := []any{"mode", "hints", "progress", "status"}
 	comps := []map[string]any{
 		nil,

@@ -732,3 +732,20 @@ exactly so; `internal/mermaidsvg/flatten.go` writes concrete colours in
 before margin sends one. An inline `<svg>` in a surface's own document is
 different: Stylo resolves its `currentColor` (hotty-blitz `tests/svg.rs`).
 
+
+## F35 — a kit surface a row tall draws its text below that row
+
+hotty-a2ui's `.k-surface` has 12px of padding and fills the surface
+(`min-height: 100vh`), so on a 20px row a pane's text starts about 21px down.
+In a plx pane the relay clips the surface to its row exactly, so the row is
+blank; straight in hottyterm it spills into the window's bottom padding,
+half drawn. The footer, one row, was the case (2026-10-21). `SetDense` (kit
+78a9985) takes the padding off above and below, makes a line one row high
+and centres the content. A bar also must not wrap: at 60 columns the footer's
+caption wrapped to a second line beside the key hints, which keep their full
+width, and the bar was two rows tall again; kit d6d7db1 keeps a dense
+surface's text on one line and lets the hints give way. Check a bar's document with
+`hotty render doc.html --cols N --rows auto --cell 9.5x20`: it should give 1
+at every width. The search prompt has the same problem and is not fixed: its
+field and label need 4 rows even dense, and margin gives it the 2 it has in
+cells.

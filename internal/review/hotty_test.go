@@ -551,3 +551,27 @@ func TestHottySearchIsASurface(t *testing.T) {
 		t.Errorf("the search landed on %v %q, want the quote", got.kind, got.text)
 	}
 }
+
+// On a host the footer is a one-row surface the kit draws dense, its keys
+// inside that row; the palette, taller, is not.
+func TestHottyFooterIsADenseBar(t *testing.T) {
+	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		var s *hottytest.Surface
+		waitFor(t, "the footer's surface", func() bool { s = h.Surface("margin-" + footerID); return s != nil && s.Placed() })
+		if rows := s.Placement().Rows; rows != 1 {
+			t.Errorf("footer placed %d rows tall, want 1", rows)
+		}
+		if class, _ := s.Attr("~s", "class"); !strings.Contains(class, "k-dense") {
+			t.Errorf("footer surface class %q, want k-dense", class)
+		}
+		h.Type(":")
+		var p *hottytest.Surface
+		waitFor(t, "the palette's surface", func() bool { p = h.Surface("margin-" + paletteID); return p != nil && p.Placed() })
+		if class, _ := p.Attr("~s", "class"); strings.Contains(class, "k-dense") {
+			t.Errorf("palette surface class %q, want no k-dense", class)
+		}
+		h.Key("escape")
+		waitFor(t, "the palette gone", func() bool { p := h.Surface("margin-" + paletteID); return p == nil || !p.Placed() })
+	})
+}

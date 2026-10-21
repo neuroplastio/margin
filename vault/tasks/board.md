@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-10-21 (D24: mermaid drawn by Ondine)
+Last updated: 2026-10-22 (the footer dense on a host, F35)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (footer on a host) the footer is a dense kit surface (hotty-a2ui
+  `SetDense`), its line inside its row in hottyterm and in a plx pane where
+  it was half drawn or blank — whether it sits centred in the row, and how
+  the hints cut off in a narrow pane — journal 2026-10-22.1
 - (mermaid by Ondine) on a HOTTY host a mermaid fence is drawn by Ondine
   instead of merman (D24): monospace labels at 16px, margin's palette
   written in, 33 kinds where there were 11, about a second's cold compile —
@@ -436,6 +440,10 @@ Last updated: 2026-10-21 (D24: mermaid drawn by Ondine)
 
 ## Done
 
+- [x] **(maintainer report)** the footer's keys cut off or blank on a HOTTY
+      host: the kit's padding put a one-row surface's text below its row
+      (F35); the footer is now a dense surface (hotty-a2ui `SetDense`).
+      `[felt]` — see journal 2026-10-22.1 — done 2026-10-22
 - [x] **(direction)** mermaid on a HOTTY host drawn by Ondine
       (github.com/wevm/ondine) instead of merman: every kind it has, a
       module that imports nothing, margin's palette written in by
@@ -855,6 +863,10 @@ or a Dn before building.
 - Render the diff as prose — a rewritten paragraph reads as a rewritten
   paragraph, not as a wall of `-`/`+`
 - Carry marks and threads across a revision; show what changed under a mark
+- (from the 2026-10-21 report) the search prompt on a HOTTY host is cut: its
+  label and field need ~6 rows (4 dense) and margin places it over 2 (F35).
+  A one-row field with an inline label from the kit, or more rows from
+  margin; ask before building
 
 **Exit:** an agent hands back round four of a plan and the reviewer can see what
 moved without re-reading it.

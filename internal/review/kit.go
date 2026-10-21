@@ -145,6 +145,9 @@ type pane struct {
 	c  *view.Controller
 	cr *cells.Rendition
 	hr *html.Rendition
+	// bar: the pane is a row of the screen, as the footer is; on a host
+	// it is a dense surface, its text inside that row (SetDense).
+	bar bool
 	// components is what the pane was last defined with, as JSON: define
 	// sends them again only when they changed.
 	components string
@@ -289,6 +292,7 @@ func (p *pane) html(name string) *html.Rendition {
 	if p.hr == nil {
 		p.hr = html.New(p.c, name)
 		p.hr.SetTheme(kitTheme)
+		p.hr.SetDense(p.bar)
 	}
 	return p.hr
 }
