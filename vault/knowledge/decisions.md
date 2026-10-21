@@ -452,9 +452,11 @@ from a workflow run.
   goreleaser for four `go build`s.
 
 **D19 — On a HOTTY host a mermaid fence is its diagram, drawn as SVG in
-margin's process.** Maintainer direction (2026-10-02): "I want images, gifs
-and mermaid diagrams to render via hotty". Amends D17, which kept mermaid in
-cells.
+margin's process.**
+*Amended by D24: the renderer is Ondine, and labels are monospace; the rest
+stands.*
+Maintainer direction (2026-10-02): "I want images, gifs and mermaid diagrams
+to render via hotty". Amends D17, which kept mermaid in cells.
 
 - **The renderer is merman** (`=0.8.0-alpha.7`, a Rust port of Mermaid 12,
   MIT OR Apache-2.0), compiled to a WASI command and embedded gzipped
@@ -660,3 +662,38 @@ the session keeps in every repository it commits to. margin's agent is
 - **Rejected.** D8's maintainer-as-author with the agent in a trailer: `git
   log`, `git blame` and GitHub show the author, and a trailer only shows to
   someone reading the message (P-2).
+
+**D24 — The mermaid renderer is Ondine. Amends D19.** Maintainer direction
+(2026-10-21): "Do the swap", after an evaluation of ondine.sh against merman
+on margin's own documents. Everything else in D19 stands: SVG in margin's
+process under wazero, one fresh instance per diagram, cells until drawn, a
+resource per diagram.
+
+- **Ondine** (github.com/wevm/ondine, MIT): a Mermaid compiler in Rust with
+  no dependencies, built from its own `wasm` crate at a pinned commit
+  (`ONDINE_REV` in the Makefile, `make mermaid-wasm`) with every kind it has
+  (33) and its size profile, and embedded gzipped (0.7 MB, from merman's
+  2.5 MB). margin carries no Rust: the merman wrapper crate and its Inter
+  metrics are gone. Rebuilding needs Rust; building margin does not.
+- **No WASI.** The module imports nothing. `alloc` takes the source and the
+  options, `render` returns one length-prefixed buffer: the SVG, or the
+  parser's code, line and message. A trap (a Rust panic aborts) is an error,
+  never margin's crash; 128 MiB and 10 s bound a render as before. A diagram
+  takes 1–2 ms, a cold compile ~0.9 s.
+- **margin's palette is written in, in Go** (`internal/mermaidsvg/flatten.go`).
+  Ondine themes with CSS custom properties and `color-mix()`; usvg has
+  neither (F34). Every `var()` becomes the palette's value or its fallback,
+  every `color-mix()` the colour it computes, and the root's custom
+  properties go. The palette is D19's: hotdoc.go's xterm-256 colours, a
+  transparent root, lines 1.5px.
+- **Labels are monospace**, in Ondine's stack (`ui-monospace, SFMono-Regular,
+  Menlo, Consolas, 'Liberation Mono', 'DejaVu Sans Mono', monospace`), at
+  16px. Ondine measures every glyph at a 0.6em advance, so a proportional
+  font would overrun its boxes: D19's "measured with Inter's widths" is
+  gone with merman.
+- **Rejected.** Keeping merman (eleven kinds, 15–260 ms a diagram, its
+  `<foreignObject>` labels converted under a work budget); Ondine's `release`
+  profile (1.3 MB gzipped and a 2.8 s cold compile for no speed margin would
+  notice); flattening in a Rust wrapper of margin's own (Rust to keep for one
+  string pass, where Go's needs none); asking upstream for concrete colours
+  first (the flattening is Ondine's own approach for resvg, in its CLI).

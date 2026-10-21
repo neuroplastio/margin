@@ -720,3 +720,15 @@ capital without shift is its small letter, as Caps Lock makes it". A
 terminal or a test that reports a capital that way would type a small letter
 into a field. margin names a typed character by its text (`fieldKeyName`): a
 capital is `shift+` its letter, and text no key names (an IME's) is pasted.
+
+## F34 — usvg reads no CSS custom properties and no `color-mix()`
+
+An SVG sent as an `<img>` resource is painted by usvg (0.48 in hotty-blitz),
+not through the page's CSS: `var(--x, #fff)` is not resolved, fallback
+included, and `color-mix()` is not a colour. A fill or stroke written with
+either is dropped to its default, so an SVG themed that way paints as black
+shapes with black text, on any background. Ondine's diagrams are themed
+exactly so; `internal/mermaidsvg/flatten.go` writes concrete colours in
+before margin sends one. An inline `<svg>` in a surface's own document is
+different: Stylo resolves its `currentColor` (hotty-blitz `tests/svg.rs`).
+

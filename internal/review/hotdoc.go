@@ -155,8 +155,8 @@ func (d *hotDocs) open(dir string) {
 
 // hotDiagram is a mermaid diagram drawn as SVG (internal/mermaidsvg), sent
 // as a resource that an <img> in the block's document shows. Until it is
-// drawn, and for one merman cannot draw, the block stays cells: the ASCII
-// rendering, or the source.
+// drawn, and for one the renderer cannot draw, the block stays cells: the
+// ASCII rendering, or the source.
 type hotDiagram struct {
 	id   string // the resource; "" until drawn
 	w, h int    // the SVG's size in pixels

@@ -71,9 +71,9 @@ func hotRun(t *testing.T, src string, play func(h *hottytest.Host, m *model), op
 	return m, h
 }
 
-// fakeMermaid stands in for merman (internal/mermaidsvg has its own tests,
-// and compiling it takes seconds): an SVG 300×144 for a flowchart, and the
-// parser's refusal for anything else.
+// fakeMermaid stands in for the renderer (internal/mermaidsvg has its own
+// tests, and compiling it takes a second): an SVG 300×144 for a flowchart,
+// and the parser's refusal for anything else.
 func fakeMermaid(_ context.Context, src string) ([]byte, error) {
 	if !strings.HasPrefix(strings.TrimSpace(src), "flowchart") {
 		return nil, errors.New("mermaid: Unsupported diagram type")
@@ -204,7 +204,7 @@ func TestHottyProseIsSurfaces(t *testing.T) {
 }
 
 // A mermaid fence on a host is its diagram as SVG, sent as a resource and
-// shown by an <img> sized from it; one merman cannot draw stays cells.
+// shown by an <img> sized from it; one the renderer cannot draw stays cells.
 func TestHottyMermaidIsAnSVG(t *testing.T) {
 	src := "Before.\n\n```mermaid\nflowchart LR\n    a --> b\n```\n\n```mermaid\npie\n    \"x\" : 1\n```\n"
 	var diagram *hottytest.Surface
@@ -234,7 +234,7 @@ func TestHottyMermaidIsAnSVG(t *testing.T) {
 		t.Errorf("the diagram's resource %s: %q %v", id, mime, ok)
 	}
 	if !strings.Contains(screen, "pie") {
-		t.Errorf("the diagram merman could not draw is not in cells:\n%s", screen)
+		t.Errorf("the diagram the renderer could not draw is not in cells:\n%s", screen)
 	}
 }
 

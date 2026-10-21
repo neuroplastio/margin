@@ -1,9 +1,16 @@
 # Board
 
-Last updated: 2026-10-18 (D22: margin on hotty-a2ui)
+Last updated: 2026-10-21 (D24: mermaid drawn by Ondine)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (mermaid by Ondine) on a HOTTY host a mermaid fence is drawn by Ondine
+  instead of merman (D24): monospace labels at 16px, margin's palette
+  written in, 33 kinds where there were 11, about a second's cold compile —
+  whether monospace labels read beside the prose, whether wide diagrams
+  shrink until their text is too small, whether a quadrant or xychart now
+  shows as SVG, and whether the demo flowchart's `plan.md → margin` edge
+  has its line — journal 2026-10-21.1
 - (margin on hotty-a2ui) the composer is hotty-a2ui's text field, nvim gone,
   and the rest of the screen — palette, search prompt, footer, tree pane,
   threads view, an open thread's comments — is A2UI panes, HTML on a HOTTY
@@ -429,6 +436,11 @@ Last updated: 2026-10-18 (D22: margin on hotty-a2ui)
 
 ## Done
 
+- [x] **(direction)** mermaid on a HOTTY host drawn by Ondine
+      (github.com/wevm/ondine) instead of merman: every kind it has, a
+      module that imports nothing, margin's palette written in by
+      `flatten.go` (D24, F34). `[felt]` — see journal 2026-10-21.1 — done
+      2026-10-21
 - [x] **(direction)** a stable channel and a release pipeline driven by git
       tags: a tag named for its day (`26.10.03`) on main is built, made a
       GitHub release and published to `pkg.neuroplast.io/margin/stable`;

@@ -21,7 +21,7 @@ DIST_LDFLAGS := -s -w -X $(VERSION_PKG).Commit=$(COMMIT) \
 	-X $(VERSION_PKG).Version=$(DIST_VERSION) -X $(VERSION_PKG).Channel=$(CHANNEL)
 DIST_PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
-.PHONY: check build dist release test test-race vet fmt run clean mermaid-wasm mermaid-metrics
+.PHONY: check build dist release test test-race vet fmt run clean mermaid-wasm
 
 # The canonical gate. Keep the tree green.
 check: build test vet
@@ -93,21 +93,20 @@ run: build
 clean:
 	rm -rf bin dist
 
-# The mermaid renderer internal/mermaidsvg embeds: merman (Rust) built as a
-# WASI command and committed gzipped, so `go build` and `go install` need no
-# Rust. Rebuild after changing anything under $(MERMAID_DIR); see its
-# README.md. The toolchain and the wasm32-wasip1 target are pinned in
-# $(MERMAID_DIR)/rust-toolchain.toml.
+# The mermaid renderer internal/mermaidsvg embeds: Ondine (Rust) at
+# ONDINE_REV, built for wasm32-unknown-unknown and committed gzipped, so `go
+# build` and `go install` need no Rust. Rebuild after moving ONDINE_REV; see
+# $(MERMAID_DIR)/README.md. Ondine's own rust-toolchain.toml pins the
+# toolchain and the target; its Cargo.lock is used as it is.
 MERMAID_DIR := internal/mermaidsvg/wasm
+ONDINE_DIR := $(MERMAID_DIR)/ondine
+ONDINE_REV := 6a1586e5af980e67c104239593ae931837157b8b
 CARGO ?= mise x rust -- cargo
 mermaid-wasm:
-	cd $(MERMAID_DIR) && $(CARGO) build --release --locked --target wasm32-wasip1
-	gzip -9 -n -c $(MERMAID_DIR)/target/wasm32-wasip1/release/margin-mermaid.wasm \
+	@test -d $(ONDINE_DIR)/.git || git init -q $(ONDINE_DIR)
+	git -C $(ONDINE_DIR) fetch -q --depth 1 https://github.com/wevm/ondine $(ONDINE_REV)
+	git -C $(ONDINE_DIR) checkout -q --detach $(ONDINE_REV)
+	cd $(ONDINE_DIR) && $(CARGO) build --locked -p wasm --profile wasm --features all --target wasm32-unknown-unknown
+	gzip -9 -n -c $(ONDINE_DIR)/target/wasm32-unknown-unknown/wasm/wasm.wasm \
 		> internal/mermaidsvg/mermaid.wasm.gz
 	@ls -l internal/mermaidsvg/mermaid.wasm.gz
-
-# Regenerates the Inter advance widths the renderer measures labels with.
-INTER_TTC ?= /usr/share/fonts/inter/Inter.ttc
-mermaid-metrics:
-	cd $(MERMAID_DIR) && $(CARGO) run --locked --example gen_metrics -- $(INTER_TTC) > src/inter_metrics.rs.new
-	mv $(MERMAID_DIR)/src/inter_metrics.rs.new $(MERMAID_DIR)/src/inter_metrics.rs

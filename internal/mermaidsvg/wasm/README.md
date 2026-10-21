@@ -1,71 +1,74 @@
-# margin-mermaid
+# The mermaid renderer
 
-The mermaid renderer behind `internal/mermaidsvg`: a WASI command (mermaid
-source on stdin, one SVG on stdout, a message on stderr and a non-zero exit on
-failure) that margin embeds gzipped as `../mermaid.wasm.gz` and runs with
-wazero. Nothing here is needed to build margin, only to change the renderer.
+`internal/mermaidsvg` embeds [Ondine](https://github.com/wevm/ondine) (MIT,
+`LICENSE` here), a Mermaid-to-SVG compiler in Rust with no dependencies,
+built for `wasm32-unknown-unknown` and committed gzipped as
+`../mermaid.wasm.gz`. margin carries no Rust of its own: the module is
+Ondine's `wasm` crate exactly as it is at the pinned commit. Nothing here is
+needed to build margin, only to change the renderer.
 
 ## Rebuilding
 
 ```
-make mermaid-wasm       # cargo build --release for wasm32-wasip1, then gzip -9 -n
-make mermaid-metrics    # regenerate src/inter_metrics.rs from /usr/share/fonts/inter/Inter.ttc
+make mermaid-wasm       # fetch ONDINE_REV into ./ondine, cargo build, gzip -9 -n
 ```
 
-Both run cargo through `mise x rust -- cargo` (override with `CARGO=...`).
-`rust-toolchain.toml` pins Rust 1.98.1 and the `wasm32-wasip1` target. Commit
-`../mermaid.wasm.gz` together with whatever changed here; `Cargo.lock` is
-committed and the build uses `--locked`.
+`ONDINE_REV` in the Makefile is the commit. The build runs cargo through
+`mise x rust -- cargo` (override with `CARGO=...`, e.g. `CARGO=cargo` with
+rustup), in Ondine's checkout, so its `rust-toolchain.toml` (Rust 1.97.0, the
+`wasm32-unknown-unknown` target) and `Cargo.lock` apply. Commit
+`../mermaid.wasm.gz` with the Makefile change.
 
 ## What is in it
 
-- **merman `=0.8.0-alpha.7`** (github.com/Latias94/merman, MIT OR Apache-2.0),
-  a Rust port of Mermaid 12 used by Zed. Its third-party notices (Mermaid,
-  dagre, DOMPurify, roughjs, d3-shape and others) are MIT, ISC, BSD-3-Clause
-  or Apache-2.0. ELK (EPL-2.0) and the math fonts (OFL) are features this
-  crate leaves off. The rest of the dependency graph is MIT/Apache-2.0 apart
-  from Servo's CSS crates under lol_html (cssparser, cssparser-macros,
-  selectors, dtoa-short: MPL-2.0, file-level copyleft, linked unmodified),
-  foldhash (Zlib) and the Unicode-3.0 ICU data.
-- **The `resvg-safe` pipeline.** usvg, which hotty-blitz paints with, cannot
-  draw `<foreignObject>`, so every HTML label becomes plain `<text>`.
-  Converting HTML labels gets slow fast and hits a work budget merman will
-  not raise (around 90 flowchart nodes), so a diagram of more than 60
-  statements, or one that hits the budget anyway, is drawn with SVG labels.
-- **Inter's advance widths** (`src/inter_metrics.rs`, generated from Inter 4.1,
-  SIL OFL 1.1): labels are measured the way Inter paints them, and the SVG
-  names `Inter, IBM Plex Sans, system-ui, sans-serif`, so text fits its box
-  wherever Inter is installed.
-- **margin's palette.** Dark appearance, the xterm-256 colours of hotdoc.go's
-  stylesheet, transparent root. The root `<svg>` gets `width`/`height` in px
-  equal to its viewBox.
+- **Every kind Ondine draws** (`--features all`): flowchart, sequence, state,
+  class, ER, gantt, pie, mindmap, gitGraph, journey, timeline, quadrant,
+  xychart, sankey, block, architecture, C4, kanban, packet, radar,
+  requirement, treemap, treeView, venn, wardley, railroad, ishikawa,
+  cynefin, eventmodeling, swimlane, usecase, agentflow and info.
+- **Ondine's `wasm` profile**: `opt-level = "z"`, LTO, one codegen unit,
+  `panic = "abort"`, stripped. It is the smaller of Ondine's two builds; its
+  `release` profile renders no faster that margin could notice.
 
-## Size
+## The interface
 
-The shipped module is 7.3MB (2.5MB gzipped). Diagram kinds are Cargo features.
-The build carries the eleven that markdown documents commonly use: flowchart,
-sequence, state, ER, class, gantt, pie, mindmap, gitGraph, journey and
-timeline. A kind left out is an error from `Render`, and margin falls back to
-text.
+The module imports nothing. Its exports are `alloc(len) -> ptr`, which
+reserves guest memory for the host to write into, and
+`render(src, src_len, options, options_len, now) -> ptr`, whose result is a
+status byte (0 for an SVG, 1 for an error) and then fields, each a
+little-endian `u32` length and that many bytes:
 
-| Build                                  | wasm   | gzipped | cold compile |
-|----------------------------------------|--------|---------|--------------|
-| flowchart, sequence, state, ER, class  | 6.6MB  | 2.3MB   | ~2.0s        |
-| those plus the six above (shipped)     | 7.3MB  | 2.5MB   | ~2.5s        |
-| all 37 kinds                           | 9.9MB  | —       | —            |
-| all 37 kinds plus `layout-cytoscape`   | 10.3MB | 3.6MB   | ~3.7s        |
+- success: kind, width (f64), height (f64), a link count (u32) and each
+  link's href, id and internal flag, then the SVG;
+- failure: code, kind, line (u32), column (u32), snippet, message.
 
-Where the shipped module's bytes go: merman's shared parsing, layout and SVG
-code is about 1.4MB, static data 1.3MB, Rust's std, alloc and hash maps with
-serde_json about 2MB, and the HTML, CSS and markdown parsers the label
-pipeline needs about 0.4MB. Per kind, roughly: flowchart 650KB, state 320KB,
-class 290KB, sequence 250KB, ER 160KB, gantt 140KB, mindmap 115KB, gitGraph
-100KB, timeline 45KB, journey 35KB. Among the kinds left out: architecture
-200KB plus 430KB for the cytoscape layout it needs, C4 and block 125KB each,
-requirement 110KB, xychart 80KB, quadrant, sankey, kanban and radar 30–40KB
-each. To add one, add its `diagram-*` feature in `Cargo.toml` and run
-`make mermaid-wasm`.
+`options` is JSON with Ondine's render options; margin sets `idPrefix`, and
+turns `responsive`, `links` and `images` off. `now` (f64 milliseconds) is a
+gantt chart's today. margin runs one fresh instance per diagram, so the
+module's `reset`, which empties its arena for the next render, goes unused.
 
-Release profile: `opt-level = "s"`, LTO, one codegen unit, `panic = "abort"`,
-stripped. On the all-kinds build, `"z"` saved 2MB and doubled render time,
-and `3` added 3MB for no measurable gain.
+## Size and speed
+
+| Build                       | wasm  | gzipped | cold compile (wazero) | a diagram |
+|-----------------------------|-------|---------|-----------------------|-----------|
+| `wasm` profile (shipped)    | 2.0MB | 0.7MB   | ~0.9s                 | 1–2ms     |
+| `release` profile           | 4.0MB | 1.3MB   | ~2.8s                 | 1–2ms     |
+| merman, before (11 kinds)   | 7.3MB | 2.5MB   | ~2.5s                 | 15–260ms  |
+
+A diagram's time is a fresh instance and the render, measured on margin's
+`testdata/mermaid.md`.
+
+## What margin does to its SVG
+
+Ondine themes a diagram with CSS custom properties (`--ondine-bg`,
+`--ondine-fg`, `--ondine-line`, the eight `--ondine-series-N`, …) and
+`color-mix()`. usvg, which hotty-blitz paints an `<img>` with, has neither,
+and draws such a diagram as black boxes with no text. `../flatten.go` puts
+margin's palette in for the variables, computes each `color-mix()`, and
+drops the root's custom-property declarations; Ondine's own terminal output
+does the same for resvg.
+
+Ondine measures every label as monospace with a 0.6em advance, so the SVG
+names Ondine's monospace stack (`ui-monospace, SFMono-Regular, Menlo,
+Consolas, 'Liberation Mono', 'DejaVu Sans Mono', monospace`): a
+proportional font would not fit the boxes.

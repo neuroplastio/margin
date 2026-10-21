@@ -62,13 +62,47 @@ const er = `erDiagram
         string sha
     }`
 
+const quadrant = `quadrantChart
+    title Effort vs value
+    x-axis Low effort --> High effort
+    y-axis Low value --> High value
+    Retries: [0.3, 0.6]`
+
+const xychart = `xychart-beta
+    title "Build minutes"
+    x-axis [mon, tue, wed]
+    y-axis "Minutes" 0 --> 60
+    bar [12, 30, 45]`
+
+const sankey = `sankey-beta
+
+Budget,Builds,10
+Budget,Tests,5`
+
 // svgDoc is what the tests read back from a rendered SVG.
 type svgDoc struct {
 	width, height float64
 	viewBox       [4]float64
 	texts         []string
-	textYs        []float64
+	textYs        []float64 // each <text> or <tspan> y, in the root's space
 	foreign       int
+}
+
+// translateY is the y of a transform that only translates, and false for
+// one that does anything else.
+func translateY(t *testing.T, transform string) (float64, bool) {
+	if transform == "" {
+		return 0, true
+	}
+	args, ok := strings.CutPrefix(transform, "translate(")
+	if !ok || !strings.HasSuffix(args, ")") {
+		return 0, false
+	}
+	f := strings.FieldsFunc(strings.TrimSuffix(args, ")"), func(r rune) bool { return r == ',' || r == ' ' })
+	if len(f) != 2 {
+		return 0, len(f) == 1
+	}
+	return number(t, "translate y", f[1]), true
 }
 
 // parseSVG checks that out is one well-formed XML document rooted at <svg>
@@ -80,6 +114,9 @@ func parseSVG(t *testing.T, out []byte) svgDoc {
 	var root bool
 	var inText int
 	var text strings.Builder // one <text>'s characters, across its <tspan>s
+	// offsets is each open element's y offset from the root, NaN under a
+	// transform other than a translation.
+	offsets := []float64{0}
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
@@ -113,19 +150,29 @@ func parseSVG(t *testing.T, out []byte) svgDoc {
 					doc.viewBox[i] = number(t, "viewBox", f[i])
 				}
 			}
+			off := offsets[len(offsets)-1]
+			if dy, ok := translateY(t, attr("transform")); ok {
+				off += dy
+			} else {
+				off = math.NaN()
+			}
+			offsets = append(offsets, off)
 			switch el.Name.Local {
 			case "foreignObject":
 				doc.foreign++
-			case "text":
-				if inText == 0 {
-					text.Reset()
+			case "text", "tspan":
+				if el.Name.Local == "text" {
+					if inText == 0 {
+						text.Reset()
+					}
+					inText++
 				}
-				inText++
-				if y := attr("y"); y != "" {
-					doc.textYs = append(doc.textYs, number(t, "text y", y))
+				if y := attr("y"); y != "" && !math.IsNaN(off) {
+					doc.textYs = append(doc.textYs, off+number(t, "text y", y))
 				}
 			}
 		case xml.EndElement:
+			offsets = offsets[:len(offsets)-1]
 			if el.Name.Local == "text" {
 				if inText--; inText == 0 {
 					if s := strings.TrimSpace(text.String()); s != "" {
@@ -175,9 +222,25 @@ func TestRenderKinds(t *testing.T) {
 		{"state", state, []string{"Queued", "promoted", "retried by the supervisor"}},
 		{"class", class, []string{"Animal", "+String name"}},
 		{"er", er, []string{"RELEASE", "triggers", "sha"}},
+		{"quadrant", quadrant, []string{"Effort vs value", "Retries"}},
+		{"xychart", xychart, []string{"Build minutes", "tue"}},
+		{"sankey", sankey, []string{"Budget", "Tests"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			doc := render(t, tc.src)
+			out, err := Render(context.Background(), tc.src)
+			if err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			// usvg reads neither, and draws what uses them black.
+			for _, css := range []string{"var(", "color-mix(", "--ondine", "--_"} {
+				if i := strings.Index(string(out), css); i >= 0 {
+					t.Errorf("%q survived flattening: %.80q", css, out[max(0, i-20):])
+				}
+			}
+			if !strings.Contains(string(out), palette["--ondine-surface"]) && !strings.Contains(string(out), palette["--ondine-series-1"]) {
+				t.Error("no colour from margin's palette")
+			}
+			doc := parseSVG(t, out)
 			if doc.width <= 0 || doc.height <= 0 {
 				t.Fatalf("size %vx%v, want a positive px size", doc.width, doc.height)
 			}
@@ -199,10 +262,11 @@ func TestRenderKinds(t *testing.T) {
 }
 
 // TestRenderKeepsTextOnCanvas pins the wazero fix (wazero#2535): with an
-// older compiler a wrapped label's lines landed ±8,000,000px off the canvas.
+// older compiler the previous renderer's wrapped labels landed ±8,000,000px
+// off the canvas. Any float miscompile in layout shows the same way.
 func TestRenderKeepsTextOnCanvas(t *testing.T) {
 	doc := render(t, "flowchart TD\n  A[a label long enough that it has to wrap onto a second and a third line] --> B[short]\n")
-	if len(doc.textYs) < 3 {
+	if len(doc.textYs) < 4 {
 		t.Fatalf("%d text lines, want the long label wrapped", len(doc.textYs))
 	}
 	top, bottom := doc.viewBox[1], doc.viewBox[1]+doc.viewBox[3]
@@ -213,9 +277,8 @@ func TestRenderKeepsTextOnCanvas(t *testing.T) {
 	}
 }
 
-// TestRenderLargeFlowchart: past about 90 nodes merman cannot convert HTML
-// labels within its work budget, so the renderer draws large diagrams with
-// SVG labels instead (wasm/src/main.rs).
+// TestRenderLargeFlowchart: a diagram far past what anyone writes by hand
+// still comes out whole, its labels as <text>.
 func TestRenderLargeFlowchart(t *testing.T) {
 	var src strings.Builder
 	src.WriteString("flowchart TD\n")
@@ -231,10 +294,20 @@ func TestRenderLargeFlowchart(t *testing.T) {
 	}
 }
 
-func TestRenderUnsupportedKind(t *testing.T) {
-	_, err := Render(context.Background(), "quadrantChart\n  title Effort vs value\n  A: [0.3, 0.6]\n")
-	if err == nil || !strings.Contains(err.Error(), "quadrantChart") {
-		t.Fatalf("err = %v, want one naming the unsupported kind", err)
+func TestRenderUnknownKind(t *testing.T) {
+	_, err := Render(context.Background(), "zenuml\n  title Checkout\n  A.pay()\n")
+	if err == nil || !strings.Contains(err.Error(), "No diagram type detected") {
+		t.Fatalf("err = %v, want one saying no kind was recognised", err)
+	}
+}
+
+func TestRenderParseErrorOnOneLine(t *testing.T) {
+	_, err := Render(context.Background(), "sequenceDiagram\n  A->>B: hi\n  loop retry\n")
+	if err == nil {
+		t.Fatal("an unclosed loop rendered")
+	}
+	if msg := err.Error(); strings.Contains(msg, "\n") || !strings.Contains(msg, "line") || strings.Contains(msg, "^") {
+		t.Errorf("err = %q, want one line naming the line, no caret", msg)
 	}
 }
 
@@ -269,8 +342,8 @@ func TestRenderDeadlineStopsTheGuest(t *testing.T) {
 	render(t, "flowchart LR\n  A --> B\n") // compile first: the deadline is for the render
 	var big strings.Builder
 	big.WriteString("flowchart TD\n")
-	for i := range 400 {
-		fmt.Fprintf(&big, "  n%d[node %d] --> n%d[node %d]\n", i, i, (i*7+1)%400, (i*7+1)%400)
+	for i := range 1000 { // ~200ms to draw, under Ondine's 50,000-character limit
+		fmt.Fprintf(&big, "  n%d[node %d] --> n%d[node %d]\n", i, i, (i*7+1)%1000, (i*7+1)%1000)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
@@ -285,7 +358,7 @@ func TestRenderDeadlineStopsTheGuest(t *testing.T) {
 }
 
 func TestRenderConcurrent(t *testing.T) {
-	srcs := []string{flowchart, sequence, state, class, er}
+	srcs := []string{flowchart, sequence, state, class, er, quadrant, xychart, sankey}
 	var wg sync.WaitGroup
 	errs := make(chan error, 2*len(srcs))
 	for i := range 2 * len(srcs) {
