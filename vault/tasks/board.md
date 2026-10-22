@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-22 (the footer dense on a host, F35)
+Last updated: 2026-10-22 (a slow host keeps its surfaces)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -440,6 +440,9 @@ Last updated: 2026-10-22 (the footer dense on a host, F35)
 
 ## Done
 
+- [x] **(maintainer report)** a wave of measures that took more than 3 s
+      in all made margin deaf, answered or not; it now waits 3 s from the
+      last answer. `[mech]` — see journal 2026-10-22.2 — done 2026-10-22
 - [x] **(maintainer report)** the footer's keys cut off or blank on a HOTTY
       host: the kit's padding put a one-row surface's text below its row
       (F35); the footer is now a dense surface (hotty-a2ui `SetDense`).

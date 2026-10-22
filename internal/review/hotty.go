@@ -51,6 +51,7 @@ type hotState struct {
 	pending map[int]hotKey // by request number
 	nextN   int
 	wave    int  // the measuring wave the timeout belongs to
+	heard   int  // measures answered so far, so a wave still answering waits
 	deaf    bool // a host that never answered a measure: everything in cells
 	want    []hotWant
 
@@ -143,15 +144,15 @@ type hotDiagramMsg struct {
 }
 
 // hotMeasureTimeoutMsg gives up on a wave of measures the host did not
-// answer.
-type hotMeasureTimeoutMsg struct{ wave int }
+// answer: none of it since heard, the answers there were when it was set.
+type hotMeasureTimeoutMsg struct{ wave, heard int }
 
 const (
 	hotMeasureName = "margin-measure"
 	// hotWave is how many blocks are measured at once, nearest the screen
 	// first: enough to fill it, few enough that the first frame comes soon.
 	hotWave = 64
-	// hotMeasureWait is how long a wave may go unanswered.
+	// hotMeasureWait is how long a wave may go without an answer.
 	hotMeasureWait = 3 * time.Second
 	// hotRelayoutAfter gathers the replies of a wave into one frame.
 	hotRelayoutAfter = 16 * time.Millisecond
@@ -283,6 +284,11 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		if msg.wave != h.wave || len(h.pending) == 0 {
 			return nil, false
 		}
+		if msg.heard != h.heard {
+			// A slow host, still answering (a multiplexer that answers one
+			// measure at a time): wait on it from here.
+			return h.awaitWave(), false
+		}
 		// A host that leaves a whole wave unanswered will not answer the
 		// next: show everything in cells rather than wait on it.
 		h.tracef("deaf: wave %d left %d measures unanswered", msg.wave, len(h.pending))
@@ -302,6 +308,7 @@ func (h *hotState) measured(r hotty.Reply) bool {
 		return false
 	}
 	delete(h.pending, r.N)
+	h.heard++
 	if r.OK && r.Re == "place" && r.Rows > 0 {
 		h.rows[key] = r.Rows
 		h.last[key.html] = r.Rows
@@ -560,8 +567,14 @@ func (m *model) hotMeasure() tea.Cmd {
 	}
 	h.wave++
 	h.tracef("measure: wave %d, %d blocks", h.wave, n)
-	wave := h.wave
-	return tea.Tick(hotMeasureWait, func(time.Time) tea.Msg { return hotMeasureTimeoutMsg{wave} })
+	return h.awaitWave()
+}
+
+// awaitWave gives up on the wave if hotMeasureWait passes without an answer
+// to any of it.
+func (h *hotState) awaitWave() tea.Cmd {
+	wave, heard := h.wave, h.heard
+	return tea.Tick(hotMeasureWait, func(time.Time) tea.Msg { return hotMeasureTimeoutMsg{wave, heard} })
 }
 
 // hotEvent is what the user did in a block: a press focuses it, as a click on

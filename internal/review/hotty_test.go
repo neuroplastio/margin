@@ -17,6 +17,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/neuroplastio/hotty-go"
+	"github.com/neuroplastio/hotty-go/hottytea"
 	"github.com/neuroplastio/hotty-go/hottytest"
 )
 
@@ -381,6 +382,25 @@ func TestHotName(t *testing.T) {
 	}
 	if hotName("/r/a.md", "", 3) == hotName("/r/a.md", "", 4) {
 		t.Error("blocks without an anchor share a name")
+	}
+}
+
+// TestHotMeasureWaitsOnASlowHost: a wave times out only after
+// hotMeasureWait without any answer, so a host answering one measure at a
+// time, slower than that in all, keeps margin's surfaces.
+func TestHotMeasureWaitsOnASlowHost(t *testing.T) {
+	m := &model{hot: newHotState()}
+	h := m.hot
+	h.wave = 1
+	h.pending[1], h.pending[2] = hotKey{"a", 40}, hotKey{"b", 40}
+	set := hotMeasureTimeoutMsg{h.wave, h.heard}
+	m.hotUpdate(hottytea.AckMsg{Reply: hotty.Reply{N: 1, OK: true, Re: "place", Rows: 2}})
+	if cmd, _ := m.hotUpdate(set); h.deaf || cmd == nil {
+		t.Fatalf("a wave answered since its timeout was set: deaf %v, waits again %v", h.deaf, cmd != nil)
+	}
+	m.hotUpdate(hotMeasureTimeoutMsg{h.wave, h.heard})
+	if !h.deaf {
+		t.Error("a wave unanswered for hotMeasureWait did not give up")
 	}
 }
 
