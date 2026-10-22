@@ -136,7 +136,7 @@ jobs:
             name="[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]-dev\.$(git rev-parse --short=7 HEAD)"
           fi
           dist/margin_linux_amd64 --version
-          dist/margin_linux_amd64 --version | grep -q "^margin $name ($(git rev-parse HEAD))$"
+          dist/margin_linux_amd64 --version | grep -q "^margin $name ($(git rev-parse HEAD)) · hotty [0-9][0-9]*\.[0-9][0-9]*$"
           test "$(ls dist | wc -l)" -eq 8
 
       - uses: actions/upload-artifact@v7

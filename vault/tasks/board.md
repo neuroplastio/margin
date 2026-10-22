@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-22 (margin on hotty 0.5)
+Last updated: 2026-10-22 (the release's stamp check reads the hotty part)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -447,6 +447,10 @@ Last updated: 2026-10-22 (margin on hotty 0.5)
 
 ## Done
 
+- [x] **(CI)** the release's stamp check wanted `--version` to end at the
+      commit, so the first build with ` · hotty 0.5` failed (run
+      39765104235) and published nothing; it now wants the hotty part too.
+      `[mech]` — see journal 2026-10-22.7 — done 2026-10-22
 - [x] **(hotty agent)** margin on hotty 0.5: hotty-go v0.5.0, the kit at
       hotty-a2ui b1f6b54; no code of margin's changed (the kit carries
       `rev`). `[mech]` — see journal 2026-10-22.6 — done 2026-10-22
