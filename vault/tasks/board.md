@@ -1,9 +1,12 @@
 # Board
 
-Last updated: 2026-10-22 (a narrow pane keeps the document on screen)
+Last updated: 2026-10-22 (the search prompt whole on a host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (search on a host) the `/` prompt is a dense kit surface, its rule then
+  "/", a field a row tall and the count in its two rows, where the field was
+  cut — whether a one-row field reads well as a prompt — journal 2026-10-22.4
 - (narrow pane) below 43 columns the prose wraps at the screen's edge
   instead of being cut, and a collapsed thread's line is cut with "…" at
   the measure — whether the lines read in a 30–40 column pane — journal
@@ -444,6 +447,10 @@ Last updated: 2026-10-22 (a narrow pane keeps the document on screen)
 
 ## Done
 
+- [x] **(maintainer report)** the search prompt cut on a HOTTY host: the
+      kit's field needed 5 rows where margin places it over 2 (F35); kit
+      cf085ff lays a dense one-line field out as cells does, and the prompt
+      is a bar. `[felt]` — see journal 2026-10-22.4 — done 2026-10-22
 - [x] **(maintainer report)** in a pane narrower than 43 columns every line
       and surface was cut at the right edge (the measure's 40-column
       floor); the measure now stops at the screen's edge, and a collapsed
@@ -875,10 +882,6 @@ or a Dn before building.
 - Render the diff as prose — a rewritten paragraph reads as a rewritten
   paragraph, not as a wall of `-`/`+`
 - Carry marks and threads across a revision; show what changed under a mark
-- (from the 2026-10-21 report) the search prompt on a HOTTY host is cut: its
-  label and field need ~6 rows (4 dense) and margin places it over 2 (F35).
-  A one-row field with an inline label from the kit, or more rows from
-  margin; ask before building
 
 **Exit:** an agent hands back round four of a plan and the reviewer can see what
 moved without re-reading it.

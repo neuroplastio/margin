@@ -145,8 +145,9 @@ type pane struct {
 	c  *view.Controller
 	cr *cells.Rendition
 	hr *html.Rendition
-	// bar: the pane is a row of the screen, as the footer is; on a host
-	// it is a dense surface, its text inside that row (SetDense).
+	// bar: the pane is rows of the screen, as the footer and the search
+	// prompt are; on a host it is a dense surface, its text and one-line
+	// fields a row each, as in cells (SetDense).
 	bar bool
 	// components is what the pane was last defined with, as JSON: define
 	// sends them again only when they changed.

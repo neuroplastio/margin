@@ -326,6 +326,9 @@ const searchFieldKeys = "enter=program"
 // searchPane is the search prompt's pane as the model has it.
 func (m *model) searchPane() *pane {
 	p := m.panes().pane(searchID, map[string]any{"draft": m.searchDraft, "count": ""})
+	// Placed over the two rows it has in cells: the rule, then "/", the
+	// field and the count on one row.
+	p.bar = true
 	p.define(
 		obj("id", "root", "component", "Column", "children", []any{"rule", "line"}),
 		obj("id", "rule", "component", "Divider"),

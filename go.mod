@@ -19,7 +19,7 @@ require (
 	github.com/yuin/goldmark v1.8.6
 )
 
-require github.com/neuroplastio/hotty-a2ui v0.0.0-20261021220906-d6d7db149fd4
+require github.com/neuroplastio/hotty-a2ui v0.0.0-20261022080349-cf085ffe84bb
 
 require (
 	github.com/aymanbagabas/go-udiff v0.4.1 // indirect

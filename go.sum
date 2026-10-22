@@ -49,8 +49,8 @@ github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec h1:nYDocJy/nGY
 github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec/go.mod h1:9X8xfh6qCZPjvq+2AMBXkDM4bGwl46t6JFbsREnnVWk=
 github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d h1:uQ+WOItvABuJ2zU5Bd0uJgVTmbGwwAMSCUF5imF9QDw=
 github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d/go.mod h1:Rw9J2irj6uPmmvFaGIEoVSeUWrZ80f5JSRUHauF3IkI=
-github.com/neuroplastio/hotty-a2ui v0.0.0-20261021220906-d6d7db149fd4 h1:KB+8RjD3L1cNPe83f95Awxep11mX/VyiWWCSQaQZ5O8=
-github.com/neuroplastio/hotty-a2ui v0.0.0-20261021220906-d6d7db149fd4/go.mod h1:rc30zCORL5nbx3x+f5TxF5ZFE73AlS6IwlMDrci6MHU=
+github.com/neuroplastio/hotty-a2ui v0.0.0-20261022080349-cf085ffe84bb h1:SGNLHNf0Lz4m1UF6dQTUyEQp4ImapcsYXnhLEm7fFwQ=
+github.com/neuroplastio/hotty-a2ui v0.0.0-20261022080349-cf085ffe84bb/go.mod h1:rc30zCORL5nbx3x+f5TxF5ZFE73AlS6IwlMDrci6MHU=
 github.com/neuroplastio/hotty-go v0.4.0 h1:KitzXZWDeqwbKY7Au0Rmd/yt86bOwtvkfv1pOUWjRqU=
 github.com/neuroplastio/hotty-go v0.4.0/go.mod h1:Jpc6zXV2vFn0EWfxy1dDuXswBwj/MZGGi9FY20Nv4R0=
 github.com/neuroplastio/hotty-go/hottyedit v0.4.0 h1:uyHwKyCS6/8iZ7sMY/ltzaDXIVfu2nY+6PGpRJ0Y2r4=

@@ -746,6 +746,10 @@ caption wrapped to a second line beside the key hints, which keep their full
 width, and the bar was two rows tall again; kit d6d7db1 keeps a dense
 surface's text on one line and lets the hints give way. Check a bar's document with
 `hotty render doc.html --cols N --rows auto --cell 9.5x20`: it should give 1
-at every width. The search prompt has the same problem and is not fixed: its
-field and label need 4 rows even dense, and margin gives it the 2 it has in
-cells.
+at every width. The search prompt had the same problem: in HTML a field's
+label sits above its input, and the input is 2.25rem tall with padding, so
+the prompt needed 5 rows (3 dense) where margin gives it the 2 it has in
+cells. Kit cf085ff (2026-10-22) lays a dense one-line field out as cells
+does: the label beside the input, the input a row tall, and a Divider
+without its margin. So any pane margin places over its cells rows, fields
+and all, is a bar (`pane.bar`), and its document renders the cells rows.
