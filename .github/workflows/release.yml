@@ -167,6 +167,18 @@ jobs:
           name: margin-${{ github.sha }}
           path: dist/
 
+      # The hotty version the build speaks, as its own --version says it
+      # beside its name, for the title and the notes' first line (gov P-5
+      # rule 6).
+      - name: Name the hotty version
+        run: |
+          chmod +x dist/margin_linux_amd64
+          label="$(dist/margin_linux_amd64 --version)"
+          case "$label" in
+          *' · hotty '*) echo "HOTTY=${label##* · hotty }" >> "$GITHUB_ENV" ;;
+          *) echo "::error::margin --version names no hotty version: $label"; exit 1 ;;
+          esac
+
       # What changed since the previous release on main, the chores left out.
       - name: Write the notes
         run: |
@@ -174,6 +186,8 @@ jobs:
           commit="$(git rev-parse HEAD)"
           prev="$(git describe --tags --abbrev=0 --match '[0-9][0-9].[0-9][0-9].[0-9][0-9]' HEAD^ 2>/dev/null || true)"
           {
+            echo "$tag — hotty $HOTTY"
+            echo
             echo "margin $tag is \`$commit\`, published to the stable channel:"
             echo "\`margin update\` in a margin from this release follows it."
             echo
@@ -208,10 +222,10 @@ jobs:
         run: |
           tag="$GITHUB_REF_NAME"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" --title "margin $tag" --notes-file notes.md
+            gh release edit "$tag" --title "margin $tag — hotty $HOTTY" --notes-file notes.md
             gh release upload "$tag" dist/* --clobber
           else
-            gh release create "$tag" --verify-tag --title "margin $tag" --notes-file notes.md dist/*
+            gh release create "$tag" --verify-tag --title "margin $tag — hotty $HOTTY" --notes-file notes.md dist/*
           fi
 
   publish:

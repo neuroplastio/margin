@@ -11,8 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/neuroplastio/hotty-go"
 	"github.com/neuroplastio/margin/internal/update/testchannel"
 )
+
+// hottyLabel ends every --version: the hotty version margin speaks.
+var hottyLabel = " · hotty " + hotty.Version
 
 func TestUpdateTakesAnOptionalCommit(t *testing.T) {
 	var got []string
@@ -94,7 +98,7 @@ func TestAStaleMarginReplacesItself(t *testing.T) {
 		return string(out), err
 	}
 
-	if out, _ := margin("--version"); out != "margin "+verA+" ("+commitA+")\n" {
+	if out, _ := margin("--version"); out != "margin "+verA+" ("+commitA+")"+hottyLabel+"\n" {
 		t.Fatalf("before: --version = %q", out)
 	}
 	out, err := margin("update")
@@ -104,7 +108,7 @@ func TestAStaleMarginReplacesItself(t *testing.T) {
 	if !strings.Contains(out, "margin "+verA+" → "+verB) {
 		t.Errorf("margin update said:\n%s", out)
 	}
-	if out, _ := margin("--version"); out != "margin "+verB+" ("+commitB+")\n" {
+	if out, _ := margin("--version"); out != "margin "+verB+" ("+commitB+")"+hottyLabel+"\n" {
 		t.Errorf("after: --version = %q", out)
 	}
 	if data, _ := os.ReadFile(bin); !bytes.Equal(data, newer) {
@@ -125,7 +129,7 @@ func TestAStaleMarginReplacesItself(t *testing.T) {
 	if out, err := margin("update"); err == nil || !strings.Contains(out, "sha256") {
 		t.Errorf("a tampered build: %v\n%s", err, out)
 	}
-	if out, _ := margin("--version"); out != "margin "+verB+" ("+commitB+")\n" {
+	if out, _ := margin("--version"); out != "margin "+verB+" ("+commitB+")"+hottyLabel+"\n" {
 		t.Errorf("after the refused update: --version = %q", out)
 	}
 }
@@ -186,7 +190,7 @@ func TestTheLauncherFetchesMarginAndUpdateMovesIt(t *testing.T) {
 	// ENLAUNCH_FETCH: a seed in this machine's /usr/lib/margin, from a
 	// package, must not stand in for the first fetch.
 	out, err := margin([]string{"ENLAUNCH_FETCH=1"}, "--version")
-	if err != nil || !strings.HasSuffix(out, "margin "+verA+" ("+commitA+")\n") || !strings.Contains(out, "margin: fetching") {
+	if err != nil || !strings.HasSuffix(out, "margin "+verA+" ("+commitA+")"+hottyLabel+"\n") || !strings.Contains(out, "margin: fetching") {
 		t.Fatalf("first launch: %v\n%s", err, out)
 	}
 
@@ -195,7 +199,7 @@ func TestTheLauncherFetchesMarginAndUpdateMovesIt(t *testing.T) {
 	if err != nil || !strings.Contains(out, "margin "+verA+" → "+verB) || !strings.Contains(out, "installed in "+mhome) {
 		t.Fatalf("margin update under the launcher: %v\n%s", err, out)
 	}
-	if out, _ := margin(nil, "--version"); out != "margin "+verB+" ("+commitB+")\n" {
+	if out, _ := margin(nil, "--version"); out != "margin "+verB+" ("+commitB+")"+hottyLabel+"\n" {
 		t.Errorf("the next launch: --version = %q", out)
 	}
 	if data, _ := os.ReadFile(installed); !bytes.Equal(data, launcher) {

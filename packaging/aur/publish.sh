@@ -47,6 +47,14 @@ for f in margin-launcher_linux_amd64 margin_linux_amd64 margin-launcher_linux_ar
 	curl -fsSL "$urlbase/$f" -o "$work/release/$f"
 done
 sum() { sha256sum "$work/release/$1" | cut -d' ' -f1; }
+# The hotty version the release speaks, as its margin for this machine says it
+# beside its name (gov P-5 rule 6), for pkgdesc: ", speaking hotty 0.5". A
+# release from before margin said one has none.
+case "$(uname -m)" in aarch64 | arm64) self=margin_linux_arm64 ;; *) self=margin_linux_amd64 ;; esac
+chmod +x "$work/release/$self"
+label=$(HOME="$work" "$work/release/$self" --version)
+hotty=''
+case "$label" in *' · hotty '*) hotty=", speaking hotty ${label##* · hotty }" ;; esac
 l_amd64=$(sum margin-launcher_linux_amd64)
 s_amd64=$(sum margin_linux_amd64)
 l_arm64=$(sum margin-launcher_linux_arm64)
@@ -84,7 +92,7 @@ if [ -f "$work/aur/.SRCINFO" ]; then
 fi
 
 render() {
-	sed -e "s/@PKGVER@/$1/" -e "s/@PKGREL@/$2/" \
+	sed -e "s/@PKGVER@/$1/" -e "s/@PKGREL@/$2/" -e "s/@HOTTY@/$hotty/" \
 		-e "s/@SHA256_LAUNCHER_X86_64@/$l_amd64/" -e "s/@SHA256_SEED_X86_64@/$s_amd64/" \
 		-e "s/@SHA256_LAUNCHER_AARCH64@/$l_arm64/" -e "s/@SHA256_SEED_AARCH64@/$s_arm64/" \
 		"$here/PKGBUILD"

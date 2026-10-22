@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neuroplastio/hotty-go"
 	"github.com/neuroplastio/margin/internal/review"
 )
 
@@ -89,6 +90,10 @@ func TestVersionFlag(t *testing.T) {
 	}
 	if !strings.HasPrefix(out, "margin ") {
 		t.Errorf("version output = %q, want it to name the tool", out)
+	}
+	// gov P-5 rule 6: the hotty version it speaks, beside its name.
+	if !strings.HasSuffix(out, " · hotty "+hotty.Version+"\n") {
+		t.Errorf("version output = %q, want it to end with the hotty version", out)
 	}
 }
 

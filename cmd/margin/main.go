@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/neuroplastio/hotty-go"
 	"github.com/neuroplastio/margin/internal/review"
 	"github.com/neuroplastio/margin/internal/update"
 	"github.com/neuroplastio/margin/internal/version"
@@ -36,10 +37,13 @@ func newRootCmd(run func(path string, opts review.RunOptions) error, addComment 
 	var wheelSpeed int
 	var noHotty bool
 
+	// The build's name, and beside it the hotty version margin speaks (gov
+	// P-5 rule 6): "26.11.02 (<commit>) · hotty 0.5".
+	label := version.Current().String() + " · hotty " + hotty.Version
 	root := &cobra.Command{
 		Use:     "margin [FILE.md|DIR/]",
 		Short:   "Review markdown in the terminal",
-		Version: version.Current().String(),
+		Version: label,
 		Long: `margin opens markdown for review: read the rendered prose, leave
 comments anchored to blocks, mark what you have reviewed and what still needs
 attention, then copy the whole review out for whatever wrote the document.

@@ -7,7 +7,7 @@
 # network and survives a channel outage; `margin update` then updates the copy
 # in the home, outside the package manager.
 class Margin < Formula
-  desc "Terminal tool for reviewing markdown and handing the comments back to an agent"
+  desc "Terminal tool to review markdown and hand comments back to an agent@HOTTY@"
   homepage "https://github.com/neuroplastio/margin"
   license "Apache-2.0"
 

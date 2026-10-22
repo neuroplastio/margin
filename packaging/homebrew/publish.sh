@@ -52,11 +52,20 @@ for f in $assets; do
 	curl -fsSL "$urlbase/$f" -o "$work/$f"
 done
 
+# The hotty version the release speaks, as its margin for this machine says it
+# beside its name (gov P-5 rule 6), for desc: " (hotty 0.5)". A release from
+# before margin said one has none.
+self="$work/margin_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed -e s/x86_64/amd64/ -e s/aarch64/arm64/)"
+chmod +x "$self"
+label=$(HOME="$work" "$self" --version)
+hotty=''
+case "$label" in *' · hotty '*) hotty=" (hotty ${label##* · hotty })" ;; esac
+
 platform() { case "$1" in *darwin_amd64) echo DARWIN_AMD64 ;; *darwin_arm64) echo DARWIN_ARM64 ;;
 	*linux_amd64) echo LINUX_AMD64 ;; *linux_arm64) echo LINUX_ARM64 ;; esac; }
 
 render() {
-	local args=(-e "s/@VERSION@/$release/g" -e "s/@COMMIT@/$commit/") f
+	local args=(-e "s/@VERSION@/$release/g" -e "s/@COMMIT@/$commit/" -e "s/@HOTTY@/$hotty/") f
 	for f in margin-launcher_darwin_amd64 margin-launcher_darwin_arm64 \
 		margin-launcher_linux_amd64 margin-launcher_linux_arm64; do
 		args+=(-e "s/@LAUNCHER_$(platform "$f")@/$(sum "$work/$f")/")

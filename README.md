@@ -250,6 +250,9 @@ margin update 0d7c52f    # a particular build, older ones included, while the ch
 margin --version         # 26.10.03 for a release, 26.10.02-dev.0d7c52f for a dev build, the short commit for your own
 ```
 
+`--version` also says which version of [hotty](https://github.com/neuroplastio/hotty)
+margin speaks: `margin 26.11.02 (<commit>) · hotty 0.5`.
+
 `margin update` replaces the file you ran (through any symlink), so install it
 somewhere you can write, such as `~/.local/bin`. A margin you built yourself
 updates to the dev channel's newest build, and says so. To move between
@@ -321,7 +324,9 @@ make release            # tags HEAD with today's date and pushes the tag
 
 The tag is the whole act. The release workflow builds the tagged commit,
 named after the tag and stamped with the `stable` channel; makes the GitHub
-release with its binaries and the changes since the previous release; then
+release with its binaries and the changes since the previous release, titled
+with the hotty version the build says it speaks (`margin 26.11.02 — hotty
+0.5`), as the Homebrew and AUR descriptions say it too; then
 publishes the same files to `pkg.neuroplast.io/margin/stable`, reads them back
 against the release key, and attaches the signed manifest to the GitHub
 release. A tag that is not a day, not on `main`, or on a commit already
