@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-22 (the search prompt whole on a host)
+Last updated: 2026-10-22 (margin on hotty 0.5)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -447,6 +447,12 @@ Last updated: 2026-10-22 (the search prompt whole on a host)
 
 ## Done
 
+- [x] **(hotty agent)** margin on hotty 0.5: hotty-go v0.5.0, the kit at
+      hotty-a2ui b1f6b54; no code of margin's changed (the kit carries
+      `rev`). `[mech]` — see journal 2026-10-22.6 — done 2026-10-22
+- [x] **(gov P-5 rule 6)** the hotty version beside margin's name, in
+      `--version`, the release's title and notes, and the Homebrew and AUR
+      descriptions. `[mech]` — see journal 2026-10-22.5 — done 2026-10-22
 - [x] **(maintainer report)** the search prompt cut on a HOTTY host: the
       kit's field needed 5 rows where margin places it over 2 (F35); kit
       cf085ff lays a dense one-line field out as cells does, and the prompt
@@ -847,7 +853,11 @@ Not part of a milestone; cross-cutting infrastructure the palette feedback
 asked for. Split per the feedback's own suggested ordering — see
 `vault/journal/2026-08-07.6.md` for why CMD-01 alone is this leg.
 
-- *(none)*
+- **(seen 2026-10-22)** on a HOTTY host (hottyterm 0.4 and 0.5 alike),
+  when the `:` palette opens on its full table, the query row can't be
+  seen and the table's last row is cut; with no rows matching, the `:`
+  row shows. Likely the table's rows past the pane, as the search prompt
+  was (F35). `[felt]` — see journal 2026-10-22.6
 
 ## Backlog — M3 (tree view)
 
