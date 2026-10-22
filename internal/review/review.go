@@ -457,10 +457,13 @@ func (m *model) panes() *kit {
 // to and the composer pane occupies. It adapts to the terminal — the
 // maintainer's 2026-08-10 viewport-width feedback — so a wide terminal reads
 // at its full width instead of parking columns past a fixed 76-column measure.
-// The floor keeps a very narrow terminal readable; there is deliberately no
-// upper cap, since the terminal's own width is the physical limit.
+// The floor keeps a narrow terminal readable; there is deliberately no upper
+// cap, since the terminal's own width is the physical limit. Nor does the
+// floor reach past that limit: a terminal (or a multiplexer's pane) narrower
+// than the floor gives up the right-hand gutter, then the floor, rather than
+// cut every line and surface at its edge.
 func (m *model) contentWidth() int {
-	return max(m.w-2*gutterW-m.docX(), minPaneCol)
+	return max(m.w-2*gutterW-m.docX(), min(minPaneCol, m.w-gutterW-m.docX()), 1)
 }
 
 // --- focus ------------------------------------------------------------------
@@ -3046,7 +3049,10 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		if t.draft(newCommentSlot) != "" || t.pendingEdit() >= 0 {
 			style = draftStyle
 		}
-		return []string{strings.Repeat(" ", gutterW) + marker + style.Render(t.summary(m.showDeleted))}
+		// The summary keeps to the measure: a narrow pane cuts its end, not
+		// the terminal.
+		sum := truncate(t.summary(m.showDeleted), max(m.contentWidth()-lipgloss.Width(marker), 1))
+		return []string{strings.Repeat(" ", gutterW) + marker + style.Render(sum)}
 	}
 
 	// Expanded: the whole exchange, ready to read. Comments are separately

@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-10-22 (a slow host keeps its surfaces)
+Last updated: 2026-10-22 (a narrow pane keeps the document on screen)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (narrow pane) below 43 columns the prose wraps at the screen's edge
+  instead of being cut, and a collapsed thread's line is cut with "…" at
+  the measure — whether the lines read in a 30–40 column pane — journal
+  2026-10-22.3
 - (footer on a host) the footer is a dense kit surface (hotty-a2ui
   `SetDense`), its line inside its row in hottyterm and in a plx pane where
   it was half drawn or blank — whether it sits centred in the row, and how
@@ -440,6 +444,11 @@ Last updated: 2026-10-22 (a slow host keeps its surfaces)
 
 ## Done
 
+- [x] **(maintainer report)** in a pane narrower than 43 columns every line
+      and surface was cut at the right edge (the measure's 40-column
+      floor); the measure now stops at the screen's edge, and a collapsed
+      thread's line keeps to it. `[felt]` — see journal 2026-10-22.3 — done
+      2026-10-22
 - [x] **(maintainer report)** a wave of measures that took more than 3 s
       in all made margin deaf, answered or not; it now waits 3 s from the
       last answer. `[mech]` — see journal 2026-10-22.2 — done 2026-10-22

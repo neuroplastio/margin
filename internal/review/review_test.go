@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 )
 
@@ -1431,7 +1432,7 @@ func TestFrontmatterIsAKeyboardFocusStop(t *testing.T) {
 // feedback's first part: contentWidth is the terminal's own width (minus the
 // gutter), not a fixed 76-column measure, so a wide terminal reads at its
 // full width instead of parking the extra columns. The floor still keeps a
-// very narrow terminal readable.
+// narrow terminal readable, but never reaches past the screen's edge.
 func TestContentWidthAdaptsToTheTerminal(t *testing.T) {
 	m := newTestModel(t)
 
@@ -1445,9 +1446,29 @@ func TestContentWidthAdaptsToTheTerminal(t *testing.T) {
 		t.Fatalf("contentWidth on a 100-col terminal = %d, want %d", w, 100-2*gutterW)
 	}
 
-	m.w = 10
+	m.w = minPaneCol + gutterW + 1
 	if w := m.contentWidth(); w != minPaneCol {
-		t.Fatalf("contentWidth on a 10-col terminal = %d, want the %d-col floor", w, minPaneCol)
+		t.Fatalf("contentWidth on a %d-col terminal = %d, want the %d-col floor", m.w, w, minPaneCol)
+	}
+
+	m.w = 30
+	if w := m.contentWidth(); w != 30-gutterW {
+		t.Fatalf("contentWidth on a 30-col terminal = %d, want %d (to its edge, past the gutter)", w, 30-gutterW)
+	}
+}
+
+// TestNarrowTerminalKeepsToTheScreen: below the measure's floor, no line of
+// the review reaches past the terminal's edge, where the floor alone made
+// every one 40 columns wide and a 30-column pane cut them.
+func TestNarrowTerminalKeepsToTheScreen(t *testing.T) {
+	for _, w := range []int{20, 30, 42} {
+		m := newTestModel(t)
+		m.w, m.h = w, 40
+		for i, l := range strings.Split(m.view().Content, "\n") {
+			if lw := lipgloss.Width(l); lw > w {
+				t.Fatalf("at %d columns, line %d is %d wide: %q", w, i, lw, l)
+			}
+		}
 	}
 }
 
