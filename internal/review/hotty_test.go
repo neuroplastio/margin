@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/neuroplastio/hotty-go"
@@ -555,6 +556,27 @@ func TestHotListItem(t *testing.T) {
 	}
 	if strings.Contains(got, "<p>") {
 		t.Errorf("list item text is a paragraph: %s", got)
+	}
+}
+
+// A file's bytes that are not UTF-8 reach no document: a host refuses one
+// (SPEC §3.3).
+func TestHotDocsAreUTF8(t *testing.T) {
+	src := []byte("# Bad \xff head\n\nA para \xfe with `co\xffde`.\n\n- an item \xc3\n\n| a\xff | b |\n| - | - |\n| x | y |\n\n```go\nx := \"\xff\"\n```\n")
+	var d hotDocs
+	n := 0
+	for _, b := range parseDoc(src) {
+		doc := d.base(b, src)
+		if doc == "" {
+			continue
+		}
+		n++
+		if !utf8.ValidString(doc) || !strings.Contains(doc, "\uFFFD") {
+			t.Errorf("%v block's document is %q, want UTF-8 with U+FFFD for the bad bytes", b.kind, doc)
+		}
+	}
+	if n != 5 {
+		t.Errorf("%d blocks had documents, want the heading, paragraph, item, table and code", n)
 	}
 }
 

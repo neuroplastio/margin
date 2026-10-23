@@ -211,6 +211,9 @@ func (d *hotDocs) base(b block, src []byte) string {
 	} else {
 		s = d.render(md)
 	}
+	// A host refuses a document that is not UTF-8 (SPEC §3.3), and a file
+	// can hold any bytes: they show as U+FFFD, as a terminal shows them.
+	s = strings.ToValidUTF8(s, "\uFFFD")
 	if d.html == nil {
 		d.html = map[string]string{}
 	}

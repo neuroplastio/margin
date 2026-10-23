@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (resources again after a lost document)
+Last updated: 2026-10-23 (block documents are UTF-8)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -448,6 +448,10 @@ Last updated: 2026-10-23 (resources again after a lost document)
 ## In progress
 
 ## Done
+
+- [x] **(hotty agent, SPEC §3.3)** a file's bytes that are not UTF-8 show
+      as U+FFFD in its block documents, which a host refused (EINVAL).
+      `[mech]` — see journal 2026-10-23.3 — done 2026-10-23
 
 - [x] **(resources after a lost document)** when a host loses its
       documents, margin sends the stylesheet, images and diagram SVGs
