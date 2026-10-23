@@ -910,6 +910,13 @@ moved without re-reading it.
 
 ## Blocked
 
+- **(maintainer report, 2026-10-23)** margin loses its images when plx
+  restarts. Not reproduced: plx replays the whole session on a handover
+  and a viewport re-exec. But when a host loses a document, hottytea sends
+  it again (ENOENT on a placement) and tells margin nothing, so the
+  stylesheet, images and diagram SVGs it refers to are never sent again.
+  Waits on a hottytea signal for a lost document (asked of the hotty agent
+  2026-10-23). On it, margin resends every resource it has sent.
 - **Q-0004** (how a document's previous reviewed revision is recorded and
   located) — raised 2026-08-11. Blocks M4's first item ("Diff a document
   against the previous reviewed revision") and, through it, the two M4 items
