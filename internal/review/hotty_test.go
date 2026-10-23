@@ -272,8 +272,10 @@ func TestHottyFitGrowsABlock(t *testing.T) {
 	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
 		quote := surfaceWith(t, h, "a quote")
 		second := surfaceWith(t, h, "Second")
-		if p := quote.Placement(); p.Fit != hotty.On || p.Rows != 2 {
-			t.Fatalf("the quote is placed %+v, want fit and its measured 2 rows", p)
+		// Fit is the surface's, kept from the placement that turned it on: a
+		// later one leaves it out (SPEC §5.2).
+		if p := quote.Placement(); !quote.Fit() || p.Rows != 2 {
+			t.Fatalf("the quote is placed %+v (fit %v), want fit and its measured 2 rows", p, quote.Fit())
 		}
 		_, below := second.At()
 		grown.Store(quote.Name())
