@@ -779,3 +779,10 @@ when it comes back and reports again. In hottytest, `Placement()` is only
 the last `place` as sent; hottytea leaves out `f`, `p` and `v` when they
 have not changed, so read the surface's `Fit()`, `Press()` and `Hover()`
 (2026-10-23, journal 2026-10-23.2).
+Since hotty-go 5586fd4 a reported loss takes the hidden surfaces'
+documents with it, so a surface off screen at the loss no longer reports
+again. One case remains: a surface placed twice before the host's first
+ENOENT is read (a scroll down and back up within a frame or two) reports
+twice. The first reply's frame sends its document and placement again,
+and the second reply, which answers the older placement, is counted
+against the newer one. Reported to the hotty agent 2026-10-23.
