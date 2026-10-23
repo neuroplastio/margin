@@ -606,6 +606,54 @@ func TestHotMeasureAgainOnInput(t *testing.T) {
 	}
 }
 
+func TestHotMeasureWaitsForATerminal(t *testing.T) {
+	m := newTestModel(t)
+	m.hot = newHotState()
+	h := m.hot
+	ask := func(k hotKey) int {
+		h.asked[k] = true
+		h.nextN++
+		h.pending[h.nextN] = k
+		return h.nextN
+	}
+	noterm := func(n int) hottytea.ErrorMsg {
+		return hottytea.ErrorMsg{Reply: hotty.Reply{N: n, Re: "place", Code: hotENOTERM}}
+	}
+
+	a, b := hotKey{"a", 40}, hotKey{"b", 40}
+	m.hotUpdate(noterm(ask(a)))
+	m.hotUpdate(noterm(ask(b)))
+	if _, done := h.rows[a]; done || h.tries[a] != 0 {
+		t.Fatalf("ENOTERM: measured %v, tries %d; want neither cells for good nor a try", done, h.tries[a])
+	}
+	if h.attach == nil || *h.attach != a {
+		t.Fatalf("attach = %v, want the first block answered ENOTERM", h.attach)
+	}
+	m.hotMeasure()
+	n := h.attachN
+	if n == 0 {
+		t.Fatal("the frame did not place the attach surface")
+	}
+	m.hotUpdate(noterm(n))
+	if m.status != "" || h.attachN != n {
+		t.Fatalf("the attach surface's ENOTERM: status %q, attachN %d; want it taken quietly", m.status, h.attachN)
+	}
+	m.hotMeasure()
+	if h.attachN != n {
+		t.Fatal("the attach surface was placed twice")
+	}
+
+	// A terminal attaches and lays it out: its rows are the block's, and
+	// the rest is asked again.
+	m.hotUpdate(hottytea.EventMsg{Event: hotty.Event{Kind: hotty.EventFit, Surface: hotAttachName, FitRows: 4}})
+	if h.rows[a] != 4 || h.attach != nil || h.attachN != 0 {
+		t.Fatalf("after the fit: rows %d, attach %v, attachN %d; want 4, none, 0", h.rows[a], h.attach, h.attachN)
+	}
+	if h.asked[b] || len(h.later) != 0 {
+		t.Errorf("after the fit: b asked %v, later %v; want it asked again", h.asked[b], h.later)
+	}
+}
+
 func TestHotListItem(t *testing.T) {
 	var d hotDocs
 	got := d.listItem(listItem{prefix: "    1. ", text: "**deep** item"})

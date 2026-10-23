@@ -27,6 +27,8 @@ import (
 // column's width. Each block is measured once on a throwaway surface placed
 // with r=auto (SPEC §5.2), and until its reply comes the block shows in cells
 // (D17), so a host that is slow to answer still shows the whole document.
+// A multiplexer with no terminal attached answers ENOTERM: those blocks wait
+// in cells for one, which margin hears as a fit on a surface kept for it.
 // A block can grow after it is measured, when an image decodes or a font
 // loads: placed with fit (f=1), the host says so, and the block takes the
 // rows it says from then on.
@@ -59,6 +61,13 @@ type hotState struct {
 	// asks, so a document the host never lays out in time ends in cells.
 	later []hotKey
 	tries map[hotKey]int
+	// attach is a block a multiplexer with no terminal attached answered
+	// ENOTERM for (SPEC §5.2), placed again on a surface of its own that is
+	// kept, with fit: its first fit says a terminal laid it out, and what
+	// was not measured is asked again then. attachN is that placement's
+	// request number, 0 until it is placed.
+	attach  *hotKey
+	attachN int
 
 	// The frame: what View returns on a host, the blocks render placed in
 	// it, and where the document's column is.
@@ -160,6 +169,11 @@ type hotMeasureTimeoutMsg struct{ wave, heard int }
 
 const (
 	hotMeasureName = "margin-measure"
+	// hotAttachName is the surface that waits for a terminal to attach.
+	hotAttachName = "margin-attach"
+	// hotENOTERM is SPEC §3.6's code for nothing to lay a document out
+	// with yet; hotty-go names it from its next patch.
+	hotENOTERM = "ENOTERM"
 	// hotWave is how many blocks are measured at once, nearest the screen
 	// first: enough to fill it, few enough that the first frame comes soon.
 	hotWave = 64
@@ -228,6 +242,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Every surface goes with margin: the host deletes the alternate
 		// screen's, but only SHOULD (SPEC §5.4).
 		m.hot.frame = nil
+		if m.hot.attachN != 0 {
+			m.hot.s.Send(hotty.Del(hotAttachName)) // sent outside Layout
+		}
 		closing := m.hot.s.Close()
 		m.hot.closed = true
 		return m, tea.Batch(hcmd, tea.Sequence(closing, cmd))
@@ -290,6 +307,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 			h.tracef("lost: the host lost documents; resources again")
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 			h.docs.lost()
+			h.attachN = 0 // the next frame places it again
 		}
 		return nil, true
 	case hottytea.PongMsg:
@@ -332,6 +350,13 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 // measured takes a reply to a measuring placement, and reports whether it was
 // one.
 func (h *hotState) measured(r hotty.Reply) bool {
+	if r.N != 0 && r.N == h.attachN {
+		// ENOTERM, as expected, or rows if a terminal attached meanwhile.
+		if h.attach != nil && r.OK && r.Rows > 0 {
+			h.attached(r.Rows)
+		}
+		return true
+	}
 	key, ok := h.pending[r.N]
 	if r.N == 0 || !ok {
 		return false
@@ -342,9 +367,16 @@ func (h *hotState) measured(r hotty.Reply) bool {
 	case r.OK && r.Re == "place" && r.Rows > 0:
 		h.rows[key] = r.Rows
 		h.last[key.html] = r.Rows
+	case r.Code == hotENOTERM:
+		// No terminal to lay it out with yet, which is no try: asked again
+		// when one attaches.
+		h.later = append(h.later, key)
+		if h.attach == nil {
+			h.attach = &key
+		}
 	case r.Code == hotty.EBUDGET:
-		// Not laid out in time, which is not a refusal: plx answers so for
-		// every measure from a pane it is not showing.
+		// Not laid out in time, which is not a refusal: plx before ENOTERM
+		// answers so for every measure from a pane it is not showing.
 		h.notYet(key)
 	default:
 		h.rows[key] = 0
@@ -378,6 +410,17 @@ func (h *hotState) again() {
 	h.deaf = false
 }
 
+// attached is a terminal laying the attach surface out in rows: they are its
+// block's, the surface goes, and what was not measured is asked again.
+func (h *hotState) attached(rows int) {
+	k := *h.attach
+	h.tracef("attach: a terminal laid %s out in %d rows", hotAttachName, rows)
+	h.rows[k], h.last[k.html] = rows, rows
+	h.s.Send(hotty.Del(hotAttachName))
+	h.attach, h.attachN = nil, 0
+	h.again()
+}
+
 // hotInput is whether msg is the user's: a key, the mouse, a paste, or what
 // they did in a surface.
 func hotInput(msg tea.Msg) bool {
@@ -398,6 +441,13 @@ func (m *model) hotFit(ev hotty.Event) bool {
 	rows := ev.FitRows
 	if rows <= 0 {
 		return false
+	}
+	if ev.Surface == hotAttachName {
+		if h.attach == nil {
+			return false
+		}
+		h.attached(rows)
+		return true
 	}
 	for _, b := range h.blocks {
 		if hotName(m.path, m.entries[b.entry].b.anchor, b.entry) != ev.Surface {
@@ -600,6 +650,16 @@ func (m *model) hotResend() {
 // surface is deleted straight after, so nothing of it stays on screen.
 func (m *model) hotMeasure() tea.Cmd {
 	h := m.hot
+	if h.attach != nil && h.attachN == 0 {
+		// Placed like a measure, but kept, with fit, until a terminal
+		// attaches and lays it out.
+		h.nextN++
+		h.attachN = h.nextN
+		h.s.Send(hotty.Doc(hotAttachName, hotDocument(h.attach.html, "measure", false, false, "")),
+			hotty.PlaceAt(hotAttachName, max(0, m.w-1), max(0, m.h-1),
+				hotty.Placement{Cols: h.attach.w, Window: hotty.Window{W: 1, H: 1}, Z: -1000, Fit: hotty.On}, hotty.N(h.attachN)))
+		h.tracef("attach: no terminal yet; %s waits for one", hotAttachName)
+	}
 	if len(h.pending) > 0 || len(h.want) == 0 || h.deaf {
 		return nil
 	}

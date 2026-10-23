@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (hotty-go v0.5.1)
+Last updated: 2026-10-23 (ENOTERM: waiting for a terminal)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -452,6 +452,10 @@ Last updated: 2026-10-23 (hotty-go v0.5.1)
 ## In progress
 
 ## Done
+
+- [x] **(hotty agent, SPEC ENOTERM)** a measure answered ENOTERM waits, without
+      a try, for a terminal: the `margin-attach` surface's first fit asks
+      again. `[mech]` — see journal 2026-10-23.6 — done 2026-10-23
 
 - [x] **(hotty agent)** hotty-go v0.5.1 for every module, off the 0954c06
       pseudo-version. `[mech]` — see journal 2026-10-23.5 — done 2026-10-23
