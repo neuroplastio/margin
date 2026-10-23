@@ -11,9 +11,9 @@ require (
 	github.com/mattn/go-runewidth v0.0.24
 	github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec
 	github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d
-	github.com/neuroplastio/hotty-go v0.5.0
-	github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023082353-0954c063e5f7
-	github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023082353-0954c063e5f7
+	github.com/neuroplastio/hotty-go v0.5.1
+	github.com/neuroplastio/hotty-go/hottytea v0.5.1
+	github.com/neuroplastio/hotty-go/hottytest v0.5.1
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.12.1-0.20260928190838-e234f6fe6ecd // at or after 424d3ca (wazero#2535), see internal/mermaidsvg
 	github.com/yuin/goldmark v1.8.6
@@ -34,8 +34,8 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/neuroplastio/hotty-go/hottyedit v0.5.0 // indirect
-	github.com/neuroplastio/hotty-go/hottyterm v0.5.0 // indirect
+	github.com/neuroplastio/hotty-go/hottyedit v0.5.1 // indirect
+	github.com/neuroplastio/hotty-go/hottyterm v0.5.1 // indirect
 	github.com/neuroplastio/myelin/myelinkey v0.1.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

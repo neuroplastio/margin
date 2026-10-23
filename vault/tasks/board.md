@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (measured again on input after a hidden plx pane)
+Last updated: 2026-10-23 (hotty-go v0.5.1)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -452,6 +452,9 @@ Last updated: 2026-10-23 (measured again on input after a hidden plx pane)
 ## In progress
 
 ## Done
+
+- [x] **(hotty agent)** hotty-go v0.5.1 for every module, off the 0954c06
+      pseudo-version. `[mech]` — see journal 2026-10-23.5 — done 2026-10-23
 
 - [x] **(maintainer: hotty disappears on a hidden plx pane)** an EBUDGET
       answer, or a wave left unanswered, is measured again on the next input,
