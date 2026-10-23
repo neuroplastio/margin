@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (hotty-go v0.5.3, ENOTERM kept unchecked)
+Last updated: 2026-10-23 (hotty-go v0.5.4)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -453,6 +453,9 @@ Last updated: 2026-10-23 (hotty-go v0.5.3, ENOTERM kept unchecked)
 
 ## Done
 
+- [x] **(hotty agent, hotty-go v0.5.4)** pins at v0.5.4: hottytea drops its
+      own mark's `ENOTERM`. margin's own check stays (SPEC §3.6). `[mech]` —
+      see journal 2026-10-23.10 — done 2026-10-23
 - [x] **(hotty agent, hotty-go v0.5.3)** pins at v0.5.3 (SPEC 4bb45a7);
       an `ENOTERM` on a numbered document is kept, unchecked, not a status.
       `[mech]` — see journal 2026-10-23.9 — done 2026-10-23
@@ -947,12 +950,6 @@ moved without re-reading it.
 
 ## Blocked
 
-- **hotty-go v0.5.4** — waits for the maintainer's go-ahead on hotty's tag.
-  hotty-go main 55a396e makes hottytea drop its own mark's `ENOTERM`, which
-  margin took as a status until bc5c484. When it's tagged, move all three pins.
-  Keep margin's own `ENOTERM` check: by SPEC §3.6, any numbered document
-  answered `ENOTERM` is kept unchecked, whoever numbered it (journal
-  2026-10-23.9).
 - **Q-0004** (how a document's previous reviewed revision is recorded and
   located) — raised 2026-08-11. Blocks M4's first item ("Diff a document
   against the previous reviewed revision") and, through it, the two M4 items
