@@ -245,21 +245,28 @@ func TestCtrlEnterDecodesThroughRealReader(t *testing.T) {
 		defer close(done)
 		_ = tr.StreamEvents(context.Background(), evc)
 	}()
+	var ev uv.Event
 	select {
-	case ev := <-evc:
-		kev, ok := ev.(uv.KeyPressEvent)
-		if !ok {
-			t.Fatalf("decoded %T, want KeyPressEvent", ev)
-		}
-		if kev.Code != uv.KeyEnter || kev.Mod&uv.ModCtrl == 0 {
-			t.Fatalf("decoded %#v, want ctrl+enter", kev)
-		}
-		m.handleKey(tea.KeyPressMsg(tea.Key(kev)))
+	case ev = <-evc:
 	case <-done:
-		t.Fatal("terminal reader produced no event for CSI 13;5u")
+		// The reader returns at the end of its input, the event usually sent
+		// already: both are ready then, and select takes either.
+		select {
+		case ev = <-evc:
+		default:
+			t.Fatal("terminal reader produced no event for CSI 13;5u")
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for the reader to decode")
 	}
+	kev, ok := ev.(uv.KeyPressEvent)
+	if !ok {
+		t.Fatalf("decoded %T, want KeyPressEvent", ev)
+	}
+	if kev.Code != uv.KeyEnter || kev.Mod&uv.ModCtrl == 0 {
+		t.Fatalf("decoded %#v, want ctrl+enter", kev)
+	}
+	m.handleKey(tea.KeyPressMsg(tea.Key(kev)))
 
 	if m.comp != nil {
 		t.Fatal("ctrl+enter left the composer open")
