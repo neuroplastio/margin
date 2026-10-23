@@ -675,6 +675,23 @@ func TestHotMeasureWaitsForATerminal(t *testing.T) {
 	if h.asked[b] || len(h.later) != 0 {
 		t.Errorf("after the fit: b asked %v, later %v; want it asked again", h.asked[b], h.later)
 	}
+
+	// Input asks again before any fit, and the block is measured: the
+	// attach surface goes with no fit.
+	c := hotKey{"c", 40}
+	m.hotUpdate(noterm(ask(c)))
+	m.hotMeasure()
+	if h.attach == nil || *h.attach != c || h.attachN == 0 {
+		t.Fatalf("attach = %v, attachN %d; want c placed", h.attach, h.attachN)
+	}
+	m.hotUpdate(tea.KeyPressMsg(tea.Key{Code: 'j', Text: "j"}))
+	if h.asked[c] {
+		t.Fatal("input did not ask c again")
+	}
+	m.hotUpdate(hottytea.AckMsg{Reply: hotty.Reply{N: ask(c), OK: true, Re: "place", Rows: 3}})
+	if h.rows[c] != 3 || h.attach != nil || h.attachN != 0 {
+		t.Errorf("measured on input: rows %d, attach %v, attachN %d; want 3, none, 0", h.rows[c], h.attach, h.attachN)
+	}
 }
 
 func TestHotListItem(t *testing.T) {

@@ -364,6 +364,11 @@ func (h *hotState) measured(r hotty.Reply) bool {
 	case r.OK && r.Re == "place" && r.Rows > 0:
 		h.rows[key] = r.Rows
 		h.last[key.html] = r.Rows
+		if h.attach != nil && *h.attach == key {
+			// Asked again on input and measured before any fit came: the
+			// attach surface has nothing left to wait for.
+			h.unattach()
+		}
 	case r.Code == hotty.ENOTERM:
 		// No terminal to lay it out with yet, which is no try: asked again
 		// when one attaches.
@@ -413,9 +418,16 @@ func (h *hotState) attached(rows int) {
 	k := *h.attach
 	h.tracef("attach: a terminal laid %s out in %d rows", hotAttachName, rows)
 	h.rows[k], h.last[k.html] = rows, rows
-	h.s.Send(hotty.Del(hotAttachName))
-	h.attach, h.attachN = nil, 0
+	h.unattach()
 	h.again()
+}
+
+// unattach takes the attach surface down, if it was placed.
+func (h *hotState) unattach() {
+	if h.attachN != 0 {
+		h.s.Send(hotty.Del(hotAttachName))
+	}
+	h.attach, h.attachN = nil, 0
 }
 
 // hotInput is whether msg is the user's: a key, the mouse, a paste, or what

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (ENOTERM against hottytest)
+Last updated: 2026-10-23 (ENOTERM against plx's build)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -452,6 +452,11 @@ Last updated: 2026-10-23 (ENOTERM against hottytest)
 ## In progress
 
 ## Done
+
+- [x] **(plx agent, ENOTERM build)** ran against plx's ENOTERM build: ENOTERM
+      ok, no fit on attach (reported); `margin-attach` now goes when input
+      measures its block first. `[mech]` — see journal 2026-10-23.8 — done
+      2026-10-23
 
 - [x] **(hotty agent, hottytest NoTerminal)** ENOTERM end to end against
       hottytest; hotty-go pinned to cb540bc until v0.5.3. `[mech]` — see

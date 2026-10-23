@@ -364,7 +364,9 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   attached, SPEC §5.2 since hotty 9f5950c) is no try: the first such block
   is placed again on `margin-attach`, kept with `f=1`, and that surface's
   first `fit` says a terminal laid it out, so what was not measured is
-  asked again (journal 2026-10-23.6). After a resize a block keeps its last height
+  asked again (journal 2026-10-23.6). If input gets that block measured
+  before any `fit` comes, the surface goes then (journal 2026-10-23.8).
+  After a resize a block keeps its last height
   until the new width's arrives, and the top visible block holds still.
   A block can need more rows after it was measured, when an image decodes or
   a web image loads late: on a host that sends `fit` (SPEC §5.2) every
