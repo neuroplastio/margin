@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -307,6 +308,78 @@ func TestHottyLinkClickFollows(t *testing.T) {
 	})
 	if got := m.entries[m.at.entry].b; got.kind != blockHeading || got.text != "Second" {
 		t.Errorf("focus is on %v %q, want the heading Second", got.kind, got.text)
+	}
+}
+
+// The pointer over a block's surface marks the block in the gutter, as motion
+// over cells does: the surface takes the pointer from the cells (SPEC §9.3),
+// so each block asks for hover (§9.4), and its out takes the mark away.
+func TestHottyHoverMarksTheBlock(t *testing.T) {
+	m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		s := surfaceWith(t, h, "a quote")
+		if !s.Hover() {
+			t.Error("the quote's surface asked for no hover")
+		}
+		if err := h.Hover(s.Name(), "", 2, 0); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if e := m.hoveredEntry; e < 0 || m.entries[e].b.kind != blockQuote {
+		t.Errorf("hovered entry %d, want the quote", e)
+	}
+
+	m, _ = hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		if err := h.Hover(surfaceWith(t, h, "a quote").Name(), "", 2, 0); err != nil {
+			t.Fatal(err)
+		}
+		h.Unhover()
+	})
+	if m.hoveredEntry != -1 {
+		t.Errorf("hovered entry %d after the pointer left, want none", m.hoveredEntry)
+	}
+}
+
+// An out that comes after the pointer moved on, over the cells or onto
+// another block, leaves the mark where the pointer went.
+func TestHottyHoverOutComesLate(t *testing.T) {
+	m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		q := surfaceWith(t, h, "a quote")
+		if err := h.Hover(q.Name(), "", 2, 0); err != nil {
+			t.Fatal(err)
+		}
+		row, col := -1, -1
+		for r, l := range strings.Split(h.Screen(), "\n") {
+			if c := strings.Index(l, "code stays cells"); c >= 0 {
+				row, col = r, len([]rune(l[:c]))
+				break
+			}
+		}
+		if row < 0 {
+			t.Fatalf("no code line on screen:\n%s", h.Screen())
+		}
+		h.Type(fmt.Sprintf("\x1b[<35;%d;%dM", col+1, row+1)) // motion, no button
+		if err := h.Emit(q.Name(), hotty.EventHover, "", map[string]bool{"out": true}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if e := m.hoveredEntry; e < 0 || m.entries[e].b.kind != blockCode {
+		t.Errorf("hovered entry %d, want the code below the quote", e)
+	}
+
+	m, _ = hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		p, q := surfaceWith(t, h, "A paragraph with bold"), surfaceWith(t, h, "a quote")
+		if err := h.Hover(p.Name(), "", 2, 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.Emit(q.Name(), hotty.EventHover, "", map[string]int{"c": 2, "r": 0}); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.Emit(p.Name(), hotty.EventHover, "", map[string]bool{"out": true}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if e := m.hoveredEntry; e < 0 || m.entries[e].b.kind != blockQuote {
+		t.Errorf("hovered entry %d, want the quote the pointer went to", e)
 	}
 }
 

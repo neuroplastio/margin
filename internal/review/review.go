@@ -2236,6 +2236,9 @@ func (t *inputThrottle) filter(msg tea.Msg) tea.Msg {
 // handleMotion sets hoveredEntry for the block under the pointer.
 func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 	line := mo.Y + m.scroll
+	if m.hot != nil {
+		m.hot.hoverFrom = "" // the cells have the pointer back
+	}
 
 	// The tree pane is not a document block — hovering it clears any
 	// document hover rather than misattributing it to whatever block sits at

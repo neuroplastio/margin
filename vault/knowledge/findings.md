@@ -753,3 +753,15 @@ cells. Kit cf085ff (2026-10-22) lays a dense one-line field out as cells
 does: the label beside the input, the input a row tall, and a Divider
 without its margin. So any pane margin places over its cells rows, fields
 and all, is a bar (`pane.bar`), and its document renders the cells rows.
+
+## F36 — a surface takes the pointer from the cells under it
+
+On a hotty host a placed surface gets the pointer (SPEC §9.3), so the
+terminal reports no mouse motion over it, and a program that lights cells
+beside its surfaces (margin's gutter bar) hears nothing while the pointer
+is over prose. Ask for hover (`v=1`, §9.4) on those surfaces and treat
+their `hover` as motion. A host sends at most one hover a frame, so an
+`out` can arrive after the pointer has moved onto cells or onto another
+surface: remember which surface set the mark, and clear it on an out only
+from that surface (2026-10-23, journal 2026-10-23.1). The hover path costs
+about a frame more than cell motion (p50 49 ms against 33 ms).

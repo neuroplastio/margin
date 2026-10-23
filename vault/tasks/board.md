@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-10-22 (the release's stamp check reads the hotty part)
+Last updated: 2026-10-23 (the gutter bar follows the pointer over prose)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (hover over prose) on a hotty host the gutter bar marks the paragraph
+  under the pointer (hover, SPEC §9.4), where it stayed put over prose —
+  whether it keeps up with the pointer, in hottyterm and in a plx pane —
+  journal 2026-10-23.1
 - (search on a host) the `/` prompt is a dense kit surface, its rule then
   "/", a field a row tall and the count in its two rows, where the field was
   cut — whether a one-row field reads well as a prompt — journal 2026-10-22.4
@@ -443,11 +447,13 @@ Last updated: 2026-10-22 (the release's stamp check reads the hotty part)
 
 ## In progress
 
-- **(hover bench)** on a HOTTY host the gutter bar does not follow the
-  pointer over prose: the block surfaces take the pointer, so margin hears
-  no motion there; ask for hover (SPEC §9.4) — claimed 2026-10-23 by margin
-
 ## Done
+
+- [x] **(hover bench)** on a hotty host the gutter bar did not follow the
+      pointer over prose: a block surface takes the pointer (SPEC §9.3).
+      Block surfaces now ask for hover, and an out clears the bar only if
+      its surface set it. `[felt]` — see journal 2026-10-23.1 — done
+      2026-10-23
 
 - [x] **(CI)** the release's stamp check wanted `--version` to end at the
       commit, so the first build with ` · hotty 0.5` failed (run

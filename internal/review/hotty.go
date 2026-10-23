@@ -74,6 +74,12 @@ type hotState struct {
 	anchor      *hotAnchor
 	closed      bool
 
+	// hoverFrom is the surface whose hover set the model's hoveredEntry, or
+	// "" when motion over the cells did: a surface takes the pointer from
+	// the cells (SPEC §9.3), so the gutter's bar follows its hover, and its
+	// out clears the bar only if nothing has moved it since.
+	hoverFrom string
+
 	trace *log.Logger // MARGIN_HOTTY_LOG
 
 	// mermaid draws a diagram as SVG: mermaidsvg.Render, but for tests.
@@ -447,6 +453,7 @@ func (m *model) hotSurfaces() []hottytea.Surface {
 			Keep:  true,
 			Press: true,
 			Fit:   true, // every 0.3 host sends fit (SPEC §4)
+			Hover: true,
 			Doc: func() string {
 				h.sent[name] = doc
 				return doc
@@ -580,7 +587,16 @@ func (h *hotState) awaitWave() tea.Cmd {
 // hotEvent is what the user did in a block: a press focuses it, as a click on
 // cells does, and a click on a link within the review follows it. Links to
 // the web are hyperlinks, which the terminal opens without telling margin.
+// The pointer over a block marks it in the gutter, as motion over cells does.
 func (m *model) hotEvent(ev hotty.Event) tea.Cmd {
+	if ev.Kind == hotty.EventHover && (ev.Hover == nil || ev.Hover.Out) {
+		// Out, from wherever the block went since.
+		if m.hot.hoverFrom == ev.Surface {
+			m.hoveredEntry = -1
+			m.hot.hoverFrom = ""
+		}
+		return nil
+	}
 	entry := -1
 	for _, b := range m.hot.blocks {
 		if hotName(m.path, m.entries[b.entry].b.anchor, b.entry) == ev.Surface {
@@ -592,6 +608,9 @@ func (m *model) hotEvent(ev hotty.Event) tea.Cmd {
 		return nil
 	}
 	switch ev.Kind {
+	case hotty.EventHover:
+		m.hoveredEntry = entry
+		m.hot.hoverFrom = ev.Surface
 	case hotty.EventPress:
 		target := cursor{entry: entry, comment: commentNone}
 		if m.comp != nil {
