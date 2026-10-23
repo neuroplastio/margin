@@ -786,3 +786,7 @@ ENOENT is read (a scroll down and back up within a frame or two) reports
 twice. The first reply's frame sends its document and placement again,
 and the second reply, which answers the older placement, is counted
 against the newer one. Reported to the hotty agent 2026-10-23.
+Fixed in hotty-go aaa1e1b (margin pins 0954c06): a reported loss takes
+every document, and an ENOENT read before the host answers the first one
+sent again belongs to the same loss. A loss is reported once, and margin's
+test checks that each resource goes once after it.

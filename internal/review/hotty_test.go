@@ -243,7 +243,8 @@ func TestHottyMermaidIsAnSVG(t *testing.T) {
 // A host that loses every surface and resource behind margin's back (one
 // restarting behind a relay) gets the stylesheet, the image and the diagram
 // again, each ahead of the document that refers to it, once the surfaces
-// are placed again and find their documents gone.
+// are placed again and find their documents gone. And once only: a surface
+// off screen at the loss comes back without reporting it again.
 func TestHottyLostResourcesGoAgain(t *testing.T) {
 	src := "# Lost\n\n![a picture](pic.png)\n\n```mermaid\nflowchart LR\n    a --> b\n```\n\n"
 	for i := range 40 {
@@ -278,17 +279,23 @@ func TestHottyLostResourcesGoAgain(t *testing.T) {
 	}, hottytest.AutoRows(func(*hottytest.Surface, int) int { return 2 }))
 
 	for _, c := range []struct{ id, surface string }{{hotCSSID, pic}, {img, pic}, {mmd, diagram}} {
-		res, doc := -1, -1
+		res, doc, sent := -1, -1, 0
 		for i, m := range cmds {
 			switch {
-			case hotty.Get(m.Control, "a") == "res" && hotty.Get(m.Control, "id") == c.id && res < 0:
-				res = i
+			case hotty.Get(m.Control, "a") == "res" && hotty.Get(m.Control, "id") == c.id:
+				if res < 0 {
+					res = i
+				}
+				sent++
 			case hotty.Get(m.Control, "a") == "doc" && hotty.Get(m.Control, "s") == c.surface && doc < 0:
 				doc = i
 			}
 		}
 		if res < 0 || doc < 0 || res > doc {
 			t.Errorf("after the loss, resource %s went at %d and %s's document at %d; want the resource first", c.id, res, c.surface, doc)
+		}
+		if sent != 1 {
+			t.Errorf("after the loss, resource %s went %d times, want once", c.id, sent)
 		}
 	}
 }

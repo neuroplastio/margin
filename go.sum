@@ -61,6 +61,8 @@ github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023074741-2ebf3ef12190 h
 github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023074741-2ebf3ef12190/go.mod h1:VywTuv9mzBiAdQQ9MOWuyTlsB+AaMovDB8pNQEqDdJI=
 github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023080130-5586fd40cba2 h1:w0k8vQwlKGNhi4gnu3Osah/FklXwSscOqaTbA+bpigU=
 github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023080130-5586fd40cba2/go.mod h1:VywTuv9mzBiAdQQ9MOWuyTlsB+AaMovDB8pNQEqDdJI=
+github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023082353-0954c063e5f7 h1:KR8aNXHXNzxzE17qDS8Ha7odXm/U8XTMyB8yO1enFvQ=
+github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023082353-0954c063e5f7/go.mod h1:VywTuv9mzBiAdQQ9MOWuyTlsB+AaMovDB8pNQEqDdJI=
 github.com/neuroplastio/hotty-go/hottyterm v0.5.0 h1:wFsYOIYPS21Hw3afXB6QHPLhI/bJvc3ATKhELoBcbu4=
 github.com/neuroplastio/hotty-go/hottyterm v0.5.0/go.mod h1:jQtJL+f9U05FGG9hYSmnRxKelETt0HaW5GfU2poEKls=
 github.com/neuroplastio/hotty-go/hottytest v0.5.0 h1:7eZAIWuCpxpGRg7Frt3WgUL5epp6NQwXAjXPQ7VIVM8=
@@ -69,6 +71,8 @@ github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023074741-2ebf3ef12190 
 github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023074741-2ebf3ef12190/go.mod h1:Ja7dw2cqkgtKTss+wJ5QsH8pUhWQBDmERxyaCmvH4fE=
 github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023080130-5586fd40cba2 h1:zr3P146wZtvOxti4kwIDDOM/Fcvj8/gOF1D5FYYOvvc=
 github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023080130-5586fd40cba2/go.mod h1:Ja7dw2cqkgtKTss+wJ5QsH8pUhWQBDmERxyaCmvH4fE=
+github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023082353-0954c063e5f7 h1:nh1/QJRqC4uRGCZPT5AggBdwHbgvWEOwBoXiEJKyq7Y=
+github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023082353-0954c063e5f7/go.mod h1:Ja7dw2cqkgtKTss+wJ5QsH8pUhWQBDmERxyaCmvH4fE=
 github.com/neuroplastio/myelin/myelinkey v0.1.0 h1:c1XVForIsnqnYxmmwwN/UHFdtUzQYv3fD94hyxGe8cI=
 github.com/neuroplastio/myelin/myelinkey v0.1.0/go.mod h1:lnIMTPFSwjs8dsx9R8zsPNGaRnlzS4rScUY4exrjLus=
 github.com/philhofer/fwd v1.2.0 h1:e6DnBTl7vGY+Gz322/ASL4Gyp1FspeMvx1RNDoToZuM=
