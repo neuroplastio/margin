@@ -603,6 +603,11 @@ message source; leaving it to "the renderer caps at 120fps" floods Update and
 View all the same. A filter keyed on message type is the hook bubbletea
 provides — there is no built-in per-message-type rate limit.
 
+Since 2026-10-23 (F39) only motion is throttled. The filter drops a wheel
+tick, which loses the distance it scrolls. It also cannot drain a backlog,
+since it reads the clock when a message leaves the queue: once frames
+outlast the period, every message passes. A cheap frame is the fix.
+
 ## F26 — shift+enter does not survive the trip to nvim; fold it onto a newline at the host
 
 *Historical (2026-10-18): the nvim composer, its pty and its emulator are gone (D22).*
@@ -808,3 +813,39 @@ something done in a surface), up to three asks, and an unanswered wave
 (deaf) waits for input the same way (2026-10-23, journal 2026-10-23.4).
 Shown without any input, the blocks stay in cells until the user does
 something: the rest is plx's, reported to the plx agent.
+
+## F39 — render drew every block on every frame; keep each block's rendering
+
+A frame on plx's ARCHITECTURE.md (163 blocks, 76 KB, 160×50) cost 43 ms,
+all of it in View: render highlighted every code block with chroma and
+wrapped and styled every paragraph, whatever had changed. Update itself
+took 150 ns. Key repeat (about 33 ms) and the wheel both come faster than
+that, so input queued, and margin worked through it a frame at a time:
+the 2026-10-23 report. A HOTTY host was worse. hotFrame runs view in
+Update, and a block shown as a surface still drew its cells for the
+search to read (`searchText`): 56 ms an Update on hottytest, and 20
+queued `j` took 2.2 s to drain.
+
+The profile: 44% chroma's `quick.Highlight`, half of it `lexers.Get`
+matching filenames against every lexer (`filepath.Match`); 34%
+`wrapInline` and lipgloss. Both are pure functions of the block.
+
+render now keeps each block's rendering in `m.bodies`, keyed by entry,
+width, horizontal offset, mark and partial (`bodyKey`), and `rebuild`
+empties it. A warm frame costs 0.5 ms (j and View: 44 ms → 0.51 ms). On
+hottytest an Update with its frame costs 0.9 ms, and 20 queued `j` drain
+in 25 ms.
+
+**The rule:** `drawBody` reads nothing but its arguments. Whatever changes
+how a block's body looks must reach it as an argument and be part of
+`bodyKey`, or frames show a stale block. The gutter, focus, hover and
+selection are drawn per row outside it, every frame.
+
+Still cold: the first frame, a frame after `rebuild`, and each new width.
+A window resized by dragging sends a WindowSizeMsg per step, each a full
+render (43 ms on this document). Highlighting does not depend on the
+width, so it could be kept apart if a resize ever floods.
+
+To measure: a test that builds the model from a large document, times
+`m.Update(key)` plus `m.View()` and `go test -cpuprofile` (journal
+2026-10-23.11 has the probe).

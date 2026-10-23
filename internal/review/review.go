@@ -47,9 +47,9 @@ const (
 	// J/K's incremental scroll and the default wheel tick.
 	tallWalkStep = 3
 	// motionFramePeriod is the input-throttle window: one 120fps frame
-	// period, matching the WithFPS(120) runModel sets. A mouse motion or wheel
-	// report inside it is dropped (see inputThrottle) — the renderer can flush
-	// at most one frame per period, so input processed faster than this is
+	// period, matching the WithFPS(120) runModel sets. A mouse motion report
+	// inside it is dropped (see inputThrottle) — the renderer can flush at
+	// most one frame per period, so motion processed faster than this is
 	// work the screen can never show.
 	motionFramePeriod = time.Second / 120
 )
@@ -158,6 +158,11 @@ type model struct {
 
 	// codeScroll stores horizontal scroll offsets (in visual columns) per code block anchor.
 	codeScroll map[string]int
+
+	// bodies is each block's rendering as render last drew it (drawBody),
+	// so a frame that moves focus or scrolls does not highlight and wrap the
+	// whole document again. rebuild empties it: the entries it names are gone.
+	bodies map[bodyKey]drawnBody
 
 	// rawH is the horizontal scroll offset (in visual columns) of the raw
 	// source view — H/L pan the whole "the file" view sideways, the raw-mode
@@ -372,6 +377,7 @@ func (m *model) orphanedThreads() []*thread {
 // everything else — focus, hit-testing, rendering — works against.
 func (m *model) rebuild() {
 	m.entries = m.entries[:0]
+	m.bodies = nil
 	for _, b := range m.doc {
 		// Frontmatter is metadata, not prose — commentable() and markable()
 		// exclude it, so no comment, mark or progress accounting can ever
@@ -2181,20 +2187,17 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	return nil
 }
 
-// inputThrottle coalesces mouse motion and wheel reports so the pointer
-// and scroll cannot flood the event loop together. Bubble Tea runs Update
-// and View for every message, and the full document render View performs is
-// the expensive half of the input path — a sweep across the document
-// delivers a report per cell and a wheel delivers ticks faster than the
-// frame rate, and both can queue faster than the loop drains them, so a
-// keystroke waits behind the backlog until it clears. The renderer only
-// flushes one frame per frame period, so input processed faster than that
-// is wasted work: drop any motion or wheel report that arrives within one
-// period of the last one that reached the model. Motion also drops reports
-// that restate the cell the pointer already occupies. The cost — the hover
-// can trail the pointer, or the wheel can lag, by at most one frame — is
-// the bound every frame-rate capping scheme pays, and is far under what
-// the eye resolves.
+// inputThrottle coalesces mouse motion so a pointer sweep cannot flood the
+// event loop. Bubble Tea runs Update and View for every message, and a
+// sweep across the document delivers a report per cell. The renderer only
+// flushes one frame per frame period, so motion processed faster than that
+// is wasted work: drop any motion report that arrives within one period of
+// the last one that reached the model, or that restates the cell the
+// pointer already occupies. The cost — the hover can trail the pointer by
+// at most one frame — is the bound every frame-rate capping scheme pays.
+// The wheel is not throttled: dropping a tick loses the distance it
+// scrolls, and since render keeps each block's rendering (m.bodies) a
+// frame costs well under a millisecond, so every tick can have one.
 type inputThrottle struct {
 	period time.Duration
 	now    func() time.Time
@@ -2203,8 +2206,8 @@ type inputThrottle struct {
 	lastY  int
 }
 
-// filter is the tea.WithFilter predicate. Non-mouse messages pass through
-// unchanged; a redundant motion or wheel report is dropped by returning nil,
+// filter is the tea.WithFilter predicate. Everything but motion passes
+// through unchanged; a redundant motion report is dropped by returning nil,
 // so it never reaches Update, View, or the renderer.
 func (t *inputThrottle) filter(msg tea.Msg) tea.Msg {
 	now := t.now()
@@ -2219,13 +2222,6 @@ func (t *inputThrottle) filter(msg tea.Msg) tea.Msg {
 		}
 		t.last = now
 		t.lastX, t.lastY = m.X, m.Y
-		return msg
-
-	case tea.MouseWheelMsg:
-		if !t.last.IsZero() && now.Sub(t.last) < t.period {
-			return nil
-		}
-		t.last = now
 		return msg
 
 	default:
@@ -2645,116 +2641,16 @@ func (m *model) render() []string {
 
 		case e.b.kind == blockPara, e.b.kind == blockRaw, e.b.kind == blockList, e.b.kind == blockQuote, e.b.kind == blockListItem, e.b.kind == blockCode, e.b.kind == blockTable, e.b.kind == blockFrontmatter:
 			mark, markPartial := m.blockMark(e.b)
-			body := textStyle
-			if mark == markOK && !markPartial {
-				// Reviewed prose recedes so unreviewed text is what draws the eye.
-				body = reviewedTxt
+			bk := bodyKey{entry: i, w: w, off: m.codeScroll[e.b.anchor], mark: mark, partial: markPartial}
+			bd, ok := m.bodies[bk]
+			if !ok {
+				bd = drawBody(e.b, w, mark, markPartial, bk.off)
+				if m.bodies == nil {
+					m.bodies = map[bodyKey]drawnBody{}
+				}
+				m.bodies[bk] = bd
 			}
-			// A blockRaw is shown verbatim: for a code fence or a table, the
-			// indentation and the line breaks are the content, so re-wrapping
-			// it to the measure would destroy it. A blockList's items and a
-			// blockQuote's text are prose, though, so they wrap like a
-			// paragraph does — a list one item at a time with a hanging
-			// indent that keeps the marker column clear (2026-08-08
-			// rendering-bugs feedback, defect 2), a quote against a rule down
-			// the left edge instead of a `>` on every line (2026-08-08
-			// blockquote-rendering feedback). Both also carry RENDER-06's
-			// inline markup now — **bold** inside a list item or a quote
-			// used to reach the screen as literal asterisks, since
-			// wrapList/wrapQuote wrapped with plain wrap() and left the
-			// caller to flatten the block to one uniform body.Render
-			// (2026-08-08 markdown-rendering feedback).
-			var out []string
-			rule := ""
-			// preStyled marks output already carrying its own ANSI styling
-			// (RENDER-06's inline markup, resolved per-fragment against body
-			// above) so the loop below does not flatten it back to one
-			// uniform body.Render.
-			preStyled := false
-			switch e.b.kind {
-			case blockPara:
-				out = wrapInline(e.b.text, w, body)
-				preStyled = true
-			case blockList, blockListItem:
-				if mark != markOK {
-					body = rawStyle
-				}
-				out = wrapList(e.b.items, w, body)
-				preStyled = true
-			case blockQuote:
-				rule = dimStyle.Render("│ ")
-				out = wrapQuote(e.b.lines, w-2, body)
-				preStyled = true
-			case blockCode:
-				// Chroma's own colours are the highlighting, regardless of
-				// review state — the same call RENDER-06 made for inline
-				// code and links: markup renders as markup, not as prose
-				// that happens to dim once reviewed. A mermaid fence renders
-				// through the in-tree ASCII renderer instead
-				// (2026-08-10 mermaid-diagrams feedback): chroma has no
-				// mermaid lexer, so its colours on a diagram were noise.
-				// A mermaid block the renderer does not understand falls
-				// back to plain source lines, not chroma.
-				if e.b.lang == "mermaid" {
-					if md, ok := renderMermaid(e.b.lines); ok {
-						out = md
-						preStyled = true
-					} else {
-						// A mermaid fence the renderer cannot parse falls back
-						// to its plain source lines — tabs expanded like any
-						// other code (2026-08-12 code-block-tabs feedback).
-						out = expandLines(e.b.lines, codeTabWidth)
-					}
-				} else {
-					out = highlightCode(e.b.lines, e.b.lang)
-					preStyled = true
-				}
-				off := m.codeScroll[e.b.anchor]
-				if off > 0 || hasOverflow(out, w) {
-					scrolled := make([]string, len(out))
-					for idx, l := range out {
-						scrolled[idx] = scrollCodeLine(l, off, w)
-					}
-					out = scrolled
-				}
-			case blockFrontmatter:
-				// Dimmed key/value lines, never truncated — a field wider
-				// than the measure scrolls horizontally with h/l, the code
-				// block treatment (the 2026-08-09 frontmatter feedback).
-				out = renderFrontmatterFields(e.b, w, m.codeScroll[e.b.anchor])
-				preStyled = true
-			case blockTable:
-				// A table is data, not markup, so it dims on review the same
-				// way a paragraph or a quote's text does — body already
-				// carries that (reviewedTxt above), and renderTable's header
-				// row builds on it with .Bold(true), the same "build on top
-				// of body" call RENDER-06 made for a paragraph's bold runs.
-				// Cells keep their own inline markup too (2026-08-10
-				// inline-code-in-tables feedback): **bold**, `code` and
-				// [links](url) render inside a cell the way they do in a
-				// paragraph, measured and padded by visible width so the
-				// columns still line up. A table wider than the terminal
-				// keeps its natural column widths and scrolls horizontally
-				// with H/L, the code-block treatment — renderTable no longer
-				// narrows columns to fit (2026-08-10 viewport-width
-				// feedback), because shaving a column hides the data the
-				// table exists to show.
-				out = renderTable(e.b.table, body)
-				off := m.codeScroll[e.b.anchor]
-				if off > 0 || hasOverflow(out, w) {
-					scrolled := make([]string, len(out))
-					for idx, l := range out {
-						scrolled[idx] = scrollCodeLine(l, off, w)
-					}
-					out = scrolled
-				}
-				preStyled = true
-			default:
-				out = e.b.lines
-				if mark != markOK || markPartial {
-					body = rawStyle
-				}
-			}
+			out, rule := bd.lines, bd.rule
 			// On a HOTTY host a prose block is a surface over its rows (D17):
 			// the rows are blank cells the size the host laid the block out,
 			// the gutter beside them as on any block, and the cell rendering
@@ -2764,13 +2660,13 @@ func (m *model) render() []string {
 				surface = true
 				m.hot.blocks = append(m.hot.blocks, hotBlock{
 					entry: i, start: len(lines), rows: rows, base: base, kind: hotClass(e.b),
-					reviewed: mark == markOK && !markPartial, selected: selected, searchText: out,
+					reviewed: mark == markOK && !markPartial, selected: selected, searchText: bd.text,
 				})
 				out = make([]string, rows)
 				for r := range out {
 					out[r] = strings.Repeat(" ", w)
 				}
-				rule, preStyled = "", true
+				rule = ""
 			}
 			// A line dive (a table or raw block whose lines are walked
 			// individually) moves the focus bar onto the dived source line's
@@ -2783,12 +2679,9 @@ func (m *model) render() []string {
 					focusedRow = r
 				}
 			}
+			lineMarked := (e.b.kind == blockTable || e.b.kind == blockRaw) && m.hasLineMarks(e.b.anchor, e.b.line, e.b.endLine)
 			for row, l := range out {
-				text := l
-				if !preStyled {
-					text = body.Render(l)
-				}
-				text = rule + text
+				text := rule + l
 				if selected && !surface {
 					// A surface shows its own selection; its rows' cells
 					// stay blank under it.
@@ -2806,7 +2699,7 @@ func (m *model) render() []string {
 				if e.b.kind == blockTable || e.b.kind == blockRaw {
 					if mk, ok := m.lineMarks[lineMarkKey(e.b.anchor, e.b.line+row)]; ok {
 						rowMark = mk
-					} else if m.hasLineMarks(e.b.anchor, e.b.line, e.b.endLine) {
+					} else if lineMarked {
 						rowMark = markNone
 					}
 				}
@@ -2836,6 +2729,144 @@ func (m *model) render() []string {
 	// it needs the spans just computed to map each line back to its entry.
 	lines = m.applySearch(lines)
 	return lines
+}
+
+// bodyKey names a block's rendering: the entry, the width it was wrapped
+// to, the review mark that picks its style, and its horizontal scroll.
+type bodyKey struct {
+	entry, w, off int
+	mark          reviewMark
+	partial       bool
+}
+
+// drawnBody is a block's rendering, before the gutter: its rows, styled;
+// text, the rows search reads (the same rows, unless the block's style is
+// applied to whole rows); and the rule drawn ahead of each row.
+type drawnBody struct {
+	lines, text []string
+	rule        string
+}
+
+// drawBody renders a block's body at width w: what render draws beside the
+// gutter. It reads nothing but its arguments, so render keeps what it
+// returns in m.bodies.
+func drawBody(b block, w int, mark reviewMark, markPartial bool, off int) drawnBody {
+	body := textStyle
+	if mark == markOK && !markPartial {
+		// Reviewed prose recedes so unreviewed text is what draws the eye.
+		body = reviewedTxt
+	}
+	// A blockRaw is shown verbatim: for a code fence or a table, the
+	// indentation and the line breaks are the content, so re-wrapping
+	// it to the measure would destroy it. A blockList's items and a
+	// blockQuote's text are prose, though, so they wrap like a
+	// paragraph does — a list one item at a time with a hanging
+	// indent that keeps the marker column clear (2026-08-08
+	// rendering-bugs feedback, defect 2), a quote against a rule down
+	// the left edge instead of a `>` on every line (2026-08-08
+	// blockquote-rendering feedback). Both also carry RENDER-06's
+	// inline markup now — **bold** inside a list item or a quote
+	// used to reach the screen as literal asterisks, since
+	// wrapList/wrapQuote wrapped with plain wrap() and left the
+	// caller to flatten the block to one uniform body.Render
+	// (2026-08-08 markdown-rendering feedback).
+	var out []string
+	rule := ""
+	// preStyled marks output already carrying its own ANSI styling
+	// (RENDER-06's inline markup, resolved per-fragment against body
+	// above) so the end of drawBody does not flatten it back to one
+	// uniform body.Render.
+	preStyled := false
+	switch b.kind {
+	case blockPara:
+		out = wrapInline(b.text, w, body)
+		preStyled = true
+	case blockList, blockListItem:
+		if mark != markOK {
+			body = rawStyle
+		}
+		out = wrapList(b.items, w, body)
+		preStyled = true
+	case blockQuote:
+		rule = dimStyle.Render("│ ")
+		out = wrapQuote(b.lines, w-2, body)
+		preStyled = true
+	case blockCode:
+		// Chroma's own colours are the highlighting, regardless of
+		// review state — the same call RENDER-06 made for inline
+		// code and links: markup renders as markup, not as prose
+		// that happens to dim once reviewed. A mermaid fence renders
+		// through the in-tree ASCII renderer instead
+		// (2026-08-10 mermaid-diagrams feedback): chroma has no
+		// mermaid lexer, so its colours on a diagram were noise.
+		// A mermaid block the renderer does not understand falls
+		// back to plain source lines, not chroma.
+		if b.lang == "mermaid" {
+			if md, ok := renderMermaid(b.lines); ok {
+				out = md
+				preStyled = true
+			} else {
+				// A mermaid fence the renderer cannot parse falls back
+				// to its plain source lines — tabs expanded like any
+				// other code (2026-08-12 code-block-tabs feedback).
+				out = expandLines(b.lines, codeTabWidth)
+			}
+		} else {
+			out = highlightCode(b.lines, b.lang)
+			preStyled = true
+		}
+		if off > 0 || hasOverflow(out, w) {
+			scrolled := make([]string, len(out))
+			for idx, l := range out {
+				scrolled[idx] = scrollCodeLine(l, off, w)
+			}
+			out = scrolled
+		}
+	case blockFrontmatter:
+		// Dimmed key/value lines, never truncated — a field wider
+		// than the measure scrolls horizontally with h/l, the code
+		// block treatment (the 2026-08-09 frontmatter feedback).
+		out = renderFrontmatterFields(b, w, off)
+		preStyled = true
+	case blockTable:
+		// A table is data, not markup, so it dims on review the same
+		// way a paragraph or a quote's text does — body already
+		// carries that (reviewedTxt above), and renderTable's header
+		// row builds on it with .Bold(true), the same "build on top
+		// of body" call RENDER-06 made for a paragraph's bold runs.
+		// Cells keep their own inline markup too (2026-08-10
+		// inline-code-in-tables feedback): **bold**, `code` and
+		// [links](url) render inside a cell the way they do in a
+		// paragraph, measured and padded by visible width so the
+		// columns still line up. A table wider than the terminal
+		// keeps its natural column widths and scrolls horizontally
+		// with H/L, the code-block treatment — renderTable no longer
+		// narrows columns to fit (2026-08-10 viewport-width
+		// feedback), because shaving a column hides the data the
+		// table exists to show.
+		out = renderTable(b.table, body)
+		if off > 0 || hasOverflow(out, w) {
+			scrolled := make([]string, len(out))
+			for idx, l := range out {
+				scrolled[idx] = scrollCodeLine(l, off, w)
+			}
+			out = scrolled
+		}
+		preStyled = true
+	default:
+		out = b.lines
+		if mark != markOK || markPartial {
+			body = rawStyle
+		}
+	}
+	if preStyled {
+		return drawnBody{lines: out, text: out, rule: rule}
+	}
+	styled := make([]string, len(out))
+	for i, l := range out {
+		styled[i] = body.Render(l)
+	}
+	return drawnBody{lines: styled, text: out, rule: rule}
 }
 
 // threadID is the open thread's pane (D22): its conversation, a comment
@@ -4200,12 +4231,11 @@ func runModel(m *model, opts RunOptions) error {
 	}
 	// The renderer's own frame quantum is the remaining floor on input latency;
 	// the 60fps default means up to 16.7ms before a damaged frame reaches the wire.
-	// Mouse input (motion and wheel) is throttled to that same frame period: a
-	// pointer sweep delivers a motion report per cell, and a wheel delivers ticks
-	// faster than the frame rate, and every report costs a full document render
-	// (Update then View), so an unthrottled sweep backs the input queue up and
-	// keystrokes wait for it to drain. Reports the screen could never draw are
-	// dropped before they reach the model.
+	// Mouse motion is throttled to that same frame period: a pointer sweep
+	// delivers a report per cell, and every report runs Update then View, so
+	// an unthrottled sweep backs the input queue up and keystrokes wait for it
+	// to drain. Reports the screen could never draw are dropped before they
+	// reach the model. Wheel ticks all reach it (see inputThrottle).
 	m.inputThrottle = inputThrottle{period: motionFramePeriod, now: time.Now}
 	progOpts := []tea.ProgramOption{
 		tea.WithFPS(120),

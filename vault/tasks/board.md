@@ -1,9 +1,14 @@
 # Board
 
-Last updated: 2026-10-23 (hotty-go v0.5.4)
+Last updated: 2026-10-23 (frames keep block renderings)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (scroll speed) a frame no longer renders the whole document again (43 ms
+  → 0.5 ms on plx's ARCHITECTURE.md), and every wheel tick scrolls where
+  some were dropped — whether held `j` and a hard wheel spin stop when you
+  stop, whether a flick now goes too far, and whether a resize stutters —
+  journal 2026-10-23.11
 - (hidden plx pane) margin started in a plx tab no one is looking at
   shows its blocks in cells once the tab is shown, until the first key or
   pointer move, which measures them again — whether they come back then,
@@ -453,6 +458,10 @@ Last updated: 2026-10-23 (hotty-go v0.5.4)
 
 ## Done
 
+- [x] **(maintainer, scrolling floods the queue)** render keeps each
+      block's rendering (`m.bodies`, F39), a frame 43 ms → 0.5 ms; the
+      wheel is no longer throttled. `[felt]` — see journal 2026-10-23.11 —
+      done 2026-10-23
 - [x] **(hotty agent, hotty-go v0.5.4)** pins at v0.5.4: hottytea drops its
       own mark's `ENOTERM`. margin's own check stays (SPEC §3.6). `[mech]` —
       see journal 2026-10-23.10 — done 2026-10-23
