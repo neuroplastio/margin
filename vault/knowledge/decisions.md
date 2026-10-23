@@ -366,6 +366,9 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   first `fit` says a terminal laid it out, so what was not measured is
   asked again (journal 2026-10-23.6). If input gets that block measured
   before any `fit` comes, the surface goes then (journal 2026-10-23.8).
+  `ENOTERM` on anything else (a numbered document, which hottytea sends
+  after a loss) means kept, unchecked (SPEC §3.6 since hotty 4bb45a7): it
+  is no failure, and no status says it is (journal 2026-10-23.9).
   After a resize a block keeps its last height
   until the new width's arrives, and the top visible block holds still.
   A block can need more rows after it was measured, when an image decodes or

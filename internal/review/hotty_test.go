@@ -629,6 +629,38 @@ func TestHottyWaitsForATerminal(t *testing.T) {
 	}, hottytest.NoTerminal(), hottytest.AutoRows(func(*hottytest.Surface, int) int { return 2 }))
 }
 
+// A document a multiplexer with no terminal attached keeps unchecked is
+// answered ENOTERM where it was numbered (SPEC §3.6): hottytea numbers one
+// after a loss. That is no failure, and the screen does not call it one.
+func TestHottyLostWithNoTerminal(t *testing.T) {
+	src := "# Lost\n\nA paragraph with **bold**.\n\n"
+	for i := range 40 {
+		src += fmt.Sprintf("Filler paragraph %d.\n\n", i)
+	}
+	m, _ := hotRun(t, src, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		h.DetachTerminal()
+		h.Forget()
+		h.Key("ctrl+d")
+		h.Key("ctrl+u")
+		waitFor(t, "a numbered document answered ENOTERM", func() bool {
+			for _, r := range h.Replies() {
+				if hotty.Get(r.Control, "re") == "doc" && hotty.Get(r.Control, "n") != "" && strings.Contains(string(r.Payload), hotty.ENOTERM) {
+					return true
+				}
+			}
+			return false
+		})
+		h.AttachTerminal()
+		surfaceWith(t, h, "A paragraph with bold")
+	}, hottytest.AutoRows(func(*hottytest.Surface, int) int { return 2 }))
+	// The reply came before the q that quit, on the same input: margin had
+	// taken it by then.
+	if strings.Contains(m.status, hotty.ENOTERM) {
+		t.Errorf("a document kept unchecked shows as an error: status %q", m.status)
+	}
+}
+
 func TestHotMeasureWaitsForATerminal(t *testing.T) {
 	m := newTestModel(t)
 	m.hot = newHotState()

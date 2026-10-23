@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (ENOTERM against plx's build)
+Last updated: 2026-10-23 (hotty-go v0.5.3, ENOTERM kept unchecked)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -453,6 +453,9 @@ Last updated: 2026-10-23 (ENOTERM against plx's build)
 
 ## Done
 
+- [x] **(hotty agent, hotty-go v0.5.3)** pins at v0.5.3 (SPEC 4bb45a7);
+      an `ENOTERM` on a numbered document is kept, unchecked, not a status.
+      `[mech]` — see journal 2026-10-23.9 — done 2026-10-23
 - [x] **(plx agent, ENOTERM build)** ran against plx's ENOTERM build: ENOTERM
       ok, no fit on attach (reported); `margin-attach` now goes when input
       measures its block first. `[mech]` — see journal 2026-10-23.8 — done

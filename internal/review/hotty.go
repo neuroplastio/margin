@@ -284,7 +284,12 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		if h.measured(msg.Reply) {
 			return h.relayoutSoon(), false
 		}
-		m.status = "hotty: " + hotty.Err(msg.Reply).Error()
+		if msg.Reply.Code == hotty.ENOTERM {
+			// A multiplexer with no terminal attached kept it, unchecked
+			// (SPEC §3.6): hottytea numbers a document after a loss.
+			return nil, false
+		}
+		m.status = hotty.Err(msg.Reply).Error()
 		return nil, true
 	case hottytea.EventMsg:
 		if msg.Event.Kind == hotty.EventFit {
