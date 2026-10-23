@@ -443,7 +443,9 @@ Last updated: 2026-10-22 (the release's stamp check reads the hotty part)
 
 ## In progress
 
-*(none)*
+- **(hover bench)** on a HOTTY host the gutter bar does not follow the
+  pointer over prose: the block surfaces take the pointer, so margin hears
+  no motion there; ask for hover (SPEC §9.4) — claimed 2026-10-23 by margin
 
 ## Done
 
