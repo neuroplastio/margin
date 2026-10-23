@@ -357,7 +357,10 @@ HOTTY host places HTML documents (surfaces) over cell rectangles.
   2026-10-02.3), nearest the screen first, 64 at a time, and cached by
   (html, width). Until a block's reply comes it shows in cells, as on a plain
   terminal; a host that never answers within 3s is treated as deaf and the
-  whole document stays in cells. After a resize a block keeps its last height
+  whole document stays in cells until the next input asks again. An
+  `EBUDGET` answer (plx's for a pane it is not showing, F38) is asked again
+  on the next input too, up to three asks in all, then cells (journal
+  2026-10-23.4). After a resize a block keeps its last height
   until the new width's arrives, and the top visible block holds still.
   A block can need more rows after it was measured, when an image decodes or
   a web image loads late: on a host that sends `fit` (SPEC §5.2) every

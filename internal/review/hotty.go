@@ -52,8 +52,13 @@ type hotState struct {
 	nextN   int
 	wave    int  // the measuring wave the timeout belongs to
 	heard   int  // measures answered so far, so a wave still answering waits
-	deaf    bool // a host that never answered a measure: everything in cells
+	deaf    bool // a host that left a wave unanswered: cells until the next input
 	want    []hotWant
+	// later is what the host did not measure in time (EBUDGET, or a wave
+	// left unanswered), asked again on the next input; tries counts the
+	// asks, so a document the host never lays out in time ends in cells.
+	later []hotKey
+	tries map[hotKey]int
 
 	// The frame: what View returns on a host, the blocks render placed in
 	// it, and where the document's column is.
@@ -160,6 +165,9 @@ const (
 	hotWave = 64
 	// hotMeasureWait is how long a wave may go without an answer.
 	hotMeasureWait = 3 * time.Second
+	// hotTries is how often a block is measured before a host that never
+	// lays it out in time (EBUDGET each time, or no answer) gets it in cells.
+	hotTries = 3
 	// hotRelayoutAfter gathers the replies of a wave into one frame.
 	hotRelayoutAfter = 16 * time.Millisecond
 )
@@ -171,6 +179,7 @@ func newHotState() *hotState {
 		last:    map[string]int{},
 		asked:   map[hotKey]bool{},
 		pending: map[int]hotKey{},
+		tries:   map[hotKey]int{},
 		sent:    map[string]string{},
 		mermaid: mermaidsvg.Render,
 	}
@@ -237,6 +246,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // update. redraw says the frame must be drawn again.
 func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 	h := m.hot
+	if hotInput(msg) {
+		h.again()
+	}
 	switch msg := msg.(type) {
 	case nil:
 		return nil, false
@@ -303,9 +315,13 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 			return h.awaitWave(), false
 		}
 		// A host that leaves a whole wave unanswered will not answer the
-		// next: show everything in cells rather than wait on it.
+		// next soon: show everything in cells rather than wait on it, until
+		// the user does something (plx with no viewer answers nothing).
 		h.tracef("deaf: wave %d left %d measures unanswered", msg.wave, len(h.pending))
 		h.deaf = true
+		for _, k := range h.pending {
+			h.notYet(k)
+		}
 		h.pending = map[int]hotKey{}
 		return nil, true
 	}
@@ -322,13 +338,56 @@ func (h *hotState) measured(r hotty.Reply) bool {
 	}
 	delete(h.pending, r.N)
 	h.heard++
-	if r.OK && r.Re == "place" && r.Rows > 0 {
+	switch {
+	case r.OK && r.Re == "place" && r.Rows > 0:
 		h.rows[key] = r.Rows
 		h.last[key.html] = r.Rows
-	} else {
+	case r.Code == hotty.EBUDGET:
+		// Not laid out in time, which is not a refusal: plx answers so for
+		// every measure from a pane it is not showing.
+		h.notYet(key)
+	default:
 		h.rows[key] = 0
 	}
 	return true
+}
+
+// notYet keeps a block the host did not measure in time for the next input,
+// up to hotTries asks; after that it shows in cells.
+func (h *hotState) notYet(k hotKey) {
+	h.tries[k]++
+	if h.tries[k] >= hotTries {
+		h.rows[k] = 0
+		return
+	}
+	h.later = append(h.later, k)
+}
+
+// again asks once more what the host did not measure in time. It is called
+// on input, when the user is looking at margin: a plx pane no one sees
+// answers each measure with EBUDGET, and with no viewer answers none.
+func (h *hotState) again() {
+	if len(h.later) == 0 || len(h.pending) > 0 {
+		return
+	}
+	h.tracef("again: %d measures", len(h.later))
+	for _, k := range h.later {
+		delete(h.asked, k)
+	}
+	h.later = h.later[:0]
+	h.deaf = false
+}
+
+// hotInput is whether msg is the user's: a key, the mouse, a paste, or what
+// they did in a surface.
+func hotInput(msg tea.Msg) bool {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg, tea.MouseMsg, tea.PasteMsg:
+		return true
+	case hottytea.EventMsg:
+		return msg.Event.Kind != hotty.EventFit
+	}
+	return false
 }
 
 // hotFit takes a fit: a block's document needs other rows than it was placed

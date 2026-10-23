@@ -790,3 +790,21 @@ Fixed in hotty-go aaa1e1b (margin pins 0954c06): a reported loss takes
 every document, and an ENOENT read before the host answers the first one
 sent again belongs to the same loss. A loss is reported once, and margin's
 test checks that each resource goes once after it.
+
+## F38 — a plx pane no one sees answers every measure with EBUDGET
+
+plx (1e94151) answers a pane program's `r=auto` placement itself, after
+asking its viewer to lay the document out. A pane that is not shown (a
+stack tab or a workspace tab in the background) gets no layer, so the
+viewer never draws the surface, and after 500 ms plxd answers the measure
+`EBUDGET` "no viewport measured the surface in time". With no viewer at all
+it answers nothing. Showing the pane sends the program nothing: no replay,
+no late `ok`, no `fit` (plx counts the late rows as heard), and plx sends
+no focus events to panes. So margin started in a tab no one was looking at
+took every block's EBUDGET as a refusal, and showed cells when the tab was
+shown, until a resize changed the width. EBUDGET is "not now", not "never":
+margin keeps such a block for the next input (a key, the pointer, a paste,
+something done in a surface), up to three asks, and an unanswered wave
+(deaf) waits for input the same way (2026-10-23, journal 2026-10-23.4).
+Shown without any input, the blocks stay in cells until the user does
+something: the rest is plx's, reported to the plx agent.

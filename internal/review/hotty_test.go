@@ -546,6 +546,66 @@ func TestHotMeasureWaitsOnASlowHost(t *testing.T) {
 	}
 }
 
+// TestHotMeasureAgainOnInput: a measure the host did not answer in time is
+// asked again on the next input, not left in cells for good. plx answers
+// every measure from a pane it is not showing with EBUDGET, and margin
+// started in a tab not shown showed cells after the tab was.
+func TestHotMeasureAgainOnInput(t *testing.T) {
+	m := newTestModel(t)
+	m.hot = newHotState()
+	h := m.hot
+	key := tea.KeyPressMsg(tea.Key{Code: 'j', Text: "j"})
+	ask := func(k hotKey) int {
+		h.asked[k] = true
+		h.nextN++
+		h.pending[h.nextN] = k
+		return h.nextN
+	}
+	budget := func(n int) hottytea.ErrorMsg {
+		return hottytea.ErrorMsg{Reply: hotty.Reply{N: n, Re: "place", Code: hotty.EBUDGET}}
+	}
+
+	a := hotKey{"a", 40}
+	m.hotUpdate(budget(ask(a)))
+	if _, done := h.rows[a]; done || !h.asked[a] {
+		t.Fatalf("EBUDGET: measured %v, asked %v; want neither cells for good nor asked before input", done, h.asked[a])
+	}
+	m.hotUpdate(hotRelayoutMsg{})
+	if !h.asked[a] {
+		t.Fatal("a frame with no input asked again")
+	}
+	m.hotUpdate(key)
+	if h.asked[a] {
+		t.Fatal("input did not ask again")
+	}
+
+	// A wave no one answers goes deaf, until input asks it again too.
+	b := hotKey{"b", 40}
+	ask(b)
+	h.wave++
+	m.hotUpdate(hotMeasureTimeoutMsg{h.wave, h.heard})
+	if !h.deaf {
+		t.Fatal("an unanswered wave did not go deaf")
+	}
+	m.hotUpdate(tea.MouseMotionMsg{X: 3, Y: 4})
+	if h.deaf || h.asked[b] {
+		t.Fatalf("the pointer moving left deaf %v, asked %v; want both asked again", h.deaf, h.asked[b])
+	}
+
+	// A block the host never lays out in time ends in cells.
+	for range hotTries - 1 {
+		m.hotUpdate(budget(ask(a)))
+		m.hotUpdate(key)
+	}
+	if r, done := h.rows[a]; !done || r != 0 {
+		t.Errorf("after %d EBUDGETs: rows %d, measured %v; want cells", hotTries, r, done)
+	}
+	m.hotUpdate(key)
+	if !h.asked[a] {
+		t.Error("a block in cells for good is asked again")
+	}
+}
+
 func TestHotListItem(t *testing.T) {
 	var d hotDocs
 	got := d.listItem(listItem{prefix: "    1. ", text: "**deep** item"})

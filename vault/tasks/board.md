@@ -1,9 +1,13 @@
 # Board
 
-Last updated: 2026-10-23 (block documents are UTF-8)
+Last updated: 2026-10-23 (measured again on input after a hidden plx pane)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (hidden plx pane) margin started in a plx tab no one is looking at
+  shows its blocks in cells once the tab is shown, until the first key or
+  pointer move, which measures them again — whether they come back then,
+  and whether waiting for input is good enough — journal 2026-10-23.4
 - (hover over prose) on a hotty host the gutter bar marks the paragraph
   under the pointer (hover, SPEC §9.4), where it stayed put over prose —
   whether it keeps up with the pointer, in hottyterm and in a plx pane —
@@ -448,6 +452,11 @@ Last updated: 2026-10-23 (block documents are UTF-8)
 ## In progress
 
 ## Done
+
+- [x] **(maintainer: hotty disappears on a hidden plx pane)** an EBUDGET
+      answer, or a wave left unanswered, is measured again on the next input,
+      up to three asks, instead of cells for good. The rest is plx's (F38).
+      `[felt]` — see journal 2026-10-23.4 — done 2026-10-23
 
 - [x] **(hotty agent, SPEC §3.3)** a file's bytes that are not UTF-8 show
       as U+FFFD in its block documents, which a host refused (EINVAL).
