@@ -171,9 +171,6 @@ const (
 	hotMeasureName = "margin-measure"
 	// hotAttachName is the surface that waits for a terminal to attach.
 	hotAttachName = "margin-attach"
-	// hotENOTERM is SPEC §3.6's code for nothing to lay a document out
-	// with yet; hotty-go names it from its next patch.
-	hotENOTERM = "ENOTERM"
 	// hotWave is how many blocks are measured at once, nearest the screen
 	// first: enough to fill it, few enough that the first frame comes soon.
 	hotWave = 64
@@ -367,7 +364,7 @@ func (h *hotState) measured(r hotty.Reply) bool {
 	case r.OK && r.Re == "place" && r.Rows > 0:
 		h.rows[key] = r.Rows
 		h.last[key.html] = r.Rows
-	case r.Code == hotENOTERM:
+	case r.Code == hotty.ENOTERM:
 		// No terminal to lay it out with yet, which is no try: asked again
 		// when one attaches.
 		h.later = append(h.later, key)

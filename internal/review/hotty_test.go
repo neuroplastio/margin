@@ -606,6 +606,29 @@ func TestHotMeasureAgainOnInput(t *testing.T) {
 	}
 }
 
+// A multiplexer with no terminal attached answers every measure ENOTERM
+// (SPEC §5.2): the blocks stay in cells, quietly, until a terminal attaches,
+// and then they are surfaces with no input from anyone.
+func TestHottyWaitsForATerminal(t *testing.T) {
+	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		waitFor(t, "the attach surface", func() bool {
+			s := h.Surface(hotAttachName)
+			return s != nil && s.Placed()
+		})
+		for _, s := range h.Surfaces() {
+			if s.Placed() && s.Name() != hotAttachName && strings.Contains(s.Text(), "A paragraph with bold") {
+				t.Errorf("with no terminal, the paragraph is placed on %s; want it in cells", s.Name())
+			}
+		}
+		if strings.Contains(h.Screen(), "ENOTERM") {
+			t.Errorf("with no terminal, the screen shows the error:\n%s", h.Screen())
+		}
+		h.AttachTerminal()
+		surfaceWith(t, h, "A paragraph with bold")
+		waitFor(t, "the attach surface gone", func() bool { return h.Surface(hotAttachName) == nil })
+	}, hottytest.NoTerminal(), hottytest.AutoRows(func(*hottytest.Surface, int) int { return 2 }))
+}
+
 func TestHotMeasureWaitsForATerminal(t *testing.T) {
 	m := newTestModel(t)
 	m.hot = newHotState()
@@ -617,7 +640,7 @@ func TestHotMeasureWaitsForATerminal(t *testing.T) {
 		return h.nextN
 	}
 	noterm := func(n int) hottytea.ErrorMsg {
-		return hottytea.ErrorMsg{Reply: hotty.Reply{N: n, Re: "place", Code: hotENOTERM}}
+		return hottytea.ErrorMsg{Reply: hotty.Reply{N: n, Re: "place", Code: hotty.ENOTERM}}
 	}
 
 	a, b := hotKey{"a", 40}, hotKey{"b", 40}

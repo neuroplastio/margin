@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (ENOTERM: waiting for a terminal)
+Last updated: 2026-10-23 (ENOTERM against hottytest)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -452,6 +452,10 @@ Last updated: 2026-10-23 (ENOTERM: waiting for a terminal)
 ## In progress
 
 ## Done
+
+- [x] **(hotty agent, hottytest NoTerminal)** ENOTERM end to end against
+      hottytest; hotty-go pinned to cb540bc until v0.5.3. `[mech]` — see
+      journal 2026-10-23.7 — done 2026-10-23
 
 - [x] **(hotty agent, SPEC ENOTERM)** a measure answered ENOTERM waits, without
       a try, for a terminal: the `margin-attach` surface's first fit asks
