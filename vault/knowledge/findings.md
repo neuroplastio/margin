@@ -765,3 +765,17 @@ their `hover` as motion. A host sends at most one hover a frame, so an
 surface: remember which surface set the mark, and clear it on an out only
 from that surface (2026-10-23, journal 2026-10-23.1). The hover path costs
 about a frame more than cell motion (p50 49 ms against 33 ms).
+
+## F37 — a host's lost documents come back without their resources
+
+A host that loses its documents (a restart that keeps nothing) has lost
+their resources with them. hottytea sends a document again when a
+placement finds it gone (ENOENT), but only the program can send its
+resources again: on `RelayoutMsg{Lost: true}` (hotty-go 2ebf3ef), Send
+every resource in Update, before the frame's Layout, so they go out ahead of
+the documents in the same Flush. A loss is reported per placement: a
+surface that was off screen at the first report finds its document gone
+when it comes back and reports again. In hottytest, `Placement()` is only
+the last `place` as sent; hottytea leaves out `f`, `p` and `v` when they
+have not changed, so read the surface's `Fit()`, `Press()` and `Hover()`
+(2026-10-23, journal 2026-10-23.2).

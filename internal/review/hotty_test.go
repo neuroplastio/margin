@@ -240,6 +240,65 @@ func TestHottyMermaidIsAnSVG(t *testing.T) {
 	}
 }
 
+// A host that loses every surface and resource behind margin's back (one
+// restarting behind a relay) gets the stylesheet, the image and the diagram
+// again, each ahead of the document that refers to it, once the surfaces
+// are placed again and find their documents gone.
+func TestHottyLostResourcesGoAgain(t *testing.T) {
+	src := "# Lost\n\n![a picture](pic.png)\n\n```mermaid\nflowchart LR\n    a --> b\n```\n\n"
+	for i := range 40 {
+		src += fmt.Sprintf("Filler paragraph %d.\n\n", i)
+	}
+	var pic, diagram string // the surfaces
+	var img, mmd string     // their resources
+	var cmds []hotty.Message
+	hotRun(t, src, func(h *hottytest.Host, m *model) {
+		waitFor(t, "the picture and the diagram", func() bool {
+			for _, s := range h.Surfaces() {
+				if !s.Placed() {
+					continue
+				}
+				if doc := s.HTML(); strings.Contains(doc, "cid:img-") {
+					pic, img = s.Name(), cidOf(doc, "cid:img-")
+				} else if strings.Contains(doc, "cid:mmd-") {
+					diagram, mmd = s.Name(), cidOf(doc, "cid:mmd-")
+				}
+			}
+			return pic != "" && diagram != ""
+		})
+		h.Forget()
+		before := len(h.Commands())
+		h.Key("ctrl+d") // the surfaces move, or go, and find out
+		h.Key("ctrl+u") // and come back
+		waitFor(t, "the picture and the diagram back", func() bool {
+			p, d := h.Surface(pic), h.Surface(diagram)
+			return p != nil && p.Placed() && d != nil && d.Placed()
+		})
+		cmds = h.Commands()[before:]
+	}, hottytest.AutoRows(func(*hottytest.Surface, int) int { return 2 }))
+
+	for _, c := range []struct{ id, surface string }{{hotCSSID, pic}, {img, pic}, {mmd, diagram}} {
+		res, doc := -1, -1
+		for i, m := range cmds {
+			switch {
+			case hotty.Get(m.Control, "a") == "res" && hotty.Get(m.Control, "id") == c.id && res < 0:
+				res = i
+			case hotty.Get(m.Control, "a") == "doc" && hotty.Get(m.Control, "s") == c.surface && doc < 0:
+				doc = i
+			}
+		}
+		if res < 0 || doc < 0 || res > doc {
+			t.Errorf("after the loss, resource %s went at %d and %s's document at %d; want the resource first", c.id, res, c.surface, doc)
+		}
+	}
+}
+
+// cidOf is the resource id a document refers to, from its prefix on.
+func cidOf(doc, prefix string) string {
+	id := doc[strings.Index(doc, prefix)+len("cid:"):]
+	return id[:strings.IndexByte(id, '"')]
+}
+
 func TestSVGSize(t *testing.T) {
 	for _, c := range []struct {
 		svg  string

@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (the gutter bar follows the pointer over prose)
+Last updated: 2026-10-23 (resources again after a lost document)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -447,15 +447,12 @@ Last updated: 2026-10-23 (the gutter bar follows the pointer over prose)
 
 ## In progress
 
-- [ ] **(resources after a lost document)** margin, 2026-10-23. When a host
-  loses a document, hottytea sends it again (ENOENT on a placement), but
-  margin never sends again the stylesheet, images and diagram SVGs it
-  refers to. hottytea now says so (RelayoutMsg.Lost, hotty-go 2ebf3ef), and
-  on it margin resends every resource it has sent. From the maintainer's
-  report that margin loses its images when plx restarts (not reproduced:
-  plx replays the whole session on a handover and a viewport re-exec).
-
 ## Done
+
+- [x] **(resources after a lost document)** when a host loses its
+      documents, margin sends the stylesheet, images and diagram SVGs
+      again before them (hottytea's RelayoutMsg.Lost, hotty-go 2ebf3ef).
+      `[mech]` — see journal 2026-10-23.2 — done 2026-10-23
 
 - [x] **(hover bench)** on a hotty host the gutter bar did not follow the
       pointer over prose: a block surface takes the pointer (SPEC §9.3).

@@ -272,6 +272,13 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		}
 		return m.hotEvent(msg.Event), true
 	case hottytea.RelayoutMsg:
+		if msg.Lost && h.native() {
+			// The frame's Layout sends the lost documents again, after the
+			// resources they refer to.
+			h.tracef("lost: the host lost documents; resources again")
+			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
+			h.docs.lost()
+		}
 		return nil, true
 	case hottytea.PongMsg:
 		return nil, false

@@ -160,6 +160,7 @@ func (d *hotDocs) open(dir string) {
 type hotDiagram struct {
 	id   string // the resource; "" until drawn
 	w, h int    // the SVG's size in pixels
+	svg  []byte // kept for a host that loses it
 }
 
 type hotImage struct {
@@ -249,9 +250,22 @@ func (d *hotDocs) drew(src string, svg []byte) bool {
 		return false
 	}
 	sum := sha256.Sum256([]byte(src))
-	g.id, g.w, g.h = "mmd-"+hex.EncodeToString(sum[:8]), w, h
+	g.id, g.w, g.h, g.svg = "mmd-"+hex.EncodeToString(sum[:8]), w, h, svg
 	d.res(g.id, "image/svg+xml", svg)
 	return true
+}
+
+// lost is a host that lost the documents and, likely, the resources they
+// refer to (hottytea's RelayoutMsg.Lost): every diagram drawn goes again,
+// and every block's document is made again, which reads its images and
+// sends them again. The stylesheet is the caller's.
+func (d *hotDocs) lost() {
+	for _, g := range d.diagrams {
+		if g.id != "" {
+			d.res(g.id, "image/svg+xml", g.svg)
+		}
+	}
+	d.imgs, d.html, d.byBlock = nil, nil, nil
 }
 
 var (

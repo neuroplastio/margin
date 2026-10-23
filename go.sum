@@ -57,10 +57,14 @@ github.com/neuroplastio/hotty-go/hottyedit v0.5.0 h1:SFIHrKy10j1vG8b6OEY8o+i6a+/
 github.com/neuroplastio/hotty-go/hottyedit v0.5.0/go.mod h1:RcmPTX589vpRMuN2uXPJbZ5C8nG+A0iSLVkw+V0Hb9k=
 github.com/neuroplastio/hotty-go/hottytea v0.5.0 h1:7N2k2ajyAUnpTel6TrM1ITT7x/2o1geJ5+4RxuUcx1w=
 github.com/neuroplastio/hotty-go/hottytea v0.5.0/go.mod h1:VywTuv9mzBiAdQQ9MOWuyTlsB+AaMovDB8pNQEqDdJI=
+github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023074741-2ebf3ef12190 h1:ri87vK7T3lHTwgMPGuqbca48lBWYY1oaNX26k7P0gq4=
+github.com/neuroplastio/hotty-go/hottytea v0.5.1-0.20261023074741-2ebf3ef12190/go.mod h1:VywTuv9mzBiAdQQ9MOWuyTlsB+AaMovDB8pNQEqDdJI=
 github.com/neuroplastio/hotty-go/hottyterm v0.5.0 h1:wFsYOIYPS21Hw3afXB6QHPLhI/bJvc3ATKhELoBcbu4=
 github.com/neuroplastio/hotty-go/hottyterm v0.5.0/go.mod h1:jQtJL+f9U05FGG9hYSmnRxKelETt0HaW5GfU2poEKls=
 github.com/neuroplastio/hotty-go/hottytest v0.5.0 h1:7eZAIWuCpxpGRg7Frt3WgUL5epp6NQwXAjXPQ7VIVM8=
 github.com/neuroplastio/hotty-go/hottytest v0.5.0/go.mod h1:Ja7dw2cqkgtKTss+wJ5QsH8pUhWQBDmERxyaCmvH4fE=
+github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023074741-2ebf3ef12190 h1:+4UnOirlmnaAFm2hzSYllHcpOCyZEAhPqdQ0gfFsehE=
+github.com/neuroplastio/hotty-go/hottytest v0.5.1-0.20261023074741-2ebf3ef12190/go.mod h1:Ja7dw2cqkgtKTss+wJ5QsH8pUhWQBDmERxyaCmvH4fE=
 github.com/neuroplastio/myelin/myelinkey v0.1.0 h1:c1XVForIsnqnYxmmwwN/UHFdtUzQYv3fD94hyxGe8cI=
 github.com/neuroplastio/myelin/myelinkey v0.1.0/go.mod h1:lnIMTPFSwjs8dsx9R8zsPNGaRnlzS4rScUY4exrjLus=
 github.com/philhofer/fwd v1.2.0 h1:e6DnBTl7vGY+Gz322/ASL4Gyp1FspeMvx1RNDoToZuM=
