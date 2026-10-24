@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-24 (one scrolling surface proposed; scroll-by asked of hotty)
+Last updated: 2026-10-25 (hotty drafts scroll-by as 0.6's scroll op)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -965,11 +965,15 @@ moved without re-reading it.
   `scroll=y` document. Focus, marks and search are deltas, `reveal` moves
   to a block, `view` reports what is on screen, the per-block measuring
   goes, and the composer docks below the column. It supersedes D17's and
-  D22's rejection of one surface, so it waits on the maintainer's go. It
-  also waits on the hotty agent's answer to scroll-by, sent 2026-10-24: a
-  program-driven scroll by rows or pages, for `j`/`k` through a block taller
-  than the window, margin's paging keys, and `h`/`l` on a wide code block.
-  Until then margin does not work around it.
+  D22's rejection of one surface, so it waits on the maintainer's go.
+  The scroll-by margin asked hotty for (2026-10-24) is accepted as hotty
+  0.6's `scroll` delta op (hotty 0bc7cd2, vault/tasks/0.6.md V6-01). v is a
+  §10.2 scroll action (line, page = 0.875 of the port, half page, start,
+  end), one host step per op, a count as n ops, aimed at the nearest
+  scroller from t outward. `j`/`k` scroll a tall block until less than a
+  step is left, then `reveal end`. Paging keys page, and `h`/`l` scroll a
+  code block or table. 0.6 is held until this move is approved or other
+  items join it, so nothing can be built against it yet.
 - **Q-0004** (how a document's previous reviewed revision is recorded and
   located) — raised 2026-08-11. Blocks M4's first item ("Diff a document
   against the previous reviewed revision") and, through it, the two M4 items
