@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-23 (frames keep block renderings)
+Last updated: 2026-10-24 (one scrolling surface proposed; scroll-by asked of hotty)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -959,6 +959,17 @@ moved without re-reading it.
 
 ## Blocked
 
+- **One scrolling surface for the document column** (maintainer, 2026-10-23:
+  fast trackpad scrolling still stalls; "Is there a way we can just have
+  single scrollable hotty surface?"). Proposed: on a host, the column is one
+  `scroll=y` document. Focus, marks and search are deltas, `reveal` moves
+  to a block, `view` reports what is on screen, the per-block measuring
+  goes, and the composer docks below the column. It supersedes D17's and
+  D22's rejection of one surface, so it waits on the maintainer's go. It
+  also waits on the hotty agent's answer to scroll-by, sent 2026-10-24: a
+  program-driven scroll by rows or pages, for `j`/`k` through a block taller
+  than the window, margin's paging keys, and `h`/`l` on a wide code block.
+  Until then margin does not work around it.
 - **Q-0004** (how a document's previous reviewed revision is recorded and
   located) — raised 2026-08-11. Blocks M4's first item ("Diff a document
   against the previous reviewed revision") and, through it, the two M4 items
