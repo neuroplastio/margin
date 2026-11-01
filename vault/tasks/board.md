@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-10-25 (hotty drafts scroll-by as 0.6's scroll op)
+Last updated: 2026-11-01 (margin on hotty 0.6)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -458,6 +458,9 @@ Last updated: 2026-10-25 (hotty drafts scroll-by as 0.6's scroll op)
 
 ## Done
 
+- [x] **(hotty agent)** margin on hotty 0.6: hotty-go, hottytea and hottytest
+      at v0.6.0; `--version` ends `· hotty 0.6`. `[mech]` — see journal
+      2026-11-01.1 — done 2026-11-01
 - [x] **(maintainer, scrolling floods the queue)** render keeps each
       block's rendering (`m.bodies`, F39), a frame 43 ms → 0.5 ms; the
       wheel is no longer throttled. `[felt]` — see journal 2026-10-23.11 —
