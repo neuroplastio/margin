@@ -951,3 +951,44 @@ func TestHottyFooterIsADenseBar(t *testing.T) {
 		waitFor(t, "the palette gone", func() bool { p := h.Surface("margin-" + paletteID); return p == nil || !p.Placed() })
 	})
 }
+
+// hoverSrc is shaped like the demo's "Try it": a heading, a paragraph, a
+// list with a nested item, and a quote, each its own surface.
+const hoverSrc = "# Title\n\nIntro paragraph with **bold** text that is long enough to wrap onto a second line when the column is narrow, yes it is.\n\n## Try it\n\n- Mark this list item reviewed with `r`.\n- Flag this one with `f`.\n  - Nested items are blocks too.\n- [x] Open the demo\n- [ ] Leave a comment on the diagram above\n\n> A quote is a block like any other: comment on it, or mark it. Comments survive\n> the block being reworded.\n"
+
+// Moving the pointer over a block marks it in the gutter and nothing else:
+// no surface is placed again. Bubble Tea writes a reverse index as a cheap
+// cursor-up when the gutter's mark moves, and hottytea once took it for a
+// scroll, placing every surface again on a hover, so the text jittered
+// (journal 2026-11-05.5).
+func TestHottyHoverPlacesNothingAgain(t *testing.T) {
+	hotRun(t, hoverSrc, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "Mark this list item")
+		time.Sleep(500 * time.Millisecond)
+		var names []string
+		for _, s := range h.Surfaces() {
+			if strings.HasPrefix(s.Name(), hotMeasureName) || strings.HasPrefix(s.Name(), "margin-") || !s.Placed() {
+				continue
+			}
+			names = append(names, s.Name())
+		}
+		slices.Sort(names)
+		if len(names) < 8 {
+			t.Fatalf("%d block surfaces, want the document's nine", len(names))
+		}
+		for round := 0; round < 2; round++ {
+			for _, n := range names {
+				before := len(h.Commands())
+				if err := h.Hover(n, "", 2, 0); err != nil {
+					t.Fatal(err)
+				}
+				time.Sleep(100 * time.Millisecond)
+				for _, c := range h.Commands()[before:] {
+					if hotty.Get(c.Control, "a") == "place" {
+						t.Errorf("hover over %s placed %s again", n, hotty.Get(c.Control, "s"))
+					}
+				}
+			}
+		}
+	})
+}

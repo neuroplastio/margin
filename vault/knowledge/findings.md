@@ -865,4 +865,5 @@ Bubble Tea writes `ESC M` as a cheap cursor-up, and hottytea's watcher
 counts every RI as a scroll under the surfaces: it clears the Session's
 placements and every surface is placed again, so the text jitters on a
 hover. (`CSI J` is not the trigger: ED 0 drops no placement.) Present in
-4c12de7. hotty Agent fixes it in hottytea. Journal 2026-11-05.5.
+4c12de7; fixed in hotty-go a5f717a, which counts an RI only at the top row
+(`TestHottyHoverPlacesNothingAgain`). Journal 2026-11-05.5, .8.

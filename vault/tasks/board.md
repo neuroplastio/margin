@@ -4,6 +4,10 @@ Last updated: 2026-11-01 (margin on hotty 0.6)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (hover) moving the pointer over blocks no longer places every surface
+  again: hotty-go a5f717a counts a reverse index only at the top row — whether
+  the "Try it" text now holds still under the pointer, on a host and in a plx
+  pane — journal 2026-11-05.8
 - (palette on hotty-surf) the `:` palette is a hotty-surf component: no
   header row, key caps, mono and dense — whether it reads without the
   header, whether the caps beat plain keys, whether the id column is
@@ -958,17 +962,6 @@ document, regardless of the order the tree-view work itself lands in.
   landed, see Done 2026-08-10.)*
 - *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
   earlier; see Done.)*
-
-## Backlog — hover
-
-- **Hover re-places every surface (found 2026-11-05, in 4c12de7 and before).**
-  The pointer over some blocks makes Bubble Tea write `ESC M` (RI, a cheap
-  cursor-up) before a `CSI J`; hottytea's `watch.scan` counts every RI as a
-  scroll, sends `erasedMsg` and clears `Session.placed`, so all surfaces are
-  re-placed (10 `a=place` per hover) and the text jitters. Fix: hotty Agent,
-  in hotty-go's hottytea (count an RI only at the top row). No sentinel in
-  margin. When it lands: take a hotty-go pseudo-version of main, and add the
-  reproduction (journal 2026-11-05.5) as the regression test.
 
 ## Backlog — M4 (round two)
 

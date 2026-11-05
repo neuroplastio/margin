@@ -11,9 +11,9 @@ require (
 	github.com/mattn/go-runewidth v0.0.24
 	github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec
 	github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d
-	github.com/neuroplastio/hotty-go v0.6.0
-	github.com/neuroplastio/hotty-go/hottytea v0.6.0
-	github.com/neuroplastio/hotty-go/hottytest v0.6.0
+	github.com/neuroplastio/hotty-go v0.6.1-0.20261105150951-a5f717a28783
+	github.com/neuroplastio/hotty-go/hottytea v0.6.1-0.20261105150951-a5f717a28783
+	github.com/neuroplastio/hotty-go/hottytest v0.6.1-0.20261105150951-a5f717a28783
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.12.1-0.20260928190838-e234f6fe6ecd // at or after 424d3ca (wazero#2535), see internal/mermaidsvg
 	github.com/yuin/goldmark v1.8.6
