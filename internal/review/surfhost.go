@@ -1,7 +1,6 @@
 package review
 
 import (
-	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -140,29 +139,15 @@ func (p *surfHost) key(h *hotState, name string) bool {
 	return took
 }
 
-// frame is f as hotty commands, in surfrun.Frame's order.
+// frame is f as hotty commands, in surfrun.Frame's order
+// (surfrun.WriteFrame). A Select's list is not written: no pane uses one.
 func (p *surfHost) frame(f surfrun.Frame) []string {
-	var out []string
-	ops, reveals := f.Ops, f.Reveals
-	if !f.Blur && f.Focus == "" {
-		ops, reveals = slices.Concat(ops, reveals), nil
+	var b strings.Builder
+	surfrun.WriteFrame(&b, p.name, f, nil)
+	if b.Len() == 0 {
+		return nil
 	}
-	if len(ops) > 0 {
-		out = append(out, hotty.Delta(p.name, ops))
-	}
-	for _, fl := range f.Fields {
-		out = append(out, hotty.SetField(p.name, fl.ID, fl.Change))
-	}
-	if f.Blur {
-		out = append(out, hotty.Blur(p.name))
-	}
-	if f.Focus != "" {
-		out = append(out, hotty.Focus(p.name, f.Focus))
-	}
-	if len(reveals) > 0 {
-		out = append(out, hotty.Delta(p.name, reveals))
-	}
-	return out
+	return []string{b.String()}
 }
 
 // ready tells the Surface what the host said about itself: how a binding's
