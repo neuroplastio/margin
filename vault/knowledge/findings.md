@@ -859,9 +859,10 @@ once drew the search prompt's cells to count its rows even where a host placed
 it, so the host never got the count's change. Draw the cells only where there
 is no host (journal 2026-11-05.4).
 
-## An erase under surfaces re-places them all (2026-11-05)
+## A reverse index re-places every surface (2026-11-05)
 
-Bubble Tea clears to the end of the screen (`CSI J`) when the cells below a
-changed row are blank, as they are under surfaces. The host drops the
-placements the erase covers, hottytea re-places every surface, and the text
-jitters. Present in 4c12de7. Journal 2026-11-05.5.
+Bubble Tea writes `ESC M` as a cheap cursor-up, and hottytea's watcher
+counts every RI as a scroll under the surfaces: it clears the Session's
+placements and every surface is placed again, so the text jitters on a
+hover. (`CSI J` is not the trigger: ED 0 drops no placement.) Present in
+4c12de7. hotty Agent fixes it in hottytea. Journal 2026-11-05.5.

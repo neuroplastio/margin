@@ -957,12 +957,13 @@ document, regardless of the order the tree-view work itself lands in.
 ## Backlog — hover
 
 - **Hover re-places every surface (found 2026-11-05, in 4c12de7 and before).**
-  The pointer over some blocks makes Bubble Tea write `CSI J` (erase to the
-  end of the screen) over the blank cells under the surfaces; the host drops
-  their placements and the Session re-places all of them (10 `a=place` per
-  hover), so the text jitters. Fix held for gov: hotty Agent is asked
-  whether hottytea should own it. Candidate in margin: one non-blank cell
-  outside every surface. Reproduction: journal 2026-11-05.5.
+  The pointer over some blocks makes Bubble Tea write `ESC M` (RI, a cheap
+  cursor-up) before a `CSI J`; hottytea's `watch.scan` counts every RI as a
+  scroll, sends `erasedMsg` and clears `Session.placed`, so all surfaces are
+  re-placed (10 `a=place` per hover) and the text jitters. Fix: hotty Agent,
+  in hotty-go's hottytea (count an RI only at the top row). No sentinel in
+  margin. When it lands: take a hotty-go pseudo-version of main, and add the
+  reproduction (journal 2026-11-05.5) as the regression test.
 
 ## Backlog — M4 (round two)
 
