@@ -963,6 +963,25 @@ document, regardless of the order the tree-view work itself lands in.
 - *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
   earlier; see Done.)*
 
+## Next
+
+- **Move margin to hotty-surf 730ae32 [felt].** Lowercase keycaps (the footer,
+  the palette and the search prompt draw `j`, `space`, `⇧+y`, `[ctrl+s]`), the
+  label pill is `chip` and a count is `badge` (margin uses neither), and
+  a widget's modifiers (tone, fill, bold, muted) now win over its own rules.
+  Started on the branch `kit-730ae32-wip` (c202f02, not on main, not pushed): the
+  pin, `go generate`, the lowercase footer key in `watch_test.go`, and the
+  palette's query row at `pad="1 0"` (the kit's items sit about 7 px nearer the
+  edge). `make check` passed there (review package, run once). Sheets of the
+  footer and palette at 897 and 1796, host and cells, were shot and looked at
+  but not judged; they are in the session scratchpad, not in the vault, so shoot
+  them again. Things the shots showed: on a host the keys are plain lowercase
+  text with no cap boxes, so `j move  c comment` reads as a sentence (does it want
+  a gap or a tone?); the selected row's bar touches the first letter; cells hints
+  keep five of six at 897 without a status and four with one, as before; the
+  hover and `Try it` checks are unaffected. Then the tree pane, the threads view
+  and the open thread, which wait for G2, G5 and this move.
+
 ## Backlog — M4 (round two)
 
 The differentiator, and the reason block ids exist. No felt decision is baked
