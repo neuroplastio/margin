@@ -4,6 +4,11 @@ Last updated: 2026-11-01 (margin on hotty 0.6)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (footer on hotty-surf) the footer is a hotty-surf component, a dense
+  surface on a host and cells elsewhere: key caps where there were plain keys,
+  a semibold mode — whether the caps read better, whether the line sits right
+  at the left edge, and how it cuts in a narrow pane (G7) — journal
+  2026-11-05.3, shots in vault/shots/hotty-surf-footer/
 - (scroll speed) a frame no longer renders the whole document again (43 ms
   → 0.5 ms on plx's ARCHITECTURE.md), and every wheel tick scrolls where
   some were dropped — whether held `j` and a hard wheel spin stop when you

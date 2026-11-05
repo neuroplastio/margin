@@ -521,7 +521,7 @@ func TestDocChangedMsgSetsTheNotice(t *testing.T) {
 func TestDocChangedNoticeShowsInTheFooterUntilCleared(t *testing.T) {
 	m := newTestModel(t)
 	m.docChanged = true
-	if footer := m.View().Content; !strings.Contains(footer, "file changed") || !strings.Contains(footer, "ctrl+r") {
+	if footer := m.View().Content; !strings.Contains(footer, "file changed") || !strings.Contains(footer, "Ctrl+R") {
 		t.Fatalf("footer with the notice on = %q, want the file-changed marker and its reload key", footer)
 	}
 	m.docChanged = false

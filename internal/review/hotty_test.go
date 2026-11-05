@@ -932,8 +932,8 @@ func TestHottyFooterIsADenseBar(t *testing.T) {
 		if rows := s.Placement().Rows; rows != 1 {
 			t.Errorf("footer placed %d rows tall, want 1", rows)
 		}
-		if class, _ := s.Attr("~s", "class"); !strings.Contains(class, "k-dense") {
-			t.Errorf("footer surface class %q, want k-dense", class)
+		if class, _ := s.Attr("r", "class"); !strings.Contains(class, "u-dense") {
+			t.Errorf("footer surface class %q, want u-dense", class)
 		}
 		h.Type(":")
 		var p *hottytest.Surface

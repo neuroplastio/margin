@@ -81,6 +81,8 @@ type hotState struct {
 	// panes are the review's panes this frame gave a rectangle of their own
 	// (D22): HTML surfaces there, their cells left blank.
 	panes []hotPane
+	// surfs are the hotty-surf surfaces this frame placed (surfhost.go).
+	surfs []hotSurf
 
 	// sent is each surface's document as last sent, so a change of review
 	// state sends the document again; now is this frame's.
@@ -132,6 +134,23 @@ type hotPane struct {
 	p    *pane
 	rect hottytea.Rect
 	clip hottytea.Rect // what of the screen the pane may show in
+}
+
+// hotSurf is a hotty-surf surface placed: where, and what shows it.
+type hotSurf struct {
+	p    *surfHost
+	rect hottytea.Rect
+	clip hottytea.Rect
+}
+
+// placeSurf puts a hotty-surf surface at r for this frame, as place does a
+// pane, and reports whether it did.
+func (h *hotState) placeSurf(p *surfHost, r, clip hottytea.Rect) bool {
+	if !h.native() || h.deaf {
+		return false
+	}
+	h.surfs = append(h.surfs, hotSurf{p, r, clip})
+	return true
 }
 
 // hotPaneName is a pane's surface's name on the host.
@@ -303,6 +322,10 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		}
 		if p := m.hotPaneOf(msg.Event.Surface); p != nil {
 			return m.hotPaneEvent(p, msg.Event), true
+		}
+		if sp := m.hotSurfOf(msg.Event.Surface); sp != nil {
+			sp.event(h, msg.Event)
+			return nil, true
 		}
 		return m.hotEvent(msg.Event), true
 	case hottytea.RelayoutMsg:
@@ -534,11 +557,17 @@ func (m *model) hotFrame() tea.Cmd {
 	h.want = h.want[:0]
 	v := m.view()
 	h.frame = &v
-	h.s.Layout(append(m.hotSurfaces(), m.hotPaneSurfaces()...))
+	h.s.Layout(append(append(m.hotSurfaces(), m.hotPaneSurfaces()...), m.hotSurfSurfaces()...))
 	// A pane's document went with the layout; its changes, and the keyboard
 	// where the pane wants it, go after.
 	for _, hp := range h.panes {
 		h.s.Send(hp.p.html(hotPaneName(hp.p)).Update()...)
+	}
+	// A surf surface's first frame goes after its placement, and what the
+	// review changed since goes as ops.
+	for _, hs := range h.surfs {
+		hs.p.sendFirst(h)
+		hs.p.sync(h)
 	}
 	m.hotResend()
 	measuring := m.hotMeasure()
@@ -607,6 +636,25 @@ func (m *model) hotPaneSurfaces() []hottytea.Surface {
 		out = append(out, s)
 	}
 	return out
+}
+
+// hotSurfSurfaces are the hotty-surf surfaces this frame placed.
+func (m *model) hotSurfSurfaces() []hottytea.Surface {
+	var out []hottytea.Surface
+	for _, hs := range m.hot.surfs {
+		out = append(out, hs.p.surface(m.hot, hs.rect, hs.clip))
+	}
+	return out
+}
+
+// hotSurfOf is the hotty-surf surface a host's surface is, if any.
+func (m *model) hotSurfOf(surface string) *surfHost {
+	for _, hs := range m.hot.surfs {
+		if hs.p.name == surface {
+			return hs.p
+		}
+	}
+	return nil
 }
 
 // hotPaneOf is the pane a surface of the host's is, if any.

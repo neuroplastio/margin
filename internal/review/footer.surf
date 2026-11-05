@@ -1,0 +1,17 @@
+<!-- margin's footer: the mode, the keys it takes as a help line, the
+     progress and the status. The keys are margin's: nothing here handles
+     one. -->
+<surface density="dense">
+  <row gap="2" pad="1 0" key="bar">
+    <text :if="mode != ''" semibold key="mode">{{ mode }}</text>
+    <text :if="rest != ''" muted key="rest">{{ rest }}</text>
+    <row grow gap="3" key="hints">
+      <row :each="h in hints" :key="h.key" gap="1">
+        <key>{{ h.key }}</key>
+        <text muted>{{ h.label }}</text>
+      </row>
+    </row>
+    <text :if="progress != ''" small muted key="progress">{{ progress }}</text>
+    <text :if="status != ''" small muted key="status">{{ status }}</text>
+  </row>
+</surface>

@@ -288,7 +288,7 @@ func TestViewComposesPaneAndInboxColumns(t *testing.T) {
 	out := ansiRe.ReplaceAllString(m.View().Content, "")
 	// The tree pane still renders beside the threads view, and the view shows a
 	// thread row and the footer hint.
-	for _, want := range []string{"README.md", "docs/", "threads — 3 thread(s)", "oldest"} {
+	for _, want := range []string{"README.md", "docs/", "threads", "3 thread(s)", "oldest"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("inbox view does not contain %q:\n%s", want, out)
 		}

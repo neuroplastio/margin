@@ -2,13 +2,20 @@ package review
 
 import (
 	"fmt"
+	"strings"
 
-	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
+	"github.com/neuroplastio/hotty-surf/pkg/cells"
+	"github.com/neuroplastio/hotty-surf/surflive"
 )
 
-// footerID is the footer's pane (D22): the mode margin is in, the keys it
-// takes there as a help line (HottyKeyHints, from a HottyShortcut each),
-// the review's progress, and the last status.
+//go:generate go run github.com/neuroplastio/hotty-surf/cmd/surfgen
+
+// The footer (D22, amended by the hotty-surf port): the mode margin is in,
+// the keys it takes there as a help line, the review's progress, and the
+// last status. It is a hotty-surf component, footer.surf, which a host
+// draws as a surface and a terminal as cells.
+
+// footerID is the footer's surface name.
 const footerID = "footer"
 
 // hint is a key the footer lists, named as SPEC §10.4 names keys, with what
@@ -17,16 +24,16 @@ type hint struct{ key, label string }
 
 // footerState is what the footer says in the mode margin is in: the mode,
 // the keys, and the progress.
-func (m *model) footerState() (mode string, hints []hint, progress string) {
+func (m *model) footerState() (mode, rest string, hints []hint, progress string) {
 	switch {
 	case m.comp != nil:
-		mode = "**new comment**"
+		mode = "new comment"
 		if m.comp.target != newCommentSlot {
-			mode = "**editing comment**"
+			mode = "editing comment"
 		}
-		return mode, []hint{{keySubmit, "submit"}, {keyDraft, "keep draft"}, {keyDiscard, "discard"}}, ""
+		return mode, "", []hint{{keySubmit, "submit"}, {keyDraft, "keep draft"}, {keyDiscard, "discard"}}, ""
 	case m.inbox:
-		return fmt.Sprintf("**threads** — %d thread(s)", len(m.inboxItems)),
+		return "threads", fmt.Sprintf("— %d thread(s)", len(m.inboxItems)),
 			[]hint{{"j", "move"}, {"enter", "open"}, {"escape", "close"}}, ""
 	case m.visual:
 		n := 0
@@ -37,7 +44,7 @@ func (m *model) footerState() (mode string, hints []hint, progress string) {
 				}
 			}
 		}
-		return fmt.Sprintf("**-- VISUAL --**  %d block(s)", n),
+		return "-- VISUAL --", fmt.Sprintf("%d block(s)", n),
 			[]hint{{"j", "extend"}, {"y", "yank"}, {"shift+v", "cancel"}}, ""
 	}
 	done, flagged, total := m.reviewProgress()
@@ -56,7 +63,7 @@ func (m *model) footerState() (mode string, hints []hint, progress string) {
 		// The persistent half of the change notice: a status line alone is
 		// overwritten by the next verb, so the footer keeps "the document
 		// moved, ctrl+r reloads" in view until the reviewer acts on it.
-		mode = "**●** file changed"
+		mode = "● file changed"
 		hints = append(hints, hint{"ctrl+r", "reload"})
 	}
 	if m.raw {
@@ -66,41 +73,71 @@ func (m *model) footerState() (mode string, hints []hint, progress string) {
 		hints = append(hints, hint{"j", "move"}, hint{"c", "comment"}, hint{"e", "edit"},
 			hint{"space", "mark"}, hint{"shift+y", "copy review"}, hint{"q", "quit"})
 	}
-	return mode, hints, progress
+	return mode, "", hints, progress
 }
 
-// footerPane is the footer's pane as the model has it.
-func (m *model) footerPane() *pane {
-	mode, hints, progress := m.footerState()
-	p := m.panes().pane(footerID, map[string]any{"mode": "", "progress": "", "status": ""})
-	p.bar = true
-	children := []any{"mode", "hints", "progress", "status"}
-	comps := []map[string]any{
-		nil,
-		obj("id", "mode", "component", "Text", "text", bind("/mode")),
-		obj("id", "hints", "component", "HottyKeyHints", "catalogId", hottycat.ID, "toggle", false, "weight", 1),
-		obj("id", "progress", "component", "Text", "text", bind("/progress"), "variant", "caption"),
-		obj("id", "status", "component", "Text", "text", bind("/status"), "variant", "caption"),
-	}
-	for i, h := range hints {
-		// The footer only lists the keys: they are margin's, read before
-		// any pane sees them, so the action is never sent.
-		id := fmt.Sprintf("key%d", i)
-		children = append(children, id)
-		comps = append(comps, obj("id", id, "component", "HottyShortcut", "catalogId", hottycat.ID,
-			"key", h.key, "label", h.label, "action", obj("event", obj("name", "hint"))))
-	}
-	comps[0] = obj("id", "root", "component", "Row", "children", children, "align", "center")
-	p.define(comps...)
-	p.put("/mode", mode)
-	// A pane's Text is Markdown, and the kit shows a backslash escape as
-	// it is: a status quoting a comment's Markdown shows it rendered.
-	p.put("/progress", progress)
-	p.put("/status", m.status)
-	return p
+// Footer is the footer's state (footer.surf lays it out): its fields are
+// what it shows. It handles nothing: the keys it lists are margin's, read
+// before any surface sees them.
+type Footer struct {
+	Mode     string
+	Rest     string
+	Hints    []FooterHint
+	Progress string
+	Status   string
 }
 
-// renderFooter is the footer's line, w wide.
+// FooterHint is a key the footer lists and what it does.
+type FooterHint struct {
+	Key   string
+	Label string
+}
+
+// footerHost is the footer as a surface, and its cells.
+type footerHost struct {
+	f    *Footer
+	host *surfHost
+	r    *cells.Renderer // the cells' renderer, made when a terminal needs them
+}
+
+// footer is the footer as the model has it now, its state brought up to
+// date.
+func (m *model) footer() *footerHost {
+	if m.foot == nil {
+		f := &Footer{}
+		m.foot = &footerHost{f: f, host: newSurfHost("margin-"+footerID, surflive.New(surfInterpFooter(f)), nil, nil)}
+	}
+	mode, rest, hints, progress := m.footerState()
+	f := m.foot.f
+	f.Mode, f.Rest, f.Progress, f.Status = mode, rest, progress, m.status
+	f.Hints = f.Hints[:0]
+	for _, h := range hints {
+		f.Hints = append(f.Hints, FooterHint{h.key, h.label})
+	}
+	return m.foot
+}
+
+// renderFooter is the footer's line in cells, w wide.
 func (m *model) renderFooter(w int) string {
-	return m.footerPane().lines(w)[0]
+	return m.footer().line(w)
+}
+
+// line draws the footer as one line of cells, w wide.
+func (h *footerHost) line(w int) string {
+	if h.r == nil {
+		h.r = cells.New(h.host.s.Cells())
+		h.r.Show()
+	} else {
+		h.r.Update()
+	}
+	scr := h.r.Draw(w, 1)
+	var b strings.Builder
+	if len(scr.Lines) > 0 {
+		for _, run := range scr.Lines[0] {
+			b.WriteString(cellsSGR(run))
+			b.WriteString(run.Text)
+		}
+	}
+	b.WriteString("\x1b[0m")
+	return b.String()
 }

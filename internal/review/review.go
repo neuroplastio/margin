@@ -90,6 +90,7 @@ type cursor struct {
 }
 
 type model struct {
+	foot    *footerHost // the footer, a hotty-surf component
 	path    string
 	doc     []block
 	src     []byte
@@ -3179,6 +3180,7 @@ func (m *model) view() tea.View {
 	}
 	if m.hot != nil {
 		m.hot.panes = m.hot.panes[:0]
+		m.hot.surfs = m.hot.surfs[:0]
 	}
 
 	var paletteBox string
@@ -3257,7 +3259,7 @@ func (m *model) view() tea.View {
 		}
 	} else {
 		at := hottytea.Rect{X: 1, Y: viewport + 1, W: m.w - 1, H: 1}
-		if m.hot == nil || !m.hot.place(m.footerPane(), at, hottytea.Rect{W: m.w, H: m.h}) {
+		if m.hot == nil || !m.hot.placeSurf(m.footer().host, at, hottytea.Rect{W: m.w, H: m.h}) {
 			b.WriteString(m.renderFooter(m.w - 1))
 		}
 	}

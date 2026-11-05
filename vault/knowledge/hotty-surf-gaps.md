@@ -13,6 +13,10 @@ its current piece for that spot.
 | G4 | **A prose surface**: a block of HTML from a Markdown renderer (headings, lists, quotes, tables, inline code) in the reading font, and an image/SVG block, measured by the host | the document column (D17, D24) is the product itself | margin's own `hotdoc` surfaces |
 | G5 | **A table** of columns that align across rows, with a selection | the threads view lists thread, document, time, author | hotty-a2ui's `HottyTable` |
 
-Open question for leg 1, not a gap yet: whether a `surfrun.Surface` can be
-hosted inside a program that places its own surfaces with hottytea's
-`Session` (margin's shape), rather than owning the terminal.
+| # | Need | Why margin needs it | margin keeps meanwhile |
+| --- | --- | --- | --- |
+| G6 | **A cells screen painted as ANSI lines**, exported: `cells.Screen` → the terminal's colours (surfrun's unexported `cellsSGR`, `ansiFg`) | a program that places its own cells (margin's View is lines of ANSI) paints a surf surface in the terminal | a copy of `cellsSGR` in `surfhost.go`, as the guide's "Painting the cells yourself" implies; goes when exported |
+| G7 | **A help line that is cut from its end:** a `row` whose children keep their order from the left and the last are left out where there is no room (`fit` runs right to left, flush right: the palette's footer shape) | the footer's keys read in order, the least important last, and a narrow pane gives them up from the end | a plain `row grow`; in a very narrow pane its keys are cut by the row, untested below 897 px |
+
+Answered: a `surfrun.Surface` is hosted beside margin's own surfaces
+(leg 1, journal 2026-11-05.2).
