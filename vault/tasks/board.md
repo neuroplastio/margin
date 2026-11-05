@@ -4,6 +4,10 @@ Last updated: 2026-11-01 (margin on hotty 0.6)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (search prompt on hotty-surf) the `/` prompt is a hotty-surf component: a
+  bare field after a rule, the count muted and flush right, a cursor in cells
+  — whether the bare field reads as a prompt, whether you miss the box —
+  journal 2026-11-05.4, shots in vault/shots/hotty-surf-search/
 - (footer on hotty-surf) the footer is a hotty-surf component, a dense
   surface on a host and cells elsewhere: key caps where there were plain keys,
   a semibold mode — whether the caps read better, whether the line sits right
@@ -949,6 +953,16 @@ document, regardless of the order the tree-view work itself lands in.
   landed, see Done 2026-08-10.)*
 - *(SCROLL-01/02/03 — scroll offset, page/half-page keys, mouse wheel — landed
   earlier; see Done.)*
+
+## Backlog — hover
+
+- **Hover re-places every surface (found 2026-11-05, in 4c12de7 and before).**
+  The pointer over some blocks makes Bubble Tea write `CSI J` (erase to the
+  end of the screen) over the blank cells under the surfaces; the host drops
+  their placements and the Session re-places all of them (10 `a=place` per
+  hover), so the text jitters. Fix held for gov: hotty Agent is asked
+  whether hottytea should own it. Candidate in margin: one non-blank cell
+  outside every surface. Reproduction: journal 2026-11-05.5.
 
 ## Backlog — M4 (round two)
 

@@ -849,3 +849,19 @@ width, so it could be kept apart if a resize ever floods.
 To measure: a test that builds the model from a large document, times
 `m.Update(key)` plus `m.View()` and `go test -cpuprofile` (journal
 2026-10-23.11 has the probe).
+
+## One hotty-surf Surface has one consumer (2026-11-05)
+
+A `surfrun.Surface` is shown either to a host (its `Doc` and `sync`) or to a
+cells renderer (`surfHost.lines`), never both in one frame: each `Update`
+hands the diff to whoever called it, and the other never sees it. `view()`
+once drew the search prompt's cells to count its rows even where a host placed
+it, so the host never got the count's change. Draw the cells only where there
+is no host (journal 2026-11-05.4).
+
+## An erase under surfaces re-places them all (2026-11-05)
+
+Bubble Tea clears to the end of the screen (`CSI J`) when the cells below a
+changed row are blank, as they are under surfaces. The host drops the
+placements the erase covers, hottytea re-places every surface, and the text
+jitters. Present in 4c12de7. Journal 2026-11-05.5.

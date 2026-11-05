@@ -24,6 +24,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/neuroplastio/hotty-surf/surflive"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -304,46 +306,58 @@ func (m *model) handleSearchKey(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 	}
-	p := m.searchPane()
+	// On a host the field is the host's, and typing reaches the model as
+	// input events; here are the keys the program hears (a terminal's cells,
+	// or a host that did not take them).
+	h := m.searchHost()
 	k := msg.Key()
-	if name := fieldKeyName(k); name == "" && k.Text != "" {
-		p.paste(k.Text)
-	} else {
-		p.key(name)
+	switch name := fieldKeyName(k); {
+	case name == "" && k.Text != "":
+		h.cellsPaste(k.Text)
+	case name != "":
+		h.cellsKey(name)
 	}
-	m.searchDrafted(p.text("/draft"))
 	return nil
 }
 
-// searchID is the search prompt's pane (D22): the field the draft is typed
-// in, and where the reader is among its matches.
+// searchID is the search prompt's surface name.
 const searchID = "search"
 
-// searchFieldKeys gives margin enter in the prompt's field on a host, where
-// it commits the draft. esc always reaches margin.
-const searchFieldKeys = "enter=program"
+// searchFieldKeys are margin's own keys in the prompt: a surf text field
+// gives them back, so enter commits the draft and esc cancels it.
+var searchFieldKeys = []string{"enter", "escape", "ctrl+c"}
 
-// searchPane is the search prompt's pane as the model has it.
-func (m *model) searchPane() *pane {
-	p := m.panes().pane(searchID, map[string]any{"draft": m.searchDraft, "count": ""})
-	// Placed over the two rows it has in cells: the rule, then "/", the
-	// field and the count on one row.
-	p.bar = true
-	p.define(
-		obj("id", "root", "component", "Column", "children", []any{"rule", "line"}),
-		obj("id", "rule", "component", "Divider"),
-		obj("id", "line", "component", "Row", "children", []any{"draft", "count"}, "align", "center"),
-		obj("id", "draft", "component", "TextField", "label", "/", "value", bind("/draft"), "weight", 1,
-			"metadata", obj("extensions", obj("io_neuroplast_hotty", obj("keys", searchFieldKeys)))),
-		obj("id", "count", "component", "Text", "text", bind("/count"), "variant", "caption"),
-	)
-	p.put("/draft", m.searchDraft)
-	p.put("/count", m.searchPosition())
-	if !p.c.St.Keyboard {
-		p.focus(p.c.FindComponent("draft", rootScope))
-	}
-	return p
+// Search is the search prompt's state (search.surf lays it out): the
+// draft the field holds and where the reader is among the matches.
+type Search struct {
+	Draft string
+	Count string
+
+	typed func(string)
 }
+
+// Typed is the field's input: draft is the whole of what it holds.
+func (s *Search) Typed(draft string) {
+	s.Draft = draft
+	if s.typed != nil {
+		s.typed(draft)
+	}
+}
+
+// searchHost is the search prompt as the model has it, its state brought up
+// to date: a new one when the prompt opens, so it opens empty.
+func (m *model) searchHost() *surfHost {
+	if m.search == nil {
+		s := &Search{Draft: m.searchDraft, typed: m.searchDrafted}
+		m.search = newSurfHost("margin-"+searchID, surflive.New(surfInterpSearch(s)), nil, searchFieldKeys)
+		m.searchState = s
+	}
+	m.searchState.Count = m.searchPosition()
+	return m.search
+}
+
+// searchRows is the prompt's height: a rule, then the field and the count.
+const searchRows = 2
 
 // searchDrafted takes a draft the prompt's field holds: a new draft starts
 // from its first match.
@@ -359,7 +373,7 @@ func (m *model) searchDrafted(d string) {
 func (m *model) closeSearch() {
 	m.searchOpen = false
 	m.searchDraft = ""
-	m.dropPane(searchID)
+	m.search, m.searchState = nil, nil
 }
 
 // searchPosition is the current match over the total, so the reader knows
@@ -376,5 +390,5 @@ func (m *model) searchPosition() string {
 // rule to separate it from the document, then the draft's field and the
 // match count.
 func (m *model) renderSearchPrompt(w int) string {
-	return strings.Join(m.searchPane().lines(w), "\n")
+	return strings.Join(m.searchHost().lines(w, searchRows), "\n")
 }

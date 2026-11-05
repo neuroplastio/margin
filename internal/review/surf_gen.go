@@ -9,13 +9,14 @@ import (
 	cellite "github.com/neuroplastio/cel-lite"
 	surf "github.com/neuroplastio/hotty-surf"
 	"github.com/neuroplastio/hotty-surf/surflive"
+	"github.com/neuroplastio/hotty-surf/surfrun"
 	"github.com/neuroplastio/hotty-surf/surfui"
 	"sync"
 )
 
 // The templates, embedded.
 //
-//go:embed footer.surf
+//go:embed footer.surf search.surf
 var surfFiles embed.FS
 
 // surfSet is the templates, loaded at its first call.
@@ -30,7 +31,7 @@ var (
 )
 
 // surfShapes are what the templates name of the package's types.
-var surfShapes = []*surf.Shape{&surfShapeFooter, &surfShapeFooterHint}
+var surfShapes = []*surf.Shape{&surfShapeFooter, &surfShapeSearch, &surfShapeFooterHint}
 
 // surfShapeFooter is Footer's shape, a component.
 var surfShapeFooter = surf.Shape{Name: "Footer", Component: true,
@@ -84,6 +85,58 @@ func (o surfFooter) Call(m int, args []cellite.Value) cellite.Value {
 
 // surfInterpFooter is c drawn by its template, interpreted.
 func surfInterpFooter(c *Footer) surflive.Component { return surf.Component(surfSet(), surfFooter{c}) }
+
+// surfShapeSearch is Search's shape, a component.
+var surfShapeSearch = surf.Shape{Name: "Search", Component: true,
+	Fields: []surf.Field{{Name: "draft", Type: cellite.String}, {Name: "count", Type: cellite.String}},
+	Methods: []surf.Method{
+		{Name: "typed", Args: []cellite.Type{cellite.String}},
+	},
+}
+
+// surfSearch is a *Search as its templates read it.
+type surfSearch struct{ p *Search }
+
+// surfSearchValue is p as a value: null for nil.
+func surfSearchValue(p *Search) cellite.Value {
+	if p == nil {
+		return cellite.NullValue()
+	}
+	return cellite.ObjectValue("Search", surfSearch{p})
+}
+
+// surfSearchOf is a value's *Search: nil for any other.
+func surfSearchOf(v cellite.Value) *Search {
+	if o, ok := v.Object().(surfSearch); ok {
+		return o.p
+	}
+	return nil
+}
+
+func (o surfSearch) Field(i int) cellite.Value {
+	switch i {
+	case 0:
+		return cellite.StringValue(string(o.p.Draft))
+	case 1:
+		return cellite.StringValue(string(o.p.Count))
+	}
+	return cellite.NullValue()
+}
+
+func (o surfSearch) Shape() *surf.Shape { return &surfShapeSearch }
+
+func (o surfSearch) Unwrap() any { return o.p }
+
+func (o surfSearch) Call(m int, args []cellite.Value) cellite.Value {
+	switch m {
+	case 0:
+		o.p.Typed(string(args[0].String()))
+	}
+	return cellite.NullValue()
+}
+
+// surfInterpSearch is c drawn by its template, interpreted.
+func surfInterpSearch(c *Search) surflive.Component { return surf.Component(surfSet(), surfSearch{c}) }
 
 // surfShapeFooterHint is FooterHint's shape, a struct.
 var surfShapeFooterHint = surf.Shape{Name: "FooterHint", Component: false,
@@ -221,9 +274,80 @@ func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fil
 	return out
 }
 
+// surfRenderSearch draws search.surf for Search.
+func surfRenderSearch(e *surf.Errs, out []*surfui.Node, c *Search, fill surf.Fill) []*surfui.Node {
+	// search.surf:4:1 <surface>
+	if e.Enter("search.surf", 4, 1) {
+		var k1 []*surfui.Node
+		// search.surf:5:3 <stack>
+		if e.Enter("search.surf", 5, 3) {
+			var k2 []*surfui.Node
+			// search.surf:6:5 <rule>
+			if e.Enter("search.surf", 6, 5) {
+				n3 := surfui.Rule()
+				surf.ModKey(n3, "rule")
+				k2 = append(k2, n3)
+				e.Leave()
+			}
+			// search.surf:7:5 <row>
+			if e.Enter("search.surf", 7, 5) {
+				var k4 []*surfui.Node
+				// search.surf:8:7 <text>
+				if e.Enter("search.surf", 8, 7) {
+					n5 := surfui.Text("/")
+					surf.ModMuted(n5, true)
+					k4 = append(k4, n5)
+					e.Leave()
+				}
+				// search.surf:9:7 <field>
+				if e.Enter("search.surf", 9, 7) {
+					n6 := surfui.Field()
+					surf.ModKey(n6, "draft")
+					surf.ModGrow(n6, true)
+					surf.ModValue(n6, c.Draft)
+					surf.ModLabel(n6, "Search")
+					surf.ModBare(n6, true)
+					surf.ModAutofocus(n6, true)
+					n6.On("input", func(ev surfrun.Event) { c.Typed(ev.Value) })
+					k4 = append(k4, n6)
+					e.Leave()
+				}
+				// search.surf:10:7 <text>
+				if e.Enter("search.surf", 10, 7) {
+					n7 := surfui.Text(c.Count)
+					surf.ModMuted(n7, true)
+					surf.ModSmall(n7, true)
+					k4 = append(k4, n7)
+					e.Leave()
+				}
+				n4 := surfui.Row(k4...)
+				surf.ModKey(n4, "line")
+				surf.ModGap(n4, 1)
+				surf.ModPad(n4, [2]int64{1, 0})
+				k2 = append(k2, n4)
+				e.Leave()
+			}
+			n2 := surfui.Stack(k2...)
+			surf.ModKey(n2, "prompt")
+			k1 = append(k1, n2)
+			e.Leave()
+		}
+		n1 := surf.NewSurface(k1...)
+		surf.ModDensity(n1, "dense")
+		out = append(out, n1)
+		e.Leave()
+	}
+	return out
+}
+
 // surfCompiledFooter is c drawn by its templates compiled into Go.
 func surfCompiledFooter(c *Footer) surflive.Component {
 	return surf.Compiled(c, "footer.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderFooter(e, nil, c, nil) })
+}
+
+// surfCompiledSearch is c drawn by its templates compiled into Go.
+func surfCompiledSearch(c *Search) surflive.Component {
+	return surf.Compiled(c, "search.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderSearch(e, nil, c, nil) })
 }
 
 // surfList1 is a []FooterHint as a list.

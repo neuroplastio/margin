@@ -2,9 +2,7 @@ package review
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/neuroplastio/hotty-surf/pkg/cells"
 	"github.com/neuroplastio/hotty-surf/surflive"
 )
 
@@ -97,7 +95,6 @@ type FooterHint struct {
 type footerHost struct {
 	f    *Footer
 	host *surfHost
-	r    *cells.Renderer // the cells' renderer, made when a terminal needs them
 }
 
 // footer is the footer as the model has it now, its state brought up to
@@ -119,25 +116,8 @@ func (m *model) footer() *footerHost {
 
 // renderFooter is the footer's line in cells, w wide.
 func (m *model) renderFooter(w int) string {
-	return m.footer().line(w)
-}
-
-// line draws the footer as one line of cells, w wide.
-func (h *footerHost) line(w int) string {
-	if h.r == nil {
-		h.r = cells.New(h.host.s.Cells())
-		h.r.Show()
-	} else {
-		h.r.Update()
+	if l := m.footer().host.lines(w, 1); len(l) > 0 {
+		return l[0]
 	}
-	scr := h.r.Draw(w, 1)
-	var b strings.Builder
-	if len(scr.Lines) > 0 {
-		for _, run := range scr.Lines[0] {
-			b.WriteString(cellsSGR(run))
-			b.WriteString(run.Text)
-		}
-	}
-	b.WriteString("\x1b[0m")
-	return b.String()
+	return ""
 }

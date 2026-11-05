@@ -90,13 +90,15 @@ type cursor struct {
 }
 
 type model struct {
-	foot    *footerHost // the footer, a hotty-surf component
-	path    string
-	doc     []block
-	src     []byte
-	threads map[string]*thread
-	marks   map[string]reviewMark
-	entries []entry
+	foot        *footerHost // the footer, a hotty-surf component
+	search      *surfHost   // the search prompt, a hotty-surf component
+	searchState *Search
+	path        string
+	doc         []block
+	src         []byte
+	threads     map[string]*thread
+	marks       map[string]reviewMark
+	entries     []entry
 
 	// lineMarks holds review marks on individual source lines of a diveable
 	// block (table, raw) — the 2026-08-11 "mark individual lines when diving"
@@ -228,7 +230,7 @@ type model struct {
 	// wheelSpeed is how many lines one mouse wheel tick scrolls the document
 	// viewport. Defaults to 3 (a common terminal default); tunable per run via
 	// RunOptions.WheelSpeed.
-	wheelSpeed   int
+	wheelSpeed    int
 	inputThrottle inputThrottle
 	// scrollAnchor is the last focus position clampScroll pulled the viewport
 	// to. Re-anchoring only fires when m.at has moved since — otherwise a
@@ -346,10 +348,10 @@ func newModelAt(path string, doc []block, threads map[string]*thread) *model {
 	reattach(doc, threads)
 	m := &model{
 		path: path, doc: doc, threads: threads,
-		marks:      map[string]reviewMark{},
-		lineMarks:  map[string]reviewMark{},
-		codeScroll: map[string]int{},
-		at:         cursor{entry: 0, comment: commentNone},
+		marks:        map[string]reviewMark{},
+		lineMarks:    map[string]reviewMark{},
+		codeScroll:   map[string]int{},
+		at:           cursor{entry: 0, comment: commentNone},
 		hoveredEntry: -1,
 		scrollAnchor: cursor{entry: -1, comment: commentNone},
 		paneTop:      -1,
@@ -3192,8 +3194,13 @@ func (m *model) view() tea.View {
 	var searchBox string
 	searchHeight := 0
 	if m.searchOpen {
-		searchBox = m.renderSearchPrompt(m.w)
-		searchHeight = strings.Count(searchBox, "\n") + 1
+		// One Surface has one consumer: a host places it (placeSurf below),
+		// so its cells are drawn only where there is no host.
+		searchHeight = searchRows
+		if m.hot == nil || !m.hot.native() || m.hot.deaf {
+			searchBox = m.renderSearchPrompt(m.w)
+			searchHeight = strings.Count(searchBox, "\n") + 1
+		}
 	}
 
 	viewport := max(m.h-footerRows-paletteHeight-searchHeight, 1)
@@ -3252,7 +3259,7 @@ func (m *model) view() tea.View {
 		}
 	} else if m.searchOpen {
 		at := hottytea.Rect{X: 0, Y: viewport + 1, W: m.w, H: searchHeight}
-		if m.hot != nil && m.hot.place(m.searchPane(), at, hottytea.Rect{W: m.w, H: m.h}) {
+		if m.hot != nil && m.hot.placeSurf(m.searchHost(), at, hottytea.Rect{W: m.w, H: m.h}) {
 			b.WriteString(strings.Repeat("\n", searchHeight-1))
 		} else {
 			b.WriteString(searchBox)
@@ -3293,6 +3300,15 @@ func (m *model) view() tea.View {
 				}
 				v.Cursor = c
 			}
+		}
+	}
+	if m.searchOpen && m.search != nil && (m.hot == nil || !m.hot.native() || m.hot.deaf) {
+		// In cells the prompt's field has no caret of its own: the
+		// terminal's cursor goes where the renderer says it is.
+		if c := m.search.caret; c.Visible {
+			cur := tea.NewCursor(c.X, viewport+1+c.Y)
+			cur.Shape, cur.Blink = tea.CursorBar, false
+			v.Cursor = cur
 		}
 	}
 	return v
@@ -4307,4 +4323,3 @@ func runModel(m *model, opts RunOptions) error {
 	}
 	return nil
 }
-

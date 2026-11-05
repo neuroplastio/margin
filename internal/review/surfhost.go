@@ -37,6 +37,11 @@ type surfHost struct {
 	// placed the document (hotty-surf's guide): Layout calls the Doc func
 	// exactly when Show is due.
 	pending surfrun.Frame
+	// r draws the model in cells, made when a terminal needs them.
+	r *cells.Renderer
+	// caret is where the model's focused field has the caret in cells, as of
+	// the last lines.
+	caret cells.Caret
 }
 
 // surfPostMsg is a function a model posted: Update runs it, then draws.
@@ -106,7 +111,8 @@ func (p *surfHost) sendFirst(h *hotState) {
 
 // sync sends what the model's state changed since the last frame.
 func (p *surfHost) sync(h *hotState) {
-	if cmds := p.frame(p.s.Update()); len(cmds) > 0 {
+	f := p.s.Update()
+	if cmds := p.frame(f); len(cmds) > 0 {
 		h.s.Send(cmds...)
 	}
 }
@@ -226,4 +232,46 @@ func cellsTone(r cells.Role) bool {
 		return true
 	}
 	return false
+}
+
+// renderer is the cells renderer over the model's Surface, made on first
+// use: where there is no host, the model is shown in cells.
+func (p *surfHost) renderer() *cells.Renderer {
+	if p.r == nil {
+		p.r = cells.New(p.s.Cells())
+		p.r.Show()
+	}
+	return p.r
+}
+
+// lines draws the model in cells, w by rows, as lines of the terminal's
+// colours.
+func (p *surfHost) lines(w, rows int) []string {
+	r := p.renderer()
+	r.Update()
+	scr := r.Draw(w, rows)
+	p.caret = scr.Caret
+	out := make([]string, 0, len(scr.Lines))
+	for _, line := range scr.Lines {
+		var b strings.Builder
+		for _, run := range line {
+			b.WriteString(cellsSGR(run))
+			b.WriteString(run.Text)
+		}
+		b.WriteString("\x1b[0m")
+		out = append(out, b.String())
+	}
+	return out
+}
+
+// cellsKey is a key for the model in cells (myelin's name, hottytea.KeyName),
+// and cellsPaste a paste; each reports whether the model took it.
+func (p *surfHost) cellsKey(name string) bool {
+	took, _ := p.renderer().Key(name)
+	return took
+}
+
+func (p *surfHost) cellsPaste(text string) bool {
+	took, _ := p.renderer().Paste(text)
+	return took
 }

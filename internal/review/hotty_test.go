@@ -893,6 +893,9 @@ func TestHottyPaletteIsASurface(t *testing.T) {
 // On a host the search prompt is a surface whose field has the keyboard:
 // the draft is typed there, and enter commits it. It is dense, over the two
 // rows it has in cells.
+// searchFieldID is the prompt's field as surf names it, from its keys.
+const searchFieldID = "r.kprompt.kline.kdraft"
+
 func TestHottySearchIsASurface(t *testing.T) {
 	name := "margin-" + searchID
 	m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
@@ -900,14 +903,14 @@ func TestHottySearchIsASurface(t *testing.T) {
 		h.Type("/")
 		var s *hottytest.Surface
 		waitFor(t, "the prompt's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
-		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == "draft" })
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == searchFieldID })
 		if rows := s.Placement().Rows; rows != 2 {
 			t.Errorf("search prompt placed %d rows tall, want 2", rows)
 		}
-		if class, _ := s.Attr("~s", "class"); !strings.Contains(class, "k-dense") {
-			t.Errorf("search prompt surface class %q, want k-dense", class)
+		if class, _ := s.Attr("r", "class"); !strings.Contains(class, "u-dense") {
+			t.Errorf("search prompt surface class %q, want u-dense", class)
 		}
-		if err := h.Fill(name, "draft", "quote"); err != nil {
+		if err := h.Fill(name, searchFieldID, "quote"); err != nil {
 			t.Fatal(err)
 		}
 		waitFor(t, "the count of matches", func() bool { return strings.Contains(s.Text(), "1/1") })

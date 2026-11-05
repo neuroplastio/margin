@@ -1,0 +1,13 @@
+<!-- margin's search prompt: a rule to part it from the document, then "/",
+     the field the draft is typed in, and where the reader is among the
+     matches. enter and esc are margin's: the field gives them back. -->
+<surface density="dense">
+  <stack key="prompt">
+    <rule key="rule"/>
+    <row gap="1" pad="1 0" key="line">
+      <text muted>/</text>
+      <field bare grow :value="draft" label="Search" autofocus @input="typed($value)" key="draft"/>
+      <text small muted>{{ count }}</text>
+    </row>
+  </stack>
+</surface>
