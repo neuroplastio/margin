@@ -63,7 +63,11 @@ func newSurfHost(name string, m surfrun.Model, send func(tea.Msg), keys []string
 // Post, Quit and Focus are surfrun.Runner. Post runs f on the program's
 // goroutine, from Update, which then draws what changed; Quit is margin's
 // own, so it does nothing; Focus is the Surface's.
-func (p *surfHost) Post(f func())    { p.send(surfPostMsg{p, f}) }
+func (p *surfHost) Post(f func()) {
+	if p.send != nil {
+		p.send(surfPostMsg{p, f})
+	}
+}
 func (p *surfHost) Quit()            {}
 func (p *surfHost) Focus(key string) { p.s.Focus(key) }
 
@@ -154,71 +158,6 @@ func (p *surfHost) frame(f surfrun.Frame) []string {
 // mod reads, and the system a key is labelled for (hottytea.ReadyMsg).
 func (p *surfHost) ready(caps hotty.Caps) { p.s.Platform = hotty.PlatformOf(caps) }
 
-// cellsSGR is a run of a cells screen in the terminal's own colours, as its
-// roles say: a copy of hotty-surf's surfrun.cellsSGR (surfrun/cells.go),
-// which draws the same screen for its Runtime. It is the documented way
-// for a host that paints its own cells ("Painting the cells yourself"),
-// and goes when hotty-surf exports it (gap G6).
-func cellsSGR(run cells.Run) string {
-	ps := []string{"0"}
-	fg := run.Fg
-	switch bg := run.Bg; {
-	case bg == cells.Sel:
-		ps = append(ps, "7")
-		fg = cells.Fg
-	case fg == cells.OnAccent || fg == cells.Bg || cellsTone(bg):
-		if c := cellsFg(bg); c != "" {
-			ps = append(ps, c)
-		}
-		ps = append(ps, "7")
-		fg = ""
-	case bg == cells.Selected || bg == cells.Field || bg == cells.Line || bg == cells.Border || bg == cells.Muted || bg == cells.Faint:
-		ps = append(ps, "100")
-	}
-	if c := cellsFg(fg); c != "" {
-		ps = append(ps, c)
-	}
-	for _, a := range [...]struct {
-		attr cells.Attr
-		sgr  string
-	}{{cells.Bold, "1"}, {cells.Dim, "2"}, {cells.Italic, "3"}, {cells.Underline, "4"}, {cells.Reverse, "7"}, {cells.Strike, "9"}} {
-		if run.Attr&a.attr != 0 {
-			ps = append(ps, a.sgr)
-		}
-	}
-	return "\x1b[" + strings.Join(ps, ";") + "m"
-}
-
-// cellsFg is a role's colour as text's SGR, "" for the terminal's own.
-func cellsFg(r cells.Role) string {
-	switch r {
-	case cells.Accent:
-		return "35"
-	case cells.OK:
-		return "92"
-	case cells.Warn:
-		return "93"
-	case cells.Error:
-		return "91"
-	case cells.Info:
-		return "96"
-	case cells.Border, cells.Line:
-		return "90"
-	case cells.Muted, cells.Faint:
-		return "2"
-	}
-	return ""
-}
-
-// cellsTone reports whether r is a tone, which fills as its colour.
-func cellsTone(r cells.Role) bool {
-	switch r {
-	case cells.Accent, cells.OK, cells.Warn, cells.Error, cells.Info:
-		return true
-	}
-	return false
-}
-
 // renderer is the cells renderer over the model's Surface, made on first
 // use: where there is no host, the model is shown in cells.
 func (p *surfHost) renderer() *cells.Renderer {
@@ -230,23 +169,13 @@ func (p *surfHost) renderer() *cells.Renderer {
 }
 
 // lines draws the model in cells, w by rows, as lines of the terminal's
-// colours.
+// colours (surfrun.Paint).
 func (p *surfHost) lines(w, rows int) []string {
 	r := p.renderer()
 	r.Update()
 	scr := r.Draw(w, rows)
 	p.caret = scr.Caret
-	out := make([]string, 0, len(scr.Lines))
-	for _, line := range scr.Lines {
-		var b strings.Builder
-		for _, run := range line {
-			b.WriteString(cellsSGR(run))
-			b.WriteString(run.Text)
-		}
-		b.WriteString("\x1b[0m")
-		out = append(out, b.String())
-	}
-	return out
+	return surfrun.Paint(scr)
 }
 
 // cellsKey is a key for the model in cells (myelin's name, hottytea.KeyName),

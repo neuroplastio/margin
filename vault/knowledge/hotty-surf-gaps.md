@@ -15,7 +15,7 @@ its current piece for that spot.
 
 | # | Need | Why margin needs it | margin keeps meanwhile |
 | --- | --- | --- | --- |
-| G6 | **A cells screen painted as ANSI lines**, exported: `cells.Screen` → the terminal's colours (surfrun's unexported `cellsSGR`, `ansiFg`) | a program that places its own cells (margin's View is lines of ANSI) paints a surf surface in the terminal | a copy of `cellsSGR` in `surfhost.go`, as the guide's "Painting the cells yourself" implies; goes when exported |
+| G6 (landed: `surfrun.Paint`, hotty-surf 17045a9; margin's copy is gone) | **A cells screen painted as ANSI lines**, exported: `cells.Screen` → the terminal's colours (surfrun's unexported `cellsSGR`, `ansiFg`) | a program that places its own cells (margin's View is lines of ANSI) paints a surf surface in the terminal | (gone) |
 | G7 | **A help line that is cut from its end:** a `row` whose children keep their order from the left and the last are left out where there is no room (`fit` runs right to left, flush right: the palette's footer shape) | the footer's keys read in order, the least important last, and a narrow pane gives them up from the end | a plain `row grow`; in a very narrow pane its keys are cut by the row, untested below 897 px |
 
 Answered: a `surfrun.Surface` is hosted beside margin's own surfaces
