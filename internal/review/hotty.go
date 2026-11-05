@@ -44,6 +44,9 @@ type hotState struct {
 
 	docs hotDocs
 
+	// surfCSS: hotty-surf's stylesheet went to the host (surfhost.go).
+	surfCSS bool
+
 	// Measuring. rows is a block's rows at a width, as the host laid it out
 	// (0: the host refused it, so cells); last is the rows a block took at
 	// any width, which stand in after a resize until the new width's come.
