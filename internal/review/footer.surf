@@ -2,10 +2,10 @@
      progress and the status. The keys are margin's: nothing here handles
      one. -->
 <surface>
-  <row gap="2" pad="1 0" key="bar">
+  <row gap="4" pad="1 0" key="bar">
     <text :if="mode != ''" semibold key="mode">{{ mode }}</text>
     <text :if="rest != ''" muted key="rest">{{ rest }}</text>
-    <row grow gap="3" key="hints">
+    <row fit-start grow gap="3" key="hints">
       <row :each="h in hints" :key="h.key" gap="1">
         <key>{{ h.key }}</key>
         <text muted>{{ h.label }}</text>

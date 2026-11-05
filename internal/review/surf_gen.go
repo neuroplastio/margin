@@ -334,6 +334,7 @@ func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fil
 				n5 := surfui.Row(k5...)
 				surf.ModKey(n5, "hints")
 				surf.ModGrow(n5, true)
+				surf.ModFitStart(n5, true)
 				surf.ModGap(n5, 3)
 				k2 = append(k2, n5)
 				e.Leave()
@@ -362,7 +363,7 @@ func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fil
 			}
 			n2 := surfui.Row(k2...)
 			surf.ModKey(n2, "bar")
-			surf.ModGap(n2, 2)
+			surf.ModGap(n2, 4)
 			surf.ModPad(n2, [2]int64{1, 0})
 			k1 = append(k1, n2)
 			e.Leave()

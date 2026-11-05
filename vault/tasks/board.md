@@ -4,6 +4,10 @@ Last updated: 2026-11-01 (margin on hotty 0.6)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (footer in cells) a narrow footer drops whole hints from the end, where it
+  cut every hint mid-word — whether `[Shift+Y] copy review` and `[Q] quit` going
+  first at 897 with a status is right, and whether five hints (not six) before the
+  count at 897 in cells is right — journal 2026-11-05.10, vault/shots/footer-fit-start/
 - (hover) moving the pointer over blocks no longer places every surface
   again: hotty-go a5f717a counts a reverse index only at the top row — whether
   the "Try it" text now holds still under the pointer, on a host and in a plx
