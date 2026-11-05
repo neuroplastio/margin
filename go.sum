@@ -83,6 +83,10 @@ github.com/neuroplastio/hotty-surf v0.1.2-0.20261105144446-17045a9a3040 h1:5EuaR
 github.com/neuroplastio/hotty-surf v0.1.2-0.20261105144446-17045a9a3040/go.mod h1:AxS+/9SLnEupki9WEr9aIjhllzH4aT4sj/L37ltpd7c=
 github.com/neuroplastio/hotty-surf v0.1.2-0.20261105154522-305925397451 h1:o0JrSfu5IH7emKUg08F0TuN9MFXQlmCS+joS9zQK8Io=
 github.com/neuroplastio/hotty-surf v0.1.2-0.20261105154522-305925397451/go.mod h1:AxS+/9SLnEupki9WEr9aIjhllzH4aT4sj/L37ltpd7c=
+github.com/neuroplastio/hotty-surf v0.1.2-0.20261105192813-d5ed341c079f h1:NIQ6eqztdSY/n8BlyUCZvTn5FjkX9G2tH/NpBbV+D9k=
+github.com/neuroplastio/hotty-surf v0.1.2-0.20261105192813-d5ed341c079f/go.mod h1:AxS+/9SLnEupki9WEr9aIjhllzH4aT4sj/L37ltpd7c=
+github.com/neuroplastio/hotty-surf v0.1.2-0.20261105193717-730ae32718da h1:7iB9M7Nx98G2ih7O3pUvVFiVobB4RBPNP/GuelpX/30=
+github.com/neuroplastio/hotty-surf v0.1.2-0.20261105193717-730ae32718da/go.mod h1:AxS+/9SLnEupki9WEr9aIjhllzH4aT4sj/L37ltpd7c=
 github.com/neuroplastio/myelin/myelinkey v0.1.0 h1:c1XVForIsnqnYxmmwwN/UHFdtUzQYv3fD94hyxGe8cI=
 github.com/neuroplastio/myelin/myelinkey v0.1.0/go.mod h1:lnIMTPFSwjs8dsx9R8zsPNGaRnlzS4rScUY4exrjLus=
 github.com/philhofer/fwd v1.2.0 h1:e6DnBTl7vGY+Gz322/ASL4Gyp1FspeMvx1RNDoToZuM=

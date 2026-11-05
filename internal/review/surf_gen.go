@@ -496,7 +496,7 @@ func surfRenderPalette(e *surf.Errs, out []*surfui.Node, c *Palette, fill surf.F
 				n13 := surfui.Row(k13...)
 				surf.ModKey(n13, "query")
 				surf.ModGap(n13, 1)
-				surf.ModPad(n13, [2]int64{2, 0})
+				surf.ModPad(n13, [2]int64{1, 0})
 				k2 = append(k2, n13)
 				e.Leave()
 			}

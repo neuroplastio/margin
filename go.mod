@@ -22,7 +22,7 @@ require (
 require (
 	github.com/neuroplastio/cel-lite v0.1.1
 	github.com/neuroplastio/hotty-a2ui v0.0.0-20261022101910-b1f6b54a9bd5
-	github.com/neuroplastio/hotty-surf v0.1.2-0.20261105154522-305925397451
+	github.com/neuroplastio/hotty-surf v0.1.2-0.20261105193717-730ae32718da
 )
 
 require (

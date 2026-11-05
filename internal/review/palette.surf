@@ -15,7 +15,7 @@
         <text muted>No command matches.</text>
       </item>
     </list>
-    <row gap="1" pad="2 0" key="query">
+    <row gap="1" pad="1 0" key="query">
       <text tone="accent" semibold>:</text>
       <field bare grow :value="query" label="Command" autofocus @input="typed($value)" key="field"/>
       <text :if="range != ''" small muted key="range">{{ range }}</text>
