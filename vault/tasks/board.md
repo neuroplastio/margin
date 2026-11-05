@@ -8,10 +8,6 @@ Last updated: 2026-11-01 (margin on hotty 0.6)
   cut every hint mid-word — whether `[Shift+Y] copy review` and `[Q] quit` going
   first at 897 with a status is right, and whether five hints (not six) before the
   count at 897 in cells is right — journal 2026-11-05.10, vault/shots/footer-fit-start/
-- (hover) moving the pointer over blocks no longer places every surface
-  again: hotty-go a5f717a counts a reverse index only at the top row — whether
-  the "Try it" text now holds still under the pointer, on a host and in a plx
-  pane — journal 2026-11-05.8, .11 (the table-selected case: hotty-go 23af564)
 - (palette on hotty-surf) the `:` palette is a hotty-surf component: no
   header row, key caps, mono and dense — whether it reads without the
   header, whether the caps beat plain keys, whether the id column is
