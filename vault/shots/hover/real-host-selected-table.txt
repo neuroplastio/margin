@@ -1,0 +1,8 @@
+Real hottyterm, own headless sway, 897x1153 logical at scale 1.6; margin's output
+recorded by script(1) while the pointer zig-zags over "Try it" with the table above
+it selected (search "Try it", enter, k). hotty-go 23af564.
+
+before (hotty-go a5f717a, journal 2026-11-05.5/.11): 130 a=place after 18 frames' ESU,
+  the host drew the scrolled state, then the snap back
+after (23af564):  72 a=place in 17 frames, all before the frame's ESU (CSI ?2026l),
+  none after; 18 scroll-region sets (CSI r), repaired inside their own frames

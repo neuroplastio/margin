@@ -992,3 +992,58 @@ func TestHottyHoverPlacesNothingAgain(t *testing.T) {
 		}
 	})
 }
+
+// With a block selected (j/k) and the pointer moving over the others, Bubble
+// Tea scrolls a region of the screen to move the gutter's bars, and a host
+// scrolls its surfaces with it. hottytea places them again in that same
+// write, before the frame's end, and tells the program nothing: no relayout
+// (erasedMsg) follows, so margin never lays the surfaces out again, and the
+// host never draws them scrolled (journal 2026-11-05.11; the jitter on "Try
+// it" the maintainer saw with the table above it selected). The first run
+// only selects the table; the second also hovers every block: it repairs
+// frames the first does not, and relays out no more.
+func TestHottyHoverWithASelectionRepairsInsteadOfRelaying(t *testing.T) {
+	src, err := os.ReadFile("../../testdata/demo/demo.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := func(hover bool) (relayouts, repairs int) {
+		m, _ := hotRun(t, string(src), func(h *hottytest.Host, m *model) {
+			surfaceWith(t, h, "A tour of margin")
+			time.Sleep(500 * time.Millisecond)
+			h.Type("/Try it")
+			h.Key("enter")
+			time.Sleep(300 * time.Millisecond)
+			h.Type("k") // the table above "Try it"
+			time.Sleep(time.Second) // measuring has settled: every document is written
+			if !hover {
+				return
+			}
+			var names []string
+			for _, s := range h.Surfaces() {
+				if strings.HasPrefix(s.Name(), hotMeasureName) || strings.HasPrefix(s.Name(), "margin-") || !s.Placed() {
+					continue
+				}
+				names = append(names, s.Name())
+			}
+			slices.Sort(names)
+			for round := 0; round < 3; round++ {
+				for _, n := range names {
+					if err := h.Hover(n, "", 2, 0); err != nil {
+						t.Fatal(err)
+					}
+					time.Sleep(60 * time.Millisecond)
+				}
+			}
+		})
+		return m.hot.s.Count.Relayouts, m.hot.s.Count.Repairs
+	}
+	rel0, rep0 := run(false)
+	rel1, rep1 := run(true)
+	if rep1 <= rep0 {
+		t.Errorf("hovering repaired %d frames, the control %d: the test no longer reproduces a scrolling hover", rep1, rep0)
+	}
+	if rel1 > rel0 {
+		t.Errorf("hovering made %d relayouts, the control %d: a scrolled surface was placed again after its frame", rel1, rel0)
+	}
+}
