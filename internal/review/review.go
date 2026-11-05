@@ -90,15 +90,18 @@ type cursor struct {
 }
 
 type model struct {
-	foot        *footerHost // the footer, a hotty-surf component
-	search      *surfHost   // the search prompt, a hotty-surf component
-	searchState *Search
-	path        string
-	doc         []block
-	src         []byte
-	threads     map[string]*thread
-	marks       map[string]reviewMark
-	entries     []entry
+	foot         *footerHost // the footer, a hotty-surf component
+	search       *surfHost   // the search prompt, a hotty-surf component
+	palette      *surfHost   // the palette, a hotty-surf component
+	paletteState *Palette
+	paletteTop   int // the first command in view
+	searchState  *Search
+	path         string
+	doc          []block
+	src          []byte
+	threads      map[string]*thread
+	marks        map[string]reviewMark
+	entries      []entry
 
 	// lineMarks holds review marks on individual source lines of a diveable
 	// block (table, raw) — the 2026-08-11 "mark individual lines when diving"
@@ -1976,9 +1979,10 @@ func (m *model) handlePaletteKey(msg tea.KeyPressMsg) tea.Cmd {
 			if cmd.Values != nil {
 				// A fresh field for the staged seed: on a host the field
 				// keeps what was typed in it until it loses the keyboard.
-				m.dropPane(paletteID)
+				m.dropPalette()
 				m.paletteQuery = cmd.ID + " "
 				m.paletteSelected = 0
+				m.paletteTop = 0
 				return nil
 			}
 			m.closePalette()
@@ -3188,8 +3192,12 @@ func (m *model) view() tea.View {
 	var paletteBox string
 	paletteHeight := 0
 	if m.paletteOpen {
-		paletteBox = m.renderPalette(m.w)
-		paletteHeight = strings.Count(paletteBox, "\n") + 1
+		// As the search prompt: cells only where no host places the surface.
+		paletteHeight = m.paletteHeight()
+		if m.hot == nil || !m.hot.native() || m.hot.deaf {
+			paletteBox = m.renderPalette(m.w)
+			paletteHeight = strings.Count(paletteBox, "\n") + 1
+		}
 	}
 	var searchBox string
 	searchHeight := 0
@@ -3252,7 +3260,7 @@ func (m *model) view() tea.View {
 	}
 	if m.paletteOpen && m.comp == nil {
 		at := hottytea.Rect{X: 0, Y: viewport + 1, W: m.w, H: paletteHeight}
-		if m.hot != nil && m.hot.place(m.palettePane(), at, hottytea.Rect{W: m.w, H: m.h}) {
+		if m.hot != nil && m.hot.placeSurf(m.paletteHost(), at, hottytea.Rect{W: m.w, H: m.h}) {
 			b.WriteString(strings.Repeat("\n", paletteHeight-1))
 		} else {
 			b.WriteString(paletteBox)
@@ -3302,10 +3310,17 @@ func (m *model) view() tea.View {
 			}
 		}
 	}
-	if m.searchOpen && m.search != nil && (m.hot == nil || !m.hot.native() || m.hot.deaf) {
-		// In cells the prompt's field has no caret of its own: the
+	if m.hot == nil || !m.hot.native() || m.hot.deaf {
+		// In cells the prompts' fields have no caret of their own: the
 		// terminal's cursor goes where the renderer says it is.
-		if c := m.search.caret; c.Visible {
+		prompt := m.search
+		if m.paletteOpen && m.comp == nil {
+			prompt = m.palette
+		} else if !m.searchOpen {
+			prompt = nil
+		}
+		if prompt != nil && prompt.caret.Visible {
+			c := prompt.caret
 			cur := tea.NewCursor(c.X, viewport+1+c.Y)
 			cur.Shape, cur.Blink = tea.CursorBar, false
 			v.Cursor = cur

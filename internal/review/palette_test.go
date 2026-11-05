@@ -410,18 +410,19 @@ func TestRenderPaletteShowsKeyBindings(t *testing.T) {
 	plain := ansiRe.ReplaceAllString(out, "")
 	seen := 0
 	for _, row := range strings.Split(plain, "\n") {
-		// The table's scrollbar may sit past the binding.
-		row = strings.TrimRight(strings.TrimSpace(row), " ┃│▐█")
+		// The selected row's marker sits before the id, and a key is drawn
+		// as a cap: [J].
+		row = strings.TrimLeft(strings.TrimSpace(row), "▎ ")
 		if strings.HasPrefix(row, "move.down") || strings.HasPrefix(row, "app.quit") {
 			seen++
 		}
 		if strings.HasPrefix(row, "move.down") {
-			if !strings.HasSuffix(strings.TrimRight(row, " "), "j") {
+			if !strings.HasSuffix(strings.ToLower(strings.TrimRight(row, " ")), "[j]") {
 				t.Errorf("move.down row %q does not end with its binding 'j'", row)
 			}
 		}
 		if strings.HasPrefix(row, "app.quit") {
-			if !strings.HasSuffix(strings.TrimRight(row, " "), "q") {
+			if !strings.HasSuffix(strings.ToLower(strings.TrimRight(row, " ")), "[q]") {
 				t.Errorf("app.quit row %q does not end with its binding 'q'", row)
 			}
 		}

@@ -16,7 +16,7 @@ import (
 
 // The templates, embedded.
 //
-//go:embed footer.surf search.surf
+//go:embed footer.surf palette.surf search.surf
 var surfFiles embed.FS
 
 // surfSet is the templates, loaded at its first call.
@@ -31,7 +31,7 @@ var (
 )
 
 // surfShapes are what the templates name of the package's types.
-var surfShapes = []*surf.Shape{&surfShapeFooter, &surfShapeSearch, &surfShapeFooterHint}
+var surfShapes = []*surf.Shape{&surfShapeFooter, &surfShapePalette, &surfShapeSearch, &surfShapeFooterHint, &surfShapePaletteRow}
 
 // surfShapeFooter is Footer's shape, a component.
 var surfShapeFooter = surf.Shape{Name: "Footer", Component: true,
@@ -85,6 +85,67 @@ func (o surfFooter) Call(m int, args []cellite.Value) cellite.Value {
 
 // surfInterpFooter is c drawn by its template, interpreted.
 func surfInterpFooter(c *Footer) surflive.Component { return surf.Component(surfSet(), surfFooter{c}) }
+
+// surfShapePalette is Palette's shape, a component.
+var surfShapePalette = surf.Shape{Name: "Palette", Component: true,
+	Fields: []surf.Field{{Name: "query", Type: cellite.String}, {Name: "rows", Type: cellite.ListOf(cellite.StructOf("PaletteRow"))}, {Name: "sel", Type: cellite.Int}, {Name: "idw", Type: cellite.Int}},
+	Methods: []surf.Method{
+		{Name: "pick", Args: []cellite.Type{cellite.Int}},
+		{Name: "typed", Args: []cellite.Type{cellite.String}},
+	},
+}
+
+// surfPalette is a *Palette as its templates read it.
+type surfPalette struct{ p *Palette }
+
+// surfPaletteValue is p as a value: null for nil.
+func surfPaletteValue(p *Palette) cellite.Value {
+	if p == nil {
+		return cellite.NullValue()
+	}
+	return cellite.ObjectValue("Palette", surfPalette{p})
+}
+
+// surfPaletteOf is a value's *Palette: nil for any other.
+func surfPaletteOf(v cellite.Value) *Palette {
+	if o, ok := v.Object().(surfPalette); ok {
+		return o.p
+	}
+	return nil
+}
+
+func (o surfPalette) Field(i int) cellite.Value {
+	switch i {
+	case 0:
+		return cellite.StringValue(string(o.p.Query))
+	case 1:
+		return cellite.ListValue(surfList2(o.p.Rows))
+	case 2:
+		return cellite.IntValue(int64(o.p.Sel))
+	case 3:
+		return cellite.IntValue(int64(o.p.Idw))
+	}
+	return cellite.NullValue()
+}
+
+func (o surfPalette) Shape() *surf.Shape { return &surfShapePalette }
+
+func (o surfPalette) Unwrap() any { return o.p }
+
+func (o surfPalette) Call(m int, args []cellite.Value) cellite.Value {
+	switch m {
+	case 0:
+		o.p.Pick(int(args[0].Int()))
+	case 1:
+		o.p.Typed(string(args[0].String()))
+	}
+	return cellite.NullValue()
+}
+
+// surfInterpPalette is c drawn by its template, interpreted.
+func surfInterpPalette(c *Palette) surflive.Component {
+	return surf.Component(surfSet(), surfPalette{c})
+}
 
 // surfShapeSearch is Search's shape, a component.
 var surfShapeSearch = surf.Shape{Name: "Search", Component: true,
@@ -168,6 +229,44 @@ func (o surfFooterHint) Field(i int) cellite.Value {
 		return cellite.StringValue(string(o.p.Key))
 	case 1:
 		return cellite.StringValue(string(o.p.Label))
+	}
+	return cellite.NullValue()
+}
+
+// surfShapePaletteRow is PaletteRow's shape, a struct.
+var surfShapePaletteRow = surf.Shape{Name: "PaletteRow", Component: false,
+	Fields: []surf.Field{{Name: "k", Type: cellite.String}, {Name: "id", Type: cellite.String}, {Name: "title", Type: cellite.String}, {Name: "keys", Type: cellite.String}},
+}
+
+// surfPaletteRow is a *PaletteRow as its templates read it.
+type surfPaletteRow struct{ p *PaletteRow }
+
+// surfPaletteRowValue is p as a value: null for nil.
+func surfPaletteRowValue(p *PaletteRow) cellite.Value {
+	if p == nil {
+		return cellite.NullValue()
+	}
+	return cellite.ObjectValue("PaletteRow", surfPaletteRow{p})
+}
+
+// surfPaletteRowOf is a value's *PaletteRow: nil for any other.
+func surfPaletteRowOf(v cellite.Value) *PaletteRow {
+	if o, ok := v.Object().(surfPaletteRow); ok {
+		return o.p
+	}
+	return nil
+}
+
+func (o surfPaletteRow) Field(i int) cellite.Value {
+	switch i {
+	case 0:
+		return cellite.StringValue(string(o.p.K))
+	case 1:
+		return cellite.StringValue(string(o.p.ID))
+	case 2:
+		return cellite.StringValue(string(o.p.Title))
+	case 3:
+		return cellite.StringValue(string(o.p.Keys))
 	}
 	return cellite.NullValue()
 }
@@ -274,6 +373,133 @@ func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fil
 	return out
 }
 
+// surfRenderPalette draws palette.surf for Palette.
+func surfRenderPalette(e *surf.Errs, out []*surfui.Node, c *Palette, fill surf.Fill) []*surfui.Node {
+	// palette.surf:5:1 <surface>
+	if e.Enter("palette.surf", 5, 1) {
+		var k1 []*surfui.Node
+		// palette.surf:6:3 <stack>
+		if e.Enter("palette.surf", 6, 3) {
+			var k2 []*surfui.Node
+			// palette.surf:7:5 <rule>
+			if e.Enter("palette.surf", 7, 5) {
+				n3 := surfui.Rule()
+				surf.ModKey(n3, "rule")
+				k2 = append(k2, n3)
+				e.Leave()
+			}
+			// palette.surf:8:5 <list>
+			if e.Enter("palette.surf", 8, 5) {
+				var k4 []*surfui.Node
+				{
+					l5 := c.Rows
+					for i5 := range l5 {
+						// palette.surf:9:7 <item>
+						if e.Enter("palette.surf", 9, 7) {
+							var k6 []*surfui.Node
+							// palette.surf:10:9 <text>
+							if e.Enter("palette.surf", 10, 9) {
+								n7 := surfui.Text((&l5[i5]).ID)
+								surf.ModMuted(n7, true)
+								surf.ModWidth(n7, int64(c.Idw))
+								k6 = append(k6, n7)
+								e.Leave()
+							}
+							// palette.surf:11:9 <text>
+							if e.Enter("palette.surf", 11, 9) {
+								n8 := surfui.Text((&l5[i5]).Title)
+								surf.ModGrow(n8, true)
+								k6 = append(k6, n8)
+								e.Leave()
+							}
+							if (&l5[i5]).Keys != "" {
+								// palette.surf:12:9 <key>
+								if e.Enter("palette.surf", 12, 9) {
+									n9 := surfui.Key((&l5[i5]).Keys)
+									k6 = append(k6, n9)
+									e.Leave()
+								}
+							}
+							n6 := surfui.Item(k6...)
+							surf.ModKey(n6, (&l5[i5]).K)
+							surf.ModGap(n6, 2)
+							surf.ModPad(n6, [2]int64{1, 0})
+							surf.ModSelected(n6, (int64(i5) == int64(c.Sel)))
+							{
+								a10 := int(int64(i5))
+								n6.On("click", func() { c.Pick(a10) })
+							}
+							k4 = append(k4, n6)
+							e.Leave()
+						}
+					}
+				}
+				if int64(len(c.Rows)) == int64(0) {
+					// palette.surf:14:7 <item>
+					if e.Enter("palette.surf", 14, 7) {
+						var k11 []*surfui.Node
+						// palette.surf:15:9 <text>
+						if e.Enter("palette.surf", 15, 9) {
+							n12 := surfui.Text("No command matches.")
+							surf.ModMuted(n12, true)
+							k11 = append(k11, n12)
+							e.Leave()
+						}
+						n11 := surfui.Item(k11...)
+						surf.ModKey(n11, "none")
+						k4 = append(k4, n11)
+						e.Leave()
+					}
+				}
+				n4 := surfui.List(k4...)
+				surf.ModKey(n4, "rows")
+				k2 = append(k2, n4)
+				e.Leave()
+			}
+			// palette.surf:18:5 <row>
+			if e.Enter("palette.surf", 18, 5) {
+				var k13 []*surfui.Node
+				// palette.surf:19:7 <text>
+				if e.Enter("palette.surf", 19, 7) {
+					n14 := surfui.Text(":")
+					surf.ModTone(n14, "accent")
+					surf.ModSemibold(n14, true)
+					k13 = append(k13, n14)
+					e.Leave()
+				}
+				// palette.surf:20:7 <field>
+				if e.Enter("palette.surf", 20, 7) {
+					n15 := surfui.Field()
+					surf.ModKey(n15, "field")
+					surf.ModGrow(n15, true)
+					surf.ModValue(n15, c.Query)
+					surf.ModLabel(n15, "Command")
+					surf.ModBare(n15, true)
+					surf.ModAutofocus(n15, true)
+					n15.On("input", func(ev surfrun.Event) { c.Typed(ev.Value) })
+					k13 = append(k13, n15)
+					e.Leave()
+				}
+				n13 := surfui.Row(k13...)
+				surf.ModKey(n13, "query")
+				surf.ModGap(n13, 1)
+				surf.ModPad(n13, [2]int64{1, 0})
+				k2 = append(k2, n13)
+				e.Leave()
+			}
+			n2 := surfui.Stack(k2...)
+			surf.ModKey(n2, "palette")
+			k1 = append(k1, n2)
+			e.Leave()
+		}
+		n1 := surf.NewSurface(k1...)
+		surf.ModDensity(n1, "dense")
+		out = append(out, n1)
+		e.Leave()
+	}
+	return out
+}
+
 // surfRenderSearch draws search.surf for Search.
 func surfRenderSearch(e *surf.Errs, out []*surfui.Node, c *Search, fill surf.Fill) []*surfui.Node {
 	// search.surf:4:1 <surface>
@@ -345,6 +571,11 @@ func surfCompiledFooter(c *Footer) surflive.Component {
 	return surf.Compiled(c, "footer.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderFooter(e, nil, c, nil) })
 }
 
+// surfCompiledPalette is c drawn by its templates compiled into Go.
+func surfCompiledPalette(c *Palette) surflive.Component {
+	return surf.Compiled(c, "palette.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderPalette(e, nil, c, nil) })
+}
+
 // surfCompiledSearch is c drawn by its templates compiled into Go.
 func surfCompiledSearch(c *Search) surflive.Component {
 	return surf.Compiled(c, "search.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderSearch(e, nil, c, nil) })
@@ -365,6 +596,25 @@ func surfList1Of(v cellite.Value) []FooterHint {
 	out := make([]FooterHint, l.Len())
 	for i := range out {
 		out[i] = surf.Deref(surfFooterHintOf(l.At(i)))
+	}
+	return out
+}
+
+// surfList2 is a []PaletteRow as a list.
+type surfList2 []PaletteRow
+
+func (l surfList2) Len() int               { return len(l) }
+func (l surfList2) At(i int) cellite.Value { return surfPaletteRowValue(&l[i]) }
+
+// surfList2Of is a list's value as a []PaletteRow.
+func surfList2Of(v cellite.Value) []PaletteRow {
+	l := v.List()
+	if l == nil {
+		return nil
+	}
+	out := make([]PaletteRow, l.Len())
+	for i := range out {
+		out[i] = surf.Deref(surfPaletteRowOf(l.At(i)))
 	}
 	return out
 }

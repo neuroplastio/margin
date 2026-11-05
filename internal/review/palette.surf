@@ -1,0 +1,23 @@
+<!-- margin's palette: a rule to part it from the document, the commands in
+     view (id, what it does, its key), and ":" with the field the query is
+     typed in. The selection, enter, the arrows and esc are margin's: the
+     field gives them back. -->
+<surface density="dense">
+  <stack key="palette">
+    <rule key="rule"/>
+    <list key="rows">
+      <item :each="(i, r) in rows" :key="r.k" :selected="i == sel" gap="2" pad="1 0" @click="pick(i)">
+        <text muted :width="idw">{{ r.id }}</text>
+        <text grow>{{ r.title }}</text>
+        <key :if="r.keys != ''">{{ r.keys }}</key>
+      </item>
+      <item :if="size(rows) == 0" key="none">
+        <text muted>No command matches.</text>
+      </item>
+    </list>
+    <row gap="1" pad="1 0" key="query">
+      <text tone="accent" semibold>:</text>
+      <field bare grow :value="query" label="Command" autofocus @input="typed($value)" key="field"/>
+    </row>
+  </stack>
+</surface>

@@ -4,6 +4,11 @@ Last updated: 2026-11-01 (margin on hotty 0.6)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (palette on hotty-surf) the `:` palette is a hotty-surf component: no
+  header row, key caps, mono and dense — whether it reads without the
+  header, whether the caps beat plain keys, whether the id column is
+  wide enough — journal 2026-11-05.7, shots in
+  vault/shots/hotty-surf-palette/
 - (search prompt on hotty-surf) the `/` prompt is a hotty-surf component: a
   bare field after a rule, the count muted and flush right, a cursor in cells
   — whether the bare field reads as a prompt, whether you miss the box —

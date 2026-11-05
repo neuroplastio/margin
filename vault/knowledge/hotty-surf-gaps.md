@@ -20,3 +20,7 @@ its current piece for that spot.
 
 Answered: a `surfrun.Surface` is hosted beside margin's own surfaces
 (leg 1, journal 2026-11-05.2).
+
+Found in leg 4 (the palette): G5 shows as a palette with no header row and a
+fixed-width id column (the longest id in view and two cells); a list of
+items has no columns that align by themselves, and no scrollbar.

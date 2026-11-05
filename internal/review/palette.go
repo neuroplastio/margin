@@ -22,11 +22,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-
-	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
+	"github.com/neuroplastio/hotty-surf/surflive"
 )
+
+//go:generate go run github.com/neuroplastio/hotty-surf/cmd/surfgen
 
 // matchCommands ranks cmds against query and returns the matches, best
 // first. An empty query returns every command in registry order, unranked —
@@ -215,75 +217,126 @@ func paletteTitle(c command, m *model) string {
 	return c.Description
 }
 
-// paletteID is the palette's pane (D22): a table of the commands the query
-// matches, over the field the query is typed in.
+// paletteID is the palette's surface name.
 const paletteID = "palette"
 
 // paletteShown is how many of the matching commands the palette shows at
-// once; the table scrolls to keep the selected one in view.
+// once; the list scrolls to keep the selected one in view.
 const paletteShown = 7
 
-// paletteFieldKeys gives margin the keys it reads in the palette's field
-// on a host: enter runs the selected command, the arrows and ctrl+j/ctrl+k
-// move the selection. esc always reaches margin.
-const paletteFieldKeys = "enter=program arrow_up=program arrow_down=program ctrl+j=program ctrl+k=program"
+// paletteFieldKeys are margin's own keys in the palette: a surf text field
+// gives them back. enter runs the selected command, the arrows, ctrl+j and
+// ctrl+k move the selection, tab goes down, esc closes.
+var paletteFieldKeys = []string{"enter", "arrow_up", "arrow_down", "ctrl+j", "ctrl+k", "tab", "escape", "ctrl+c"}
 
-// palettePane is the palette's pane as the model has it: the query, the
-// commands that match it, and the one selected. margin keeps the palette's
-// state (palette.go's matching, the staged values); the pane shows it and
-// edits the query.
-func (m *model) palettePane() *pane {
+// Palette is the palette's state (palette.surf lays it out): the query the
+// field holds, the window of matching commands in view and which is
+// selected in it. margin keeps the rest (palette.go's matching, the staged
+// values); the surface shows it and edits the query.
+type Palette struct {
+	Query string
+	Rows  []PaletteRow
+	Sel   int
+	// Idw is the width of the command column: the longest id in view and two
+	// cells of room, so that a host's letters never cut it.
+	Idw int
+
+	typed func(string)
+	click func(int)
+}
+
+// PaletteRow is a command in view: its id, what it does and its key.
+type PaletteRow struct {
+	K     string
+	ID    string
+	Title string
+	Keys  string
+}
+
+// Typed is the field's input: query is the whole of what it holds.
+func (p *Palette) Typed(query string) {
+	p.Query = query
+	if p.typed != nil {
+		p.typed(query)
+	}
+}
+
+// Pick is a click on the row i of the window.
+func (p *Palette) Pick(i int) {
+	if p.click != nil {
+		p.click(i)
+	}
+}
+
+// paletteHeight is the palette's height in rows: a rule, the commands in
+// view (or one row saying there are none), and the field.
+func (m *model) paletteHeight() int {
+	return 2 + max(min(len(paletteRows(m, commands, m.paletteQuery)), paletteShown), 1)
+}
+
+// paletteHost is the palette as the model has it, its state brought up to
+// date: a new one when the palette opens, so it opens on its own query with
+// the cursor after it.
+func (m *model) paletteHost() *surfHost {
 	rows := paletteRows(m, commands, m.paletteQuery)
 	m.paletteSelected = max(min(m.paletteSelected, len(rows)-1), 0)
-	p := m.panes().pane(paletteID, map[string]any{"query": m.paletteQuery, "rows": []any{}, "sel": ""})
-	p.define(
-		obj("id", "root", "component", "Column", "children", []any{"table", "query"}),
-		obj("id", "table", "component", "HottyTable", "catalogId", hottycat.ID,
-			"rows", bind("/rows"), "rowKey", "k", "selected", bind("/sel"),
-			"height", max(min(len(rows), paletteShown), 1),
-			"columns", []any{
-				obj("key", "id", "header", "command"),
-				obj("key", "title", "header", "does"),
-				obj("key", "keys", "header", "key", "align", "end"),
-			}),
-		obj("id", "query", "component", "TextField", "label", ":", "value", bind("/query"),
-			"metadata", obj("extensions", obj("io_neuroplast_hotty", obj("keys", paletteFieldKeys)))),
-	)
-	table := make([]any, len(rows))
-	for i, r := range rows {
+	if m.paletteSelected < m.paletteTop {
+		m.paletteTop = m.paletteSelected
+	}
+	if m.paletteSelected >= m.paletteTop+paletteShown {
+		m.paletteTop = m.paletteSelected - paletteShown + 1
+	}
+	m.paletteTop = max(min(m.paletteTop, max(len(rows)-paletteShown, 0)), 0)
+	if m.palette == nil {
+		p := &Palette{Query: m.paletteQuery, typed: m.paletteQueried}
+		p.click = func(i int) { m.paletteSelected = m.paletteTop + i }
+		m.palette = newSurfHost("margin-"+paletteID, surflive.New(surfInterpPalette(p)), nil, paletteFieldKeys)
+		m.paletteState = p
+	}
+	p := m.paletteState
+	p.Rows = p.Rows[:0]
+	p.Idw = 0
+	for i := m.paletteTop; i < min(m.paletteTop+paletteShown, len(rows)); i++ {
+		r := rows[i]
 		keys := ""
 		if !r.IsValue {
 			keys = firstBinding(r.Command.ID)
 		}
-		table[i] = obj("k", strconv.Itoa(i), "id", r.Command.ID, "title", r.Title, "keys", keys)
+		p.Rows = append(p.Rows, PaletteRow{K: strconv.Itoa(i), ID: r.Command.ID, Title: r.Title, Keys: keys})
+		p.Idw = max(p.Idw, utf8.RuneCountInString(r.Command.ID)+2)
 	}
-	p.put("/rows", table)
-	p.put("/sel", strconv.Itoa(m.paletteSelected))
-	p.put("/query", m.paletteQuery)
-	if !p.c.St.Keyboard {
-		p.focus(p.c.FindComponent("query", rootScope))
-	}
-	return p
+	p.Sel = m.paletteSelected - m.paletteTop
+	return m.palette
 }
 
-// closePalette closes the palette. Its pane goes with it, so the next one
+// closePalette closes the palette. Its surface goes with it, so the next one
 // opens on its own query with the cursor after it.
 func (m *model) closePalette() {
 	m.paletteOpen = false
 	m.paletteQuery = ""
-	m.dropPane(paletteID)
+	m.paletteTop = 0
+	m.dropPalette()
 }
 
-// paletteTyped gives the palette's field a key, and takes the query it
-// leaves: a new query selects its first match.
-func (m *model) paletteTyped(k tea.Key) {
-	p := m.palettePane()
-	if name := fieldKeyName(k); name == "" && k.Text != "" {
-		p.paste(k.Text)
-	} else {
-		p.key(name)
+// dropPalette forgets the palette's surface, and the host's.
+func (m *model) dropPalette() {
+	if m.palette != nil && m.hot != nil {
+		m.hot.s.Delete(m.palette.name)
 	}
-	m.paletteQueried(p.text("/query"))
+	m.palette, m.paletteState = nil, nil
+}
+
+// paletteTyped gives the palette's field a key in cells (a host's field is
+// the host's), and takes the query it leaves: a new query selects its first
+// match.
+func (m *model) paletteTyped(k tea.Key) {
+	h := m.paletteHost()
+	switch name := fieldKeyName(k); {
+	case name == "" && k.Text != "":
+		h.cellsPaste(k.Text)
+	case name != "":
+		h.cellsKey(name)
+	}
 }
 
 // paletteQueried takes a query the palette's field holds.
@@ -291,11 +344,11 @@ func (m *model) paletteQueried(q string) {
 	if q != m.paletteQuery {
 		m.paletteQuery = q
 		m.paletteSelected = 0
+		m.paletteTop = 0
 	}
 }
 
-// renderPalette is the palette drawn w wide: the matching commands under
-// their header, and the query.
+// renderPalette is the palette drawn w wide in cells.
 func (m *model) renderPalette(w int) string {
-	return strings.Join(m.palettePane().lines(w), "\n")
+	return strings.Join(m.paletteHost().lines(w, m.paletteHeight()), "\n")
 }

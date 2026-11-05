@@ -866,6 +866,9 @@ func TestHottyComposerEscapeAndDiscard(t *testing.T) {
 	}
 }
 
+// paletteFieldID is the palette's field as surf names it, from its keys.
+const paletteFieldID = "r.kpalette.kquery.kfield"
+
 // On a host the palette is a surface whose field has the keyboard: the query
 // is typed there, and enter, a key the field gives margin, runs the command.
 func TestHottyPaletteIsASurface(t *testing.T) {
@@ -875,8 +878,8 @@ func TestHottyPaletteIsASurface(t *testing.T) {
 		h.Type(":")
 		var s *hottytest.Surface
 		waitFor(t, "the palette's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
-		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == "query" })
-		if err := h.Fill(name, "query", "raw"); err != nil {
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == paletteFieldID })
+		if err := h.Fill(name, paletteFieldID, "raw"); err != nil {
 			t.Fatal(err)
 		}
 		waitFor(t, "the table narrowed to view.raw", func() bool { return strings.Contains(s.Text(), "view.raw") && !strings.Contains(s.Text(), "move.down") })
