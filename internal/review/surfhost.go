@@ -93,6 +93,7 @@ func (h *hotState) surfSheet() {
 // it).
 func (p *surfHost) surface(h *hotState, r, clip hottytea.Rect) hottytea.Surface {
 	h.surfSheet()
+	p.s.Platform = hotty.PlatformOf(h.caps)
 	if sz, ok := p.m.(surfrun.Sizer); ok {
 		sz.Resize(r.W, r.H)
 	}

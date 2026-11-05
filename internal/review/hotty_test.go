@@ -910,8 +910,8 @@ func TestHottySearchIsASurface(t *testing.T) {
 		if rows := s.Placement().Rows; rows != 2 {
 			t.Errorf("search prompt placed %d rows tall, want 2", rows)
 		}
-		if class, _ := s.Attr("r", "class"); !strings.Contains(class, "u-dense") {
-			t.Errorf("search prompt surface class %q, want u-dense", class)
+		if class, _ := s.Attr("r", "class"); !strings.Contains(class, "u-compact") {
+			t.Errorf("search prompt surface class %q, want u-compact", class)
 		}
 		if err := h.Fill(name, searchFieldID, "quote"); err != nil {
 			t.Fatal(err)
@@ -928,7 +928,7 @@ func TestHottySearchIsASurface(t *testing.T) {
 	}
 }
 
-// On a host the footer is a one-row surface the kit draws dense, its keys
+// On a host the footer is a one-row surface, in hotty-surf's Compact, its keys
 // inside that row; the palette, taller, is not.
 func TestHottyFooterIsADenseBar(t *testing.T) {
 	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
@@ -938,8 +938,8 @@ func TestHottyFooterIsADenseBar(t *testing.T) {
 		if rows := s.Placement().Rows; rows != 1 {
 			t.Errorf("footer placed %d rows tall, want 1", rows)
 		}
-		if class, _ := s.Attr("r", "class"); !strings.Contains(class, "u-dense") {
-			t.Errorf("footer surface class %q, want u-dense", class)
+		if class, _ := s.Attr("r", "class"); !strings.Contains(class, "u-compact") {
+			t.Errorf("footer surface class %q, want u-compact", class)
 		}
 		h.Type(":")
 		var p *hottytest.Surface

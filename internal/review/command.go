@@ -14,6 +14,8 @@ package review
 import (
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -805,4 +807,30 @@ func firstBinding(id string) string {
 		}
 	}
 	return ""
+}
+
+// surfKey is a binding as hotty-surf names keys (myelin's names): a capital
+// letter is shift and the letter ("J" is shift+j, which scrolls, where "j"
+// moves), a space is "space", a two-letter chord is a sequence ("y r"),
+// and the arrows, pages and escape have their long names.
+func surfKey(k string) string {
+	switch k {
+	case " ":
+		return "space"
+	case "esc":
+		return "escape"
+	case "pgdown":
+		return "page_down"
+	case "pgup":
+		return "page_up"
+	case "up", "down", "left", "right":
+		return "arrow_" + k
+	}
+	if r, n := utf8.DecodeRuneInString(k); n == len(k) && unicode.IsUpper(r) {
+		return "shift+" + string(unicode.ToLower(r))
+	}
+	if len(k) == 2 && k[0] >= 'a' && k[0] <= 'z' && k[1] >= 'a' && k[1] <= 'z' {
+		return k[:1] + " " + k[1:]
+	}
+	return k
 }

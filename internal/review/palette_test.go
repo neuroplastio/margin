@@ -480,3 +480,21 @@ func TestPaletteQueryIsAField(t *testing.T) {
 		t.Fatalf("enter on app.quit: quitting = %v, palette open = %v; want the command run and the palette closed", m.quitting, m.paletteOpen)
 	}
 }
+
+// Two different keys never read the same in the palette: "j" moves and "J"
+// scrolls, and the second is shift+j, a cap of its own.
+func TestSurfKeysAreDistinct(t *testing.T) {
+	seen := map[string]string{} // what a key reads → the command it runs
+	for _, b := range keyBindings {
+		k := surfKey(b.key)
+		if was, ok := seen[k]; ok && was != b.id {
+			t.Errorf("%q (%s) and another key (%s) both read %q", b.key, b.id, was, k)
+		}
+		seen[k] = b.id
+	}
+	for raw, want := range map[string]string{"J": "shift+j", "j": "j", "esc": "escape", "yr": "y r", " ": "space", "pgdown": "page_down", "ctrl+f": "ctrl+f"} {
+		if got := surfKey(raw); got != want {
+			t.Errorf("surfKey(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}

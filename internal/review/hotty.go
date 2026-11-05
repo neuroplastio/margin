@@ -46,6 +46,9 @@ type hotState struct {
 
 	// surfCSS: hotty-surf's stylesheet went to the host (surfhost.go).
 	surfCSS bool
+	// caps is what the host said about itself: how a key reads, and a cell's
+	// size in CSS pixels, which Compact's rows are counted in.
+	caps hotty.Caps
 
 	// Measuring. rows is a block's rows at a width, as the host laid it out
 	// (0: the host refused it, so cells); last is the rows a block took at
@@ -291,6 +294,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 	case hottytea.ReadyMsg:
 		h.tracef("ready: mode %v, caps %+v", msg.Mode, msg.Caps)
 		if msg.Mode == hottytea.Native {
+			h.caps = msg.Caps
 			h.docs.net = msg.Caps.Net["img-src"]
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 		}

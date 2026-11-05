@@ -19,6 +19,8 @@
 package review
 
 import (
+	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -237,6 +239,9 @@ type Palette struct {
 	Query string
 	Rows  []PaletteRow
 	Sel   int
+	// Range says which commands are in view where there are more than fit:
+	// "1–7 of 28".
+	Range string
 	// Idw is the width of the command column: the longest id in view and two
 	// cells of room, so that a host's letters never cut it.
 	Idw int
@@ -274,6 +279,21 @@ func (m *model) paletteHeight() int {
 	return 2 + max(min(len(paletteRows(m, commands, m.paletteQuery)), paletteShown), 1)
 }
 
+// paletteHostHeight is the palette's height in rows on a host. Compact's
+// rows are a cell and a little air (an item's padding, a rule's margin, in
+// CSS pixels), so the commands need more than one row each: the rows
+// counted from the host's cell size (hottytea.ReadyMsg's Caps.CellCSS),
+// whole, with the field under them.
+func (m *model) paletteHostHeight() int {
+	cell := 20.0
+	if m.hot != nil && m.hot.caps.CellCSS.H > 0 {
+		cell = m.hot.caps.CellCSS.H
+	}
+	n := max(min(len(paletteRows(m, commands, m.paletteQuery)), paletteShown), 1)
+	const rule, item = 9, 8 // a rule's margin and hairline, an item's padding
+	return int(math.Ceil((rule + float64(n)*(cell+item) + cell) / cell))
+}
+
 // paletteHost is the palette as the model has it, its state brought up to
 // date: a new one when the palette opens, so it opens on its own query with
 // the cursor after it.
@@ -300,12 +320,16 @@ func (m *model) paletteHost() *surfHost {
 		r := rows[i]
 		keys := ""
 		if !r.IsValue {
-			keys = firstBinding(r.Command.ID)
+			keys = surfKey(firstBinding(r.Command.ID))
 		}
 		p.Rows = append(p.Rows, PaletteRow{K: strconv.Itoa(i), ID: r.Command.ID, Title: r.Title, Keys: keys})
 		p.Idw = max(p.Idw, utf8.RuneCountInString(r.Command.ID)+2)
 	}
 	p.Sel = m.paletteSelected - m.paletteTop
+	p.Range = ""
+	if len(rows) > paletteShown {
+		p.Range = fmt.Sprintf("%d–%d of %d", m.paletteTop+1, m.paletteTop+len(p.Rows), len(rows))
+	}
 	return m.palette
 }
 

@@ -1,7 +1,7 @@
 <!-- margin's footer: the mode, the keys it takes as a help line, the
      progress and the status. The keys are margin's: nothing here handles
      one. -->
-<surface density="dense">
+<surface>
   <row gap="2" pad="1 0" key="bar">
     <text :if="mode != ''" semibold key="mode">{{ mode }}</text>
     <text :if="rest != ''" muted key="rest">{{ rest }}</text>

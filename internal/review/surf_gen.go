@@ -88,7 +88,7 @@ func surfInterpFooter(c *Footer) surflive.Component { return surf.Component(surf
 
 // surfShapePalette is Palette's shape, a component.
 var surfShapePalette = surf.Shape{Name: "Palette", Component: true,
-	Fields: []surf.Field{{Name: "query", Type: cellite.String}, {Name: "rows", Type: cellite.ListOf(cellite.StructOf("PaletteRow"))}, {Name: "sel", Type: cellite.Int}, {Name: "idw", Type: cellite.Int}},
+	Fields: []surf.Field{{Name: "query", Type: cellite.String}, {Name: "rows", Type: cellite.ListOf(cellite.StructOf("PaletteRow"))}, {Name: "sel", Type: cellite.Int}, {Name: "range", Type: cellite.String}, {Name: "idw", Type: cellite.Int}},
 	Methods: []surf.Method{
 		{Name: "pick", Args: []cellite.Type{cellite.Int}},
 		{Name: "typed", Args: []cellite.Type{cellite.String}},
@@ -123,6 +123,8 @@ func (o surfPalette) Field(i int) cellite.Value {
 	case 2:
 		return cellite.IntValue(int64(o.p.Sel))
 	case 3:
+		return cellite.StringValue(string(o.p.Range))
+	case 4:
 		return cellite.IntValue(int64(o.p.Idw))
 	}
 	return cellite.NullValue()
@@ -366,7 +368,6 @@ func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fil
 			e.Leave()
 		}
 		n1 := surf.NewSurface(k1...)
-		surf.ModDensity(n1, "dense")
 		out = append(out, n1)
 		e.Leave()
 	}
@@ -480,6 +481,17 @@ func surfRenderPalette(e *surf.Errs, out []*surfui.Node, c *Palette, fill surf.F
 					k13 = append(k13, n15)
 					e.Leave()
 				}
+				if c.Range != "" {
+					// palette.surf:21:7 <text>
+					if e.Enter("palette.surf", 21, 7) {
+						n16 := surfui.Text(c.Range)
+						surf.ModKey(n16, "range")
+						surf.ModMuted(n16, true)
+						surf.ModSmall(n16, true)
+						k13 = append(k13, n16)
+						e.Leave()
+					}
+				}
 				n13 := surfui.Row(k13...)
 				surf.ModKey(n13, "query")
 				surf.ModGap(n13, 1)
@@ -493,7 +505,6 @@ func surfRenderPalette(e *surf.Errs, out []*surfui.Node, c *Palette, fill surf.F
 			e.Leave()
 		}
 		n1 := surf.NewSurface(k1...)
-		surf.ModDensity(n1, "dense")
 		out = append(out, n1)
 		e.Leave()
 	}
@@ -559,7 +570,6 @@ func surfRenderSearch(e *surf.Errs, out []*surfui.Node, c *Search, fill surf.Fil
 			e.Leave()
 		}
 		n1 := surf.NewSurface(k1...)
-		surf.ModDensity(n1, "dense")
 		out = append(out, n1)
 		e.Leave()
 	}

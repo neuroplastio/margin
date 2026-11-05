@@ -3193,7 +3193,7 @@ func (m *model) view() tea.View {
 	paletteHeight := 0
 	if m.paletteOpen {
 		// As the search prompt: cells only where no host places the surface.
-		paletteHeight = m.paletteHeight()
+		paletteHeight = m.paletteHostHeight()
 		if m.hot == nil || !m.hot.native() || m.hot.deaf {
 			paletteBox = m.renderPalette(m.w)
 			paletteHeight = strings.Count(paletteBox, "\n") + 1
