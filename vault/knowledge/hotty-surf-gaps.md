@@ -24,3 +24,9 @@ Answered: a `surfrun.Surface` is hosted beside margin's own surfaces
 Found in leg 4 (the palette): G5 shows as a palette with no header row and a
 fixed-width id column (the longest id in view and two cells); a list of
 items has no columns that align by themselves, and no scrollbar.
+
+Status, 2026-11-09 (hotty-surf v0.3.0): G1, G2, G3 and G5 are not built.
+hotty-surf's board has them under "Kit gaps, after the kit", in the order G1,
+G5, G2, G3, none started. hotty-a2ui is archived, so these four gaps are now
+all that keeps it in margin's build (hotty-surf-port.md, legs 6–9). margin
+asks for G1 first.

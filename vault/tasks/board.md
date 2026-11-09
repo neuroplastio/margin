@@ -1,6 +1,6 @@
 # Board
 
-Last updated: 2026-11-01 (margin on hotty 0.6)
+Last updated: 2026-11-09 (the hotty-surf port re-planned)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
@@ -965,22 +965,17 @@ document, regardless of the order the tree-view work itself lands in.
 
 ## Next
 
-- **Move margin to hotty-surf 730ae32 [felt].** Lowercase keycaps (the footer,
-  the palette and the search prompt draw `j`, `space`, `⇧+y`, `[ctrl+s]`), the
-  label pill is `chip` and a count is `badge` (margin uses neither), and
-  a widget's modifiers (tone, fill, bold, muted) now win over its own rules.
-  Started on the branch `kit-730ae32-wip` (c202f02, not on main, not pushed): the
-  pin, `go generate`, the lowercase footer key in `watch_test.go`, and the
-  palette's query row at `pad="1 0"` (the kit's items sit about 7 px nearer the
-  edge). `make check` passed there (review package, run once). Sheets of the
-  footer and palette at 897 and 1796, host and cells, were shot and looked at
-  but not judged; they are in the session scratchpad, not in the vault, so shoot
-  them again. Things the shots showed: on a host the keys are plain lowercase
-  text with no cap boxes, so `j move  c comment` reads as a sentence (does it want
-  a gap or a tone?); the selected row's bar touches the first letter; cells hints
-  keep five of six at 897 without a status and four with one, as before; the
-  hover and `Try it` checks are unaffected. Then the tree pane, the threads view
-  and the open thread, which wait for G2, G5 and this move.
+- **Leg 5: the stack bump [felt]** (vault/knowledge/hotty-surf-port.md, revised
+  2026-11-09). Move to hotty-go v0.7.1, hotty-surf v0.3.0 and cel-lite v0.2.0
+  at `neuroplast.io/...`. Add a temporary `a2uibridge.go` (new `hotty.Event` →
+  old) for the four panes still on the archived hotty-a2ui, with the old
+  hotty-go path pinned at 23af564. `WriteFrame` takes a menu writer. Bring
+  over `kit-730ae32-wip` (c202f02; 730ae32 is in v0.3.0) and delete the
+  branch. Reshoot the footer, search and palette (lowercase keycaps, scaled
+  text), and check `paletteHostHeight`.
+- Then legs 6–9 (composer, threads view, tree pane, open thread), each
+  blocked on its hotty-surf gap (G1, G5, G2, G3; none started), and leg 10,
+  the cleanup that drops hotty-a2ui.
 
 ## Backlog — M4 (round two)
 
