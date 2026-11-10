@@ -169,6 +169,7 @@ func TestHottyComposerKeepsWordsOnEveryKey(t *testing.T) {
 		{"escape", "typed on a host", false},
 		{"ctrl+g", "", false},
 		{"ctrl+s", "typed on a host", true},
+		{"ctrl+enter", "typed on a host", true},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			m, _ := hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
@@ -181,7 +182,13 @@ func TestHottyComposerKeepsWordsOnEveryKey(t *testing.T) {
 				if err := h.Fill(name, composerFieldID, "typed on a host"); err != nil {
 					t.Fatal(err)
 				}
-				h.Key(tc.key)
+				if tc.key == "ctrl+enter" {
+					// A terminal can't tell it from enter without the kitty
+					// keyboard protocol: hottytest's Key has none, so send CSI-u.
+					h.Type("\x1b[13;5u")
+				} else {
+					h.Key(tc.key)
+				}
 				waitFor(t, "the composer gone", func() bool { s := h.Surface(name); return s == nil || !s.Placed() })
 			})
 			var drafts, posted []string

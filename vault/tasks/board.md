@@ -986,6 +986,8 @@ document, regardless of the order the tree-view work itself lands in.
   2026-11-10.2.)*
 - *(Leg 6, the composer on a hotty-surf field — landed 2026-11-10, journal
   2026-11-10.3.)*
+- **After hotty-surf v0.5.1** (caret on a click in a field, `CellsWheel`): bump, restore
+  `TestClickInsidePaneDoesNotBlur`'s caret assertion, wheel over the composer.
 - *(B11, the palette's host height from `Rows` and `Fit` — landed 2026-11-10, journal 2026-11-10.4.)*
 - Then legs 7–9 (threads view, tree pane, open thread), in that
   order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
