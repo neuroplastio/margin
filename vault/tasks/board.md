@@ -965,7 +965,7 @@ document, regardless of the order the tree-view work itself lands in.
 
 ## Next
 
-- **Leg 5: the stack bump [felt]** (vault/knowledge/hotty-surf-port.md, revised
+- **Leg 5: the stack bump [felt]** (claimed 2026-11-09, margin-surf) (vault/knowledge/hotty-surf-port.md, revised
   2026-11-09). Move to hotty-go v0.7.1, hotty-surf v0.3.0 and cel-lite v0.2.0
   at `neuroplast.io/...`. Add a temporary `a2uibridge.go` (new `hotty.Event` →
   old) for the four panes still on the archived hotty-a2ui, with the old
