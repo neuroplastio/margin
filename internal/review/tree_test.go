@@ -315,8 +315,8 @@ func TestViewComposesPaneAndDocumentColumns(t *testing.T) {
 	}
 }
 
-// TestTreePaneClickFocusesAFile: a click on a file's row focuses it and
-// gives the pane the keyboard, as before; it does not open it.
+// TestTreePaneClickFocusesAFile: a click on a file's row opens it, as enter
+// does (the maintainer found a click that only focused "did nothing").
 func TestTreePaneClickFocusesAFile(t *testing.T) {
 	root, _, _ := treeFixture(t)
 	m, err := newTreeModel(root)
@@ -326,11 +326,11 @@ func TestTreePaneClickFocusesAFile(t *testing.T) {
 	m.w, m.h = 100, 30
 	m.View()
 	m.handleClick(tea.Mouse{X: 8, Y: 2}) // docs/spec.md, under the docs folder
-	if !m.treeFocus || m.tree[m.treeAt].rel != "docs/spec.md" {
-		t.Fatalf("click focused %q (pane focus %v), want docs/spec.md with the pane focused", m.tree[m.treeAt].rel, m.treeFocus)
+	if m.tree[m.treeAt].rel != "docs/spec.md" {
+		t.Fatalf("click selected %q, want docs/spec.md", m.tree[m.treeAt].rel)
 	}
-	if m.store.docPath != "README.md" {
-		t.Errorf("a click opened %s; it only focuses", m.store.docPath)
+	if m.store.docPath != "docs/spec.md" {
+		t.Errorf("a click left %s open, want docs/spec.md", m.store.docPath)
 	}
 }
 

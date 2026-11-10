@@ -2911,9 +2911,8 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Width(w)
-	if focused {
-		box = box.BorderForeground(lipgloss.Color("212"))
-	}
+	// No focus colour on the box: the maintainer asked for the pink ring gone
+	// (2026-11-10); the cursor and the field show where the focus is.
 	indent := func(ls []string) []string {
 		for j := range ls {
 			ls[j] = strings.Repeat(" ", gutterW) + ls[j]

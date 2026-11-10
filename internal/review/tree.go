@@ -457,14 +457,15 @@ func (m *model) treeHost(rows int) *surftea.Host {
 	return m.treeSurf
 }
 
-// treeClicked takes the file a click in the tree pane selected: the pane has
-// the keyboard from then on, as a click on its row always gave it. A folder
+// treeClicked takes the file a click in the tree pane selected, and opens
+// it; a file already open leaves the pane the keyboard. A folder
 // path is not a file: the click folded it (Filetree.Fold).
 func (m *model) treeClicked(path string) {
 	for i, e := range m.tree {
 		if !e.isDir && e.rel == path {
 			m.treeAt = i
 			m.treeFocus = true
+			m.openTreeFile(i) // a click opens the file, as enter does
 			return
 		}
 	}

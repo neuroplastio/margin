@@ -348,8 +348,13 @@ func TestHottyTreeClickSelectsAFile(t *testing.T) {
 		if err := h.Click(name, "r.ktree.kdocs_2fspec_2emd"); err != nil {
 			t.Fatal(err)
 		}
-		waitFor(t, "the pane to have the keyboard", func() bool { return m.treeFocus })
+		// The model is read after the play ends (it is the program's goroutine's
+		// while it runs), so let the click land first.
+		time.Sleep(500 * time.Millisecond)
 	})
+	if got.store.docPath != "docs/spec.md" {
+		t.Errorf("the click left %s open, want docs/spec.md", got.store.docPath)
+	}
 	if got.tree[got.treeAt].rel != "docs/spec.md" {
 		t.Errorf("the click selected %q, want docs/spec.md", got.tree[got.treeAt].rel)
 	}
