@@ -238,8 +238,6 @@ type model struct {
 	at           cursor
 	hoveredEntry int
 	comp         *composer
-	// kit is the review's panes (D22, kit.go), made when the first is.
-	kit *kit
 
 	// pendingOpen is where focus goes once a blur has dismissed the composer:
 	// a click that lands on another thread while an editor is open.
@@ -463,23 +461,6 @@ func (m *model) Init() tea.Cmd {
 		return tea.Batch(m.watcher.wait(), m.hot.s.Detect())
 	}
 	return m.watcher.wait()
-}
-
-// dropPane deletes a pane, and on a host its surface: a pane made again
-// under the same name is a new document there.
-func (m *model) dropPane(id string) {
-	if p := m.panes().panes[id]; p != nil && m.hot != nil {
-		m.hot.s.Delete(hotPaneName(p))
-	}
-	m.panes().drop(id)
-}
-
-// panes is the review's kit, made the first time a pane is wanted.
-func (m *model) panes() *kit {
-	if m.kit == nil {
-		m.kit = newKit()
-	}
-	return m.kit
 }
 
 // contentWidth is the reading measure: the width the document's prose wraps
@@ -3087,7 +3068,6 @@ func (m *model) view() tea.View {
 		m.paneH = m.composerRows(m.paneW)
 	}
 	if m.hot != nil {
-		m.hot.panes = m.hot.panes[:0]
 		m.hot.surfs = m.hot.surfs[:0]
 	}
 

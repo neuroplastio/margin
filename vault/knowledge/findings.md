@@ -681,6 +681,8 @@ its shapes cost a probe to get right:
 
 ## F29 — the kit's Text folds a typed line break and sets paragraphs flush
 
+*Historical: the kit is gone (D25). `surfmd.HardWraps()` is the answer now.*
+
 A hotty-a2ui Text is Markdown, and in cells it sets it as Markdown does: a
 single newline is a soft break, folded into a space (`"one\ntwo"` draws `one
 two`), and consecutive blocks — paragraphs, a list after a paragraph — draw
@@ -739,6 +741,8 @@ different: Stylo resolves its `currentColor` (hotty-blitz `tests/svg.rs`).
 
 
 ## F35 — a kit surface a row tall draws its text below that row
+
+*Historical: the kit is gone (D25); hotty-surf's `u-compact` density has no such padding.*
 
 hotty-a2ui's `.k-surface` has 12px of padding and fills the surface
 (`min-height: 100vh`), so on a 20px row a pane's text starts about 21px down.
@@ -876,3 +880,26 @@ CSS pixels. A surface placed over n cells holds fewer commands than n rows
 say; count the host rows from the host's cell size (`Caps.CellCSS`), as
 `paletteHostHeight` does. The cells keep a row a cell. Dense is the
 terminal's font: mono, so not margin's chrome (journal 2026-11-05.9).
+
+
+## F36 — porting to hotty-surf: what only a run showed (2026-11-10)
+
+- **`BoxOf` paths leave the root's key out.** `BoxOf("c0", "body")`, not
+  `("comments", "c0", "body")`: the keys are those below the root.
+- **A surface cannot give the keyboard back.** `Surface.Focus(key)` takes it,
+  and `Lend` does not blur the cells renderer, so the tree pane, which is
+  bright only while it has margin's focus, is a new surface when it loses it
+  (`dropTree`). The first frame after `Focus` can still be quiet: it takes
+  effect at the next update.
+- **Enter on a host is margin's.** A table or list with the keyboard does not
+  act on Enter when the key reaches margin as a key; margin opens the row its
+  selection is on. A bound key (`<bind>`) the surface does take moves the
+  selection there.
+- **A surface not shown has no rows.** `Surface.Rows()` on a surface never
+  shown estimates 1: `surfRows` shows it once first.
+- **hottytest's host measures for you.** Its default answer to a fit
+  replaces the estimate, so a test of the estimate is a unit test, and a test
+  of fit waits for a placement that has settled before it emits one.
+- **`TestHottyHoverWithASelectionRepairsInsteadOfRelaying` flakes under load**
+  (sleeps and a busy machine); alone it passes.
+- **ctrl+enter needs the kitty keyboard protocol**: a test sends `\x1b[13;5u`.

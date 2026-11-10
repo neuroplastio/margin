@@ -80,9 +80,6 @@ type hotState struct {
 	blocks []hotBlock
 	col    hottytea.Rect
 	shown  bool // the document's column is on screen (not the inbox)
-	// panes are the review's panes this frame gave a rectangle of their own
-	// (D22): HTML surfaces there, their cells left blank.
-	panes []hotPane
 	// surfs are the hotty-surf surfaces this frame placed (surfhost.go).
 	surfs []hotSurf
 
@@ -131,13 +128,6 @@ type hotBlock struct {
 	searchText []string // the block's cell rendering, which the search reads
 }
 
-// hotPane is a pane placed as a surface: where, and what shows it.
-type hotPane struct {
-	p    *pane
-	rect hottytea.Rect
-	clip hottytea.Rect // what of the screen the pane may show in
-}
-
 // hotSurf is a hotty-surf surface placed: where, and what shows it.
 type hotSurf struct {
 	p    *surftea.Host
@@ -152,20 +142,6 @@ func (h *hotState) placeSurf(p *surftea.Host, r, clip hottytea.Rect) bool {
 		return false
 	}
 	h.surfs = append(h.surfs, hotSurf{p, r, clip})
-	return true
-}
-
-// hotPaneName is a pane's surface's name on the host.
-func hotPaneName(p *pane) string { return "margin-" + p.id }
-
-// place puts a pane at r for this frame, shown only inside clip, if
-// surfaces are in use, and reports whether it did: then its cells are the
-// host's.
-func (h *hotState) place(p *pane, r, clip hottytea.Rect) bool {
-	if !h.native() || h.deaf {
-		return false
-	}
-	h.panes = append(h.panes, hotPane{p, r, clip})
 	return true
 }
 
@@ -328,9 +304,6 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 				return h.relayoutSoon(), false
 			}
 			return nil, false
-		}
-		if p := m.hotPaneOf(msg.Event.Surface); p != nil {
-			return m.hotPaneEvent(p, msg.Event), true
 		}
 		if sp := m.hotSurfOf(msg.Event.Surface); sp != nil {
 			sp.Event(h.s, msg.Event)
@@ -571,12 +544,7 @@ func (m *model) hotFrame() tea.Cmd {
 	h.want = h.want[:0]
 	v := m.view()
 	h.frame = &v
-	h.s.Layout(append(append(m.hotSurfaces(), m.hotPaneSurfaces()...), m.hotSurfSurfaces()...))
-	// A pane's document went with the layout; its changes, and the keyboard
-	// where the pane wants it, go after.
-	for _, hp := range h.panes {
-		h.s.Send(hp.p.html(hotPaneName(hp.p)).Update()...)
-	}
+	h.s.Layout(append(m.hotSurfaces(), m.hotSurfSurfaces()...))
 	// A surf surface's first frame goes after its placement, and what the
 	// review changed since goes as ops.
 	for _, hs := range h.surfs {
@@ -640,18 +608,6 @@ func (m *model) hotSurfaces() []hottytea.Surface {
 	return out
 }
 
-// hotPaneSurfaces are the panes this frame placed.
-func (m *model) hotPaneSurfaces() []hottytea.Surface {
-	var out []hottytea.Surface
-	for _, hp := range m.hot.panes {
-		s := hp.p.surface(hotPaneName(hp.p), hp.rect)
-		clip := hp.clip
-		s.Clip = &clip
-		out = append(out, s)
-	}
-	return out
-}
-
 // hotSurfSurfaces are the hotty-surf surfaces this frame placed.
 func (m *model) hotSurfSurfaces() []hottytea.Surface {
 	var out []hottytea.Surface
@@ -672,30 +628,6 @@ func (m *model) hotSurfOf(surface string) *surftea.Host {
 		if hs.p.Mine(surface) {
 			return hs.p
 		}
-	}
-	return nil
-}
-
-// hotPaneOf is the pane a surface of the host's is, if any.
-func (m *model) hotPaneOf(surface string) *pane {
-	for _, hp := range m.hot.panes {
-		if hotPaneName(hp.p) == surface {
-			return hp.p
-		}
-	}
-	return nil
-}
-
-// hotPaneEvent is what the user did in a pane on the host: its HTML
-// rendition takes it, and margin hears the actions it sent.
-func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
-	if err := p.html(hotPaneName(p)).Event(oldEvent(ev)); err != nil {
-		m.hot.tracef("pane %s: %v", p.id, err)
-	}
-	p.dirty = true
-	switch {
-	case p.id == searchID && m.searchOpen:
-		m.searchDrafted(p.text("/draft"))
 	}
 	return nil
 }

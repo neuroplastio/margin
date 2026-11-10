@@ -34,9 +34,10 @@ an export the agent can act on.
 
 **The composer opens where you're reading.** Pressing `c` opens a text field in
 the document, at the block you're commenting on, under the conversation it
-joins. It's [hotty-a2ui](https://github.com/neuroplastio/hotty-a2ui)'s field:
-the cursor, selection, word moves, undo and the clipboard all work as they do
-in any text box, and on a HOTTY terminal it's a real HTML textarea.
+joins. It's a [hotty-surf](https://github.com/neuroplastio/hotty-surf) field of
+three to eight rows that grows with the comment: the cursor, selection, word
+moves, undo and the clipboard all work as they do in any text box, and on a
+HOTTY terminal it's a real HTML textarea.
 
 **The editor is disposable.** Losing focus closes it, and the text survives as
 a draft keyed to the block. Open it again and you're back where you left off,
@@ -54,7 +55,7 @@ margin sets headings, paragraphs, lists and quotes in a proportional reading
 font, with real heading sizes, links you can click, images inline and
 mermaid diagrams drawn as SVG. The rest of the screen — the composer, the
 palette, the search prompt, the footer, the file tree and the threads view —
-is built with hotty-a2ui, so on a HOTTY host those are HTML too; the gutter,
+is built with hotty-surf, so on a HOTTY host those are HTML too; the gutter,
 code blocks and tables stay in cells. Every other terminal gets all of it in
 cells, and `--no-hotty` asks for that on a HOTTY host too.
 `MARGIN_HOTTY_LOG=/tmp/hotty.log` records what margin and the terminal said to
@@ -346,7 +347,7 @@ git tag -fa 26.10.03 -m "margin 26.10.03" <fix> && git push -f origin refs/tags/
 
 ## Roadmap
 
-- [x] An in-document composer, with blur/resume drafts (nvim at first; hotty-a2ui's field since D22)
+- [x] An in-document composer, with blur/resume drafts (nvim at first; a hotty-surf field since D25)
 - [x] Block-anchored threads, replies, in-place editing
 - [x] Review marks with section roll-up
 - [x] Real markdown parsing (goldmark, keeping source offsets per block)

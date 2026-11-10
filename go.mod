@@ -17,18 +17,16 @@ require (
 )
 
 require (
-	github.com/neuroplastio/hotty-a2ui v0.0.0-20261022101910-b1f6b54a9bd5
-	github.com/neuroplastio/hotty-go v0.6.1-0.20261105162053-23af564543c8
 	neuroplast.io/cel-lite v0.2.0
 	neuroplast.io/hotty-go v0.7.2
 	neuroplast.io/hotty-go/hottytea v0.7.2
 	neuroplast.io/hotty-go/hottytest v0.7.2
 	neuroplast.io/hotty-surf v0.5.1
+	neuroplast.io/hotty-surf/surfmd v0.5.1
 	neuroplast.io/hotty-surf/surftea v0.5.1
 )
 
 require (
-	github.com/aymanbagabas/go-udiff v0.4.1 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/x/ansi v0.11.8 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
@@ -40,11 +38,8 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/neuroplastio/hotty-go/hottyedit v0.6.1-0.20261105162053-23af564543c8 // indirect
-	github.com/neuroplastio/myelin/myelinkey v0.1.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/sahilm/fuzzy v0.1.3 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
@@ -55,7 +50,5 @@ require (
 	golang.org/x/tools v0.52.0 // indirect
 	neuroplast.io/hotty-go/hottyedit v0.7.2 // indirect
 	neuroplast.io/hotty-go/hottyterm v0.7.2 // indirect
-	neuroplast.io/hotty-surf/surfmd v0.5.1 // indirect
 	neuroplast.io/myelin/myelinkey v0.2.0 // indirect
-	rsc.io/qr v0.2.0 // indirect
 )

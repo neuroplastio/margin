@@ -1002,10 +1002,10 @@ document, regardless of the order the tree-view work itself lands in.
 - *(B11, the palette's host height from `Rows` and `Fit` — landed 2026-11-10, journal 2026-11-10.4.)*
 - *(Leg 8, the tree pane on a hotty-surf tree list — landed 2026-11-10, journal 2026-11-10.6.)*
 - *(Leg 9, the open thread's comments on surfmd — landed 2026-11-10, journal 2026-11-10.7.)*
-- Then leg 10 (the cleanup that drops hotty-a2ui), in that
-  order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
-  hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops
-  hotty-a2ui.
+- *(Leg 10, hotty-a2ui and the bridge gone — landed 2026-11-10, journal 2026-11-10.8; decision D25.)*
+- **Left of the port:** `surfmd.Highlight` for fenced code in comments; M2 (the
+  document column on hotty-surf; ask hotty Agent); OSC 8 links in the cells'
+  document column; the palette's id column on the table.
 
 ## Backlog — M4 (round two)
 

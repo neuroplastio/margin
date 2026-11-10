@@ -19,7 +19,7 @@ language's emulator library would bring. The emulator is display-only — the ch
 writes the file — so its bugs are cosmetic rather than data loss.
 
 **D2 — The composer is a real `nvim` child process, never a built-in editor.**
-*Superseded by D22: the composer is hotty-a2ui's text field.*
+*Superseded by D22 and D25: the composer is a hotty-surf field.*
 margin does not implement text editing. Anything that looks like it needs a text
 widget is a sign the boundary is in the wrong place.
 
@@ -595,7 +595,8 @@ releases" for releases; the dev channel is unchanged.
   `margin update --channel`.
 
 **D22 — The review's panes are hotty-a2ui surfaces; the composer is its text
-field. Supersedes D2 and D3; amends D17.** Maintainer direction (2026-10-18):
+field. Supersedes D2 and D3; amends D17.** *Superseded by D25: the panes are
+hotty-surf surfaces; the keys, dismissal and gone-with-nvim below stand.* Maintainer direction (2026-10-18):
 "replace nvim with a2ui input component, and in general use hotty-a2ui for
 margin", the whole screen in one go. hotty-a2ui (`neuroplastio/hotty-a2ui`)
 renders an A2UI tree of components as HTML surfaces on a HOTTY host and as
@@ -709,3 +710,35 @@ resource per diagram.
   notice); flattening in a Rust wrapper of margin's own (Rust to keep for one
   string pass, where Go's needs none); asking upstream for concrete colours
   first (the flattening is Ondine's own approach for resvg, in its CLI).
+
+**D25 — The review's panes are hotty-surf surfaces. Supersedes D22's
+component kit; amends D17.** Maintainer direction (2026-11-09): hotty-a2ui is
+archived, so margin moves its panes to hotty-surf on the latest hotty-go
+(plan: `hotty-surf-port.md`). Done 2026-11-10 on hotty-surf v0.5.1.
+
+- **What is a pane.** Each is a hotty-surf template (`*.surf`) and a small Go
+  state it shows, hosted by a `surftea.Host` (`surfhost.go`): the composer
+  (`compose.surf`: a field of 3–8 rows and three buttons), the palette, the
+  search prompt, the footer, the tree pane (`filetree.surf`: a list of items
+  with depth, branch and open) and the threads view (`threads.surf`: a table).
+  An open thread's comments are `surfmd` Markdown drawn in cells at the box's
+  width (`comments.go`), with margin keeping the two columns beside them. On a
+  host the first six are surfaces over margin's cells, as D22 had them; the
+  comments stay cells.
+- **What stays margin's.** As D22: the document column and its gutter; and the
+  state behind each pane — the palette's matching, the threads view's and the
+  tree's selection and focus, which folders are folded. A surface shows it and
+  edits what it holds (a field's text); a click or a key asks margin through a
+  callback.
+- **Heights.** A pane that grows is placed with `Fit` (SPEC §5.2): hotty-surf's
+  estimate from the host's cell first (`surfui.Rows`), the host's measure after,
+  and a fit event re-places the frame. No pane copies surf.css's pixels.
+- **Keys.** As D22: margin reads every key first. A surface's own keys go to it
+  (`CellsKey` in cells, `Host.Key` on a host); the keys margin answers are the
+  surface's `program` keys, which a field gives back.
+- **Gone.** `kit.go`, `a2uibridge.go`, the pane plumbing in `hotty.go`, and
+  hotty-a2ui and the old-path hotty-go from go.mod.
+- **Rejected.** Home-made components while hotty-surf lacked a field, a table
+  and a tree (margin built none); keeping hotty-a2ui for the panes not yet
+  moved (the bridge, `a2uibridge.go`, was the cost, and went with the last
+  pane).

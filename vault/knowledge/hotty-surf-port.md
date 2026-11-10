@@ -1,5 +1,7 @@
 # Porting margin to hotty-surf — the plan
 
+**Done 2026-11-10** (legs 5–10, hotty-surf v0.5.1; D25, journals 2026-11-10.1–.8).
+
 Revised 2026-11-09: hotty-a2ui is archived, and the stack has moved to
 `neuroplast.io/...` paths (hotty-go v0.7.1, hotty-surf v0.3.0, cel-lite
 v0.2.0, myelinkey v0.2.0). The first plan (2026-11-05, gov's brief: "port
