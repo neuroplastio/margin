@@ -330,6 +330,7 @@ func (m *model) threadsHost(rows int) *surftea.Host {
 // one is a fresh table, scrolled to the top.
 func (m *model) dropInbox() {
 	if m.inboxHost != nil && m.hot != nil {
+		delete(m.hot.surfFit, m.inboxHost.Name())
 		m.hot.s.Delete(m.inboxHost.Name())
 	}
 	m.inboxHost, m.inboxState, m.inboxOpen = nil, nil, false

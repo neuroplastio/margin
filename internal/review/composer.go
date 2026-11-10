@@ -179,6 +179,7 @@ func (m *model) dropComposer() {
 		return
 	}
 	if m.hot != nil {
+		delete(m.hot.surfFit, m.comp.host.Name())
 		m.hot.s.Delete(m.comp.host.Name())
 	}
 	m.comp.host.Close()

@@ -63,6 +63,12 @@ func hotRunWith(t *testing.T, src string, setup func(m *model), play func(h *hot
 		setup(m)
 	}
 
+	return hotPlay(t, m, play, opts...)
+}
+
+// hotPlay runs the model m against a test host and plays play on it.
+func hotPlay(t *testing.T, m *model, play func(h *hottytest.Host, m *model), opts ...hottytest.Option) (*model, *hottytest.Host) {
+	t.Helper()
 	h := hottytest.New(t, opts...)
 	p := tea.NewProgram(m, tea.WithInput(h), tea.WithOutput(m.hotWatch(h)),
 		tea.WithWindowSize(100, 40), tea.WithoutSignalHandler(),

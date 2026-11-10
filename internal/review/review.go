@@ -2141,6 +2141,10 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 		return nil
 	}
 
+	// A click anywhere else is a click in the document: the tree pane
+	// gives the keyboard back, as tab does.
+	m.treeFocus = false
+
 	if relX, relY, ok := m.inComposer(mo.X, line); ok {
 		m.comp.host.CellsClick(relX, relY)
 		return m.composerActs()

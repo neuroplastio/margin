@@ -89,6 +89,7 @@ type hotState struct {
 	now  []hotSent
 
 	relayoutDue bool
+	surfFit     map[string]int // the rows a surface's last fit asked for
 	anchor      *hotAnchor
 	closed      bool
 
@@ -187,6 +188,7 @@ func newHotState() *hotState {
 	h := &hotState{
 		s:       hottytea.New(),
 		rows:    map[hotKey]int{},
+		surfFit: map[string]int{},
 		last:    map[string]int{},
 		asked:   map[hotKey]bool{},
 		pending: map[int]hotKey{},
@@ -298,6 +300,13 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 				// A surface's own: its model hears the rows (@height), and
 				// the frame is placed again at them.
 				sp.Event(h.s, msg.Event)
+				// Only a change in rows needs the frame again: placing it
+				// again makes the host fit it again, so a fit that repeats
+				// the last one must not draw (it spun the CPU).
+				if h.surfFit[msg.Event.Surface] == msg.Event.FitRows {
+					return nil, false
+				}
+				h.surfFit[msg.Event.Surface] = msg.Event.FitRows
 				return h.relayoutSoon(), false
 			}
 			if m.hotFit(msg.Event) {
@@ -740,6 +749,7 @@ func (m *model) hotEvent(ev hotty.Event) tea.Cmd {
 		m.hoveredEntry = entry
 		m.hot.hoverFrom = ev.Surface
 	case hotty.EventPress:
+		m.treeFocus = false // a press in the document takes the keyboard back
 		target := cursor{entry: entry, comment: commentNone}
 		if m.comp != nil {
 			m.blur(&target)

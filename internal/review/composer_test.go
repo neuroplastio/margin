@@ -327,3 +327,30 @@ func TestComposerWheelScrollsItsField(t *testing.T) {
 		t.Errorf("the document scrolled from %d to %d under a wheel over the composer", scroll, m.scroll)
 	}
 }
+
+// On a host the file tree is a surface, and a click on a file in it selects
+// the file and gives the pane the keyboard.
+func TestHottyTreeClickSelectsAFile(t *testing.T) {
+	root, _, _ := treeFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.hot = newHotState()
+	m.hot.mermaid = fakeMermaid
+	m.hotOpen()
+	name := "margin-" + treeID
+	got, _ := hotPlay(t, m, func(h *hottytest.Host, m *model) {
+		var s *hottytest.Surface
+		waitFor(t, "the tree's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
+		waitFor(t, "its files", func() bool { return strings.Contains(s.Text(), "spec.md") })
+		t.Logf("tree text %q", s.Text())
+		if err := h.Click(name, "r.ktree.kdocs_2fspec_2emd"); err != nil {
+			t.Fatal(err)
+		}
+		waitFor(t, "the pane to have the keyboard", func() bool { return m.treeFocus })
+	})
+	if got.tree[got.treeAt].rel != "docs/spec.md" {
+		t.Errorf("the click selected %q, want docs/spec.md", got.tree[got.treeAt].rel)
+	}
+}

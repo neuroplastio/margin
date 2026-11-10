@@ -473,6 +473,7 @@ func (m *model) treeClicked(path string) {
 // dropTree forgets the tree pane's surface, and the host's.
 func (m *model) dropTree() {
 	if m.treeSurf != nil && m.hot != nil {
+		delete(m.hot.surfFit, m.treeSurf.Name())
 		m.hot.s.Delete(m.treeSurf.Name())
 	}
 	m.treeSurf, m.treeState, m.treeKeys = nil, nil, false

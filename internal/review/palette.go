@@ -340,6 +340,7 @@ func (m *model) closePalette() {
 // dropPalette forgets the palette's surface, and the host's.
 func (m *model) dropPalette() {
 	if m.palette != nil && m.hot != nil {
+		delete(m.hot.surfFit, m.palette.Name())
 		m.hot.s.Delete(m.palette.Name())
 	}
 	m.palette, m.paletteState = nil, nil
