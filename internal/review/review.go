@@ -2624,7 +2624,7 @@ func (m *model) render() []string {
 			bk := bodyKey{entry: i, w: w, off: m.codeScroll[e.b.anchor], mark: mark, partial: markPartial}
 			bd, ok := m.bodies[bk]
 			if !ok {
-				bd = drawBody(e.b, w, mark, markPartial, bk.off)
+				bd = drawBody(e.b, w, mark, markPartial, bk.off, m.linkBase())
 				if m.bodies == nil {
 					m.bodies = map[bodyKey]drawnBody{}
 				}
@@ -2730,7 +2730,7 @@ type drawnBody struct {
 // drawBody renders a block's body at width w: what render draws beside the
 // gutter. It reads nothing but its arguments, so render keeps what it
 // returns in m.bodies.
-func drawBody(b block, w int, mark reviewMark, markPartial bool, off int) drawnBody {
+func drawBody(b block, w int, mark reviewMark, markPartial bool, off int, lk linkBase) drawnBody {
 	body := textStyle
 	if mark == markOK && !markPartial {
 		// Reviewed prose recedes so unreviewed text is what draws the eye.
@@ -2759,17 +2759,17 @@ func drawBody(b block, w int, mark reviewMark, markPartial bool, off int) drawnB
 	preStyled := false
 	switch b.kind {
 	case blockPara:
-		out = wrapInline(b.text, w, body)
+		out = wrapInline(b.text, w, body, lk)
 		preStyled = true
 	case blockList, blockListItem:
 		if mark != markOK {
 			body = rawStyle
 		}
-		out = wrapList(b.items, w, body)
+		out = wrapList(b.items, w, body, lk)
 		preStyled = true
 	case blockQuote:
 		rule = dimStyle.Render("│ ")
-		out = wrapQuote(b.lines, w-2, body)
+		out = wrapQuote(b.lines, w-2, body, lk)
 		preStyled = true
 	case blockCode:
 		// Chroma's own colours are the highlighting, regardless of
@@ -2824,7 +2824,7 @@ func drawBody(b block, w int, mark reviewMark, markPartial bool, off int) drawnB
 		// narrows columns to fit (2026-08-10 viewport-width
 		// feedback), because shaving a column hides the data the
 		// table exists to show.
-		out = renderTable(b.table, body)
+		out = renderTable(b.table, body, lk)
 		if off > 0 || hasOverflow(out, w) {
 			scrolled := make([]string, len(out))
 			for idx, l := range out {
@@ -3302,7 +3302,7 @@ func glueWords(s string) []glueWord {
 			} else {
 				text = ""
 			}
-			cur.frags = append(cur.frags, inlineRun{text: piece, bold: run.bold, code: run.code, link: run.link})
+			cur.frags = append(cur.frags, inlineRun{text: piece, bold: run.bold, code: run.code, link: run.link, href: run.href})
 			cur.width += lipgloss.Width(piece)
 		}
 	}
@@ -3332,7 +3332,7 @@ func fragStyle(f inlineRun, body lipgloss.Style) lipgloss.Style {
 // already ANSI-styled per RENDER-06 — **bold**, `code`, [links](url) — rather
 // than plain text for the caller to style uniformly. body is the base style
 // (plain or dimmed-for-reviewed) plain runs and bold both build on.
-func wrapInline(s string, w int, body lipgloss.Style) []string {
+func wrapInline(s string, w int, body lipgloss.Style, lk ...linkBase) []string {
 	words := glueWords(s)
 	var out []string
 	var line []glueWord
@@ -3347,7 +3347,7 @@ func wrapInline(s string, w int, body lipgloss.Style) []string {
 				sb.WriteByte(' ')
 			}
 			for _, f := range wd.frags {
-				sb.WriteString(fragStyle(f, body).Render(f.text))
+				sb.WriteString(renderFrag(f, body, lk))
 			}
 		}
 		out = append(out, sb.String())
@@ -3375,11 +3375,11 @@ func wrapInline(s string, w int, body lipgloss.Style) []string {
 // **bold**, `code` and [links](url) render instead of showing their raw
 // markup (2026-08-08 markdown-rendering feedback) — the prefix and hang
 // themselves are plain, unstyled indentation, never part of the source text.
-func wrapList(items []listItem, w int, body lipgloss.Style) []string {
+func wrapList(items []listItem, w int, body lipgloss.Style, lk ...linkBase) []string {
 	var out []string
 	for _, item := range items {
 		hang := strings.Repeat(" ", len(item.prefix))
-		for j, l := range wrapInline(item.text, w-len(item.prefix), body) {
+		for j, l := range wrapInline(item.text, w-len(item.prefix), body, lk...) {
 			if j == 0 {
 				out = append(out, item.prefix+l)
 			} else {
@@ -3404,14 +3404,14 @@ func wrapList(items []listItem, w int, body lipgloss.Style) []string {
 // own width; the caller (render) prepends the rule to every line this
 // returns, blank ones included, so the rule reads as one continuous line
 // down the quote rather than breaking for its own paragraph gaps.
-func wrapQuote(lines []string, w int, body lipgloss.Style) []string {
+func wrapQuote(lines []string, w int, body lipgloss.Style, lk ...linkBase) []string {
 	var out []string
 	var para []string
 	flush := func() {
 		if len(para) == 0 {
 			return
 		}
-		out = append(out, wrapInline(strings.Join(para, " "), w, body)...)
+		out = append(out, wrapInline(strings.Join(para, " "), w, body, lk...)...)
 		para = nil
 	}
 	for _, l := range lines {
@@ -3846,7 +3846,7 @@ const tableColumnSpacing = "  "
 // the 2026-08-10 viewport-width feedback replaced the old narrowing with
 // horizontal scroll, so renderTable renders the data at its true width and
 // the caller clips the rows through scrollCodeLine when they overflow.
-func renderTable(tb *tableBlock, body lipgloss.Style) []string {
+func renderTable(tb *tableBlock, body lipgloss.Style, lk ...linkBase) []string {
 	if tb == nil {
 		return nil
 	}
@@ -3857,10 +3857,10 @@ func renderTable(tb *tableBlock, body lipgloss.Style) []string {
 	widths := tableNaturalWidths(tb, cols)
 
 	lines := make([]string, 0, 2+len(tb.rows))
-	lines = append(lines, tableRowLine(tb.header, widths, tb.aligns, body.Bold(true)))
+	lines = append(lines, tableRowLine(tb.header, widths, tb.aligns, body.Bold(true), lk...))
 	lines = append(lines, dimStyle.Render(tableRuleLine(widths)))
 	for _, row := range tb.rows {
-		lines = append(lines, tableRowLine(row, widths, tb.aligns, body))
+		lines = append(lines, tableRowLine(row, widths, tb.aligns, body, lk...))
 	}
 	return lines
 }
@@ -3941,10 +3941,10 @@ func tableAlignAt(aligns []tableAlign, i int) tableAlign {
 // (cellWidth), and styling adds no runes, so the padded cell is exactly as
 // wide as its plain sibling would have been — a cell never needs truncating
 // because the column's width is the widest cell in it.
-func padCell(raw string, width int, align tableAlign, body lipgloss.Style) string {
+func padCell(raw string, width int, align tableAlign, body lipgloss.Style, lk ...linkBase) string {
 	var sb strings.Builder
 	for _, run := range parseInline(raw) {
-		sb.WriteString(fragStyle(run, body).Render(run.text))
+		sb.WriteString(renderFrag(run, body, lk))
 	}
 	s := sb.String()
 	pad := width - cellWidth(raw)
@@ -3968,10 +3968,10 @@ func padCell(raw string, width int, align tableAlign, body lipgloss.Style) strin
 // body so the header reads emphasised while its own **bold** runs and `code`
 // still render as themselves (fragStyle's rules) — and the join spacing
 // carries no colour.
-func tableRowLine(row []string, widths []int, aligns []tableAlign, style lipgloss.Style) string {
+func tableRowLine(row []string, widths []int, aligns []tableAlign, style lipgloss.Style, lk ...linkBase) string {
 	cells := make([]string, len(widths))
 	for i, width := range widths {
-		cells[i] = padCell(cellAt(row, i), width, tableAlignAt(aligns, i), style)
+		cells[i] = padCell(cellAt(row, i), width, tableAlignAt(aligns, i), style, lk...)
 	}
 	return strings.Join(cells, tableColumnSpacing)
 }

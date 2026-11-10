@@ -4,6 +4,10 @@ Last updated: 2026-11-10 (leg 5b, surftea.Host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (OSC 8 links) a link in the document's prose is a terminal hyperlink now —
+  whether a click opens the web link and the local files, the review-root
+  license link is right, and in-tree .md links having one too is wanted —
+  journal 2026-11-10.9
 - (leg 9, comments) an open thread's comments are surfmd Markdown drawn by
   hotty-surf — head over text, the focus bar, Markdown (bold, code, lists, a
   fenced block, typed line breaks), the composer under them — journal
@@ -1004,8 +1008,8 @@ document, regardless of the order the tree-view work itself lands in.
 - *(Leg 9, the open thread's comments on surfmd — landed 2026-11-10, journal 2026-11-10.7.)*
 - *(Leg 10, hotty-a2ui and the bridge gone — landed 2026-11-10, journal 2026-11-10.8; decision D25.)*
 - **Left of the port:** `surfmd.Highlight` for fenced code in comments; M2 (the
-  document column on hotty-surf; ask hotty Agent); OSC 8 links in the cells'
-  document column; the palette's id column on the table.
+  document column on hotty-surf; ask hotty Agent); the
+  palette's id column on the table. *(OSC 8 links in the cells' document column — landed 2026-11-10, journal 2026-11-10.9.)*
 
 ## Backlog — M4 (round two)
 

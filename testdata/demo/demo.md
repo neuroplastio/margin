@@ -202,3 +202,11 @@ Footnotes are not a thing in margin yet[^1], but a block that mentions one
 still anchors.
 
 [^1]: This is why a block's id is not its text.
+
+### Links out of the document
+
+A link to the web, [margin's README on GitHub](https://github.com/neuroplastio/margin#readme),
+is a terminal hyperlink: click it. So is one to a file beside the document, like
+[the demo's own screenshot](review.png) or [the Makefile two levels up](../../Makefile),
+and one to a file from the review's root, like [the license](/LICENSE). A link to
+[this section's heading](#links-out-of-the-document) is margin's own: `ctrl+]` follows it.

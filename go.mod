@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	github.com/charmbracelet/x/ansi v0.11.8
 	neuroplast.io/cel-lite v0.2.0
 	neuroplast.io/hotty-go v0.7.2
 	neuroplast.io/hotty-go/hottytea v0.7.2
@@ -28,7 +29,6 @@ require (
 
 require (
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
-	github.com/charmbracelet/x/ansi v0.11.8 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
