@@ -4,6 +4,10 @@ Last updated: 2026-11-10 (leg 5b, surftea.Host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (leg 9, comments) an open thread's comments are surfmd Markdown drawn by
+  hotty-surf — head over text, the focus bar, Markdown (bold, code, lists, a
+  fenced block, typed line breaks), the composer under them — journal
+  2026-11-10.7
 - (leg 8, tree pane) the file tree is a hotty-surf tree list now — whether it
   reads as a tree, folders fold on a click, the selection and the open file are
   clear, the pane's width is right with the chevrons, on a host and in cells —
@@ -997,7 +1001,8 @@ document, regardless of the order the tree-view work itself lands in.
 - *(Leg 7, the threads view on a hotty-surf table; hotty-surf v0.5.1 — landed 2026-11-10, journal 2026-11-10.5.)*
 - *(B11, the palette's host height from `Rows` and `Fit` — landed 2026-11-10, journal 2026-11-10.4.)*
 - *(Leg 8, the tree pane on a hotty-surf tree list — landed 2026-11-10, journal 2026-11-10.6.)*
-- Then leg 9 (open thread), in that
+- *(Leg 9, the open thread's comments on surfmd — landed 2026-11-10, journal 2026-11-10.7.)*
+- Then leg 10 (the cleanup that drops hotty-a2ui), in that
   order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
   hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops
   hotty-a2ui.

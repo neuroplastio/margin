@@ -1,6 +1,7 @@
 package review
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -2398,9 +2399,14 @@ func TestCommentKeepsTypedLineBreaks(t *testing.T) {
 	thr := m.threads[convoAnchor]
 	thr.posted[0].body = "line one\nline two\n\n- a\n- b"
 	plain := ansiRe.ReplaceAllString(strings.Join(m.appendComments(nil, i, thr, 80, 0, 0), "\n"), "")
-	for _, want := range []string{"  line one\n", "  line two\n", "• a", "• b"} {
-		if !strings.Contains(plain, want) {
-			t.Errorf("thread does not show %q:\n%s", want, plain)
+	var rows []string
+	for _, l := range strings.Split(plain, "\n") {
+		rows = append(rows, strings.TrimRight(l, " "))
+	}
+	// Each typed line is a row of its own; a list stays a list.
+	for _, want := range []string{"  line one", "  line two", "  • a", "  • b"} {
+		if !slices.Contains(rows, want) {
+			t.Errorf("thread does not show the row %q:\n%s", want, plain)
 		}
 	}
 }
