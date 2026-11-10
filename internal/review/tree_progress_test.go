@@ -3,6 +3,7 @@ package review
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -88,21 +89,21 @@ func TestPaneShowsPerFileProgress(t *testing.T) {
 	// One of two README blocks reviewed: "1/2" after the name.
 	markFocused(t, m, markOK)
 	rows = m.renderTree(30)
-	if !strings.Contains(rows[0], "README.md  1/2") {
+	if !treeRowHas(rows[0], `README\.md\s+1/2$`) {
 		t.Errorf("partially reviewed README row = %q, want 1/2", rows[0])
 	}
 
 	// The whole README reviewed: "2/2".
 	markAllReviewed(m)
 	rows = m.renderTree(30)
-	if !strings.Contains(rows[0], "README.md  2/2") {
+	if !treeRowHas(rows[0], `README\.md\s+2/2$`) {
 		t.Errorf("fully reviewed README row = %q, want 2/2", rows[0])
 	}
 
 	// A flagged block: "1/2!" — the `!` signals attention remains.
 	markFocusedOn(t, m, firstMarkableEntry(m), markFlag)
 	rows = m.renderTree(30)
-	if !strings.Contains(rows[0], "README.md  1/2!") {
+	if !treeRowHas(rows[0], `README\.md\s+1/2!$`) {
 		t.Errorf("flagged README row = %q, want 1/2!", rows[0])
 	}
 
@@ -211,4 +212,11 @@ func TestFooterRollsUpTheWholeTree(t *testing.T) {
 	if !strings.Contains(out, "tree 1/3 reviewed") || !strings.Contains(out, "1 flagged") {
 		t.Errorf("footer after flagging the spec = %q, want tree 1/3 reviewed · 1 flagged", out)
 	}
+}
+
+// treeRowHas reports whether the row, as plain text with its trailing
+// edge cells trimmed, matches the pattern.
+func treeRowHas(row, pattern string) bool {
+	plain := strings.TrimRight(ansiRe.ReplaceAllString(row, ""), " ▕")
+	return regexp.MustCompile(pattern).MatchString(plain)
 }

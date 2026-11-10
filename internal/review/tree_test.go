@@ -244,18 +244,22 @@ func TestRenderTreeMarksFocusAndOpenDoc(t *testing.T) {
 		t.Fatalf("newTreeModel: %v", err)
 	}
 	m.w, m.h = 100, 30
+	m.renderTree(30) // the surface is shown; the keyboard comes with the next frame
 	m.treeFocus = true
 	rows := m.renderTree(30)
 	if len(rows) != 30 {
 		t.Fatalf("renderTree returned %d rows, want 30", len(rows))
 	}
-	// Row 0 is the open README and the focused row: the tree's selection
-	// bar, and the open document's ▸.
-	if plain := ansiRe.ReplaceAllString(rows[0], ""); !strings.HasPrefix(plain, "│") || !strings.Contains(plain, "▸ README.md") {
-		t.Errorf("focused open row has no selection bar or ▸:\n%q", rows[0])
+	// Row 0 is the open README and the focused row: the selection's bar on
+	// its ground, the open document bold in the accent's tone (current).
+	if !strings.HasPrefix(rows[0], "\x1b[0;100;35m▎") || !strings.Contains(rows[0], "README.md") {
+		t.Errorf("focused open row has no selection bar:\n%q", rows[0])
+	}
+	if !strings.Contains(rows[0], "\x1b[0;100;35;1m") {
+		t.Errorf("the open document is not current (bold in the accent):\n%q", rows[0])
 	}
 	// Row 1 is the docs directory, open, not a focus stop.
-	if plain := ansiRe.ReplaceAllString(rows[1], ""); !strings.Contains(plain, "▼ docs") {
+	if plain := ansiRe.ReplaceAllString(rows[1], ""); !strings.Contains(plain, "▾ docs") {
 		t.Errorf("dir header missing:\n%q", rows[1])
 	}
 }
@@ -327,5 +331,37 @@ func TestTreePaneClickFocusesAFile(t *testing.T) {
 	}
 	if m.store.docPath != "README.md" {
 		t.Errorf("a click opened %s; it only focuses", m.store.docPath)
+	}
+}
+
+// A click on a folder folds it, on its name or on its chevron, and again
+// opens it; the files under a closed folder are not drawn, and the keys keep
+// skipping the rows that are not there.
+func TestTreePaneFoldsAFolder(t *testing.T) {
+	root, _, _ := treeFixture(t)
+	m, err := newTreeModel(root)
+	if err != nil {
+		t.Fatalf("newTreeModel: %v", err)
+	}
+	m.w, m.h = 100, 30
+	m.View()
+	row := func(i int) string { return ansiRe.ReplaceAllString(m.renderTree(30)[i], "") }
+	if !strings.Contains(row(2), "spec.md") {
+		t.Fatalf("docs is open at first, row 2 = %q", row(2))
+	}
+	for _, x := range []int{6, 2} { // its name, then its chevron
+		m.handleClick(tea.Mouse{X: x, Y: 1})
+		m.View()
+		if !m.treeClosed["docs/"] || strings.Contains(row(2), "spec.md") || !strings.Contains(row(1), "▸ docs") {
+			t.Fatalf("a click at %d did not fold docs: closed %v, rows %q %q", x, m.treeClosed, row(1), row(2))
+		}
+		m.handleClick(tea.Mouse{X: x, Y: 1})
+		m.View()
+		if m.treeClosed["docs/"] || !strings.Contains(row(2), "spec.md") {
+			t.Fatalf("a second click at %d did not open docs again: rows %q %q", x, row(1), row(2))
+		}
+	}
+	if m.treeFocus {
+		t.Error("folding a folder gave the pane the keyboard; only a file does")
 	}
 }

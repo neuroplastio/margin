@@ -1,0 +1,15 @@
+<!-- margin's file tree: the markdown files of a directory review, in folders.
+     The rows are margin's (it folds, it keeps the selection and every key:
+     keys="none"); a click on a file selects it, a click on a folder or its
+     chevron folds it. The open document is current, and a file with marks
+     carries its reviewed/total at the row's end. -->
+<surface>
+  <list scroll keys="none" :height="height" key="tree">
+    <item :each="n in nodes" :key="n.path" :depth="n.depth" :branch="n.dir" :open="n.open"
+          :selected="n.path == at" :current="n.current"
+          @click="pick(n.path)" @toggle="fold(n.path)">
+      <text grow>{{ n.name }}</text>
+      <text :if="n.progress != ''" small muted keep>{{ n.progress }}</text>
+    </item>
+  </list>
+</surface>

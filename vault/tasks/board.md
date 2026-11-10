@@ -4,6 +4,10 @@ Last updated: 2026-11-10 (leg 5b, surftea.Host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (leg 8, tree pane) the file tree is a hotty-surf tree list now — whether it
+  reads as a tree, folders fold on a click, the selection and the open file are
+  clear, the pane's width is right with the chevrons, on a host and in cells —
+  journal 2026-11-10.6
 - (leg 7, threads view) the threads view is a hotty-surf table now — whether it
   reads as a table, the selection is clear, j/k/g/G keep the row in view, the
   table fills the column and scrolls inside it, on a host and in cells —
@@ -992,7 +996,8 @@ document, regardless of the order the tree-view work itself lands in.
   2026-11-10.3.)*
 - *(Leg 7, the threads view on a hotty-surf table; hotty-surf v0.5.1 — landed 2026-11-10, journal 2026-11-10.5.)*
 - *(B11, the palette's host height from `Rows` and `Fit` — landed 2026-11-10, journal 2026-11-10.4.)*
-- Then legs 8–9 (tree pane, open thread), in that
+- *(Leg 8, the tree pane on a hotty-surf tree list — landed 2026-11-10, journal 2026-11-10.6.)*
+- Then leg 9 (open thread), in that
   order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
   hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops
   hotty-a2ui.

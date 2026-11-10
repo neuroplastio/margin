@@ -158,6 +158,13 @@ type model struct {
 	inboxState *Threads
 	inboxOpen  bool
 
+	// treeSurf is the file tree's surface and treeState what it shows;
+	// treeClosed are the folders the reviewer folded, by path and a slash.
+	treeSurf   *surftea.Host
+	treeState  *Filetree
+	treeClosed map[string]bool
+	treeKeys   bool // the list was given the keyboard
+
 	// raw switches the view to the document's verbatim markdown source — the
 	// 2026-08-09 navigation-feature-requests "rich/raw mode toggle". Rendered
 	// view re-reads m.doc's blocks; raw view re-reads m.src, the exact bytes
@@ -2144,9 +2151,7 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	// focus, and this is the tree's focus.
 	if m.tree != nil && mo.X < m.docX() && m.comp == nil {
 		if mo.X < m.treeW {
-			p := m.treePane(m.h - footerRows)
-			p.click(mo.X, mo.Y)
-			m.treeClicked(p)
+			m.treeHost(m.h-footerRows).CellsClick(mo.X, mo.Y)
 		}
 		return nil
 	}
@@ -3224,7 +3229,7 @@ func (m *model) view() tea.View {
 	// language the blockquote and gutter already use.
 	if m.tree != nil {
 		pane := m.renderTree(viewport)
-		if m.hot != nil && m.hot.place(m.treePane(viewport), hottytea.Rect{W: m.treeW, H: viewport}, hottytea.Rect{W: m.w, H: viewport}) {
+		if m.hot != nil && m.hot.placeSurf(m.treeHost(viewport), hottytea.Rect{W: m.treeW, H: viewport}, hottytea.Rect{W: m.w, H: viewport}) {
 			for i := range pane {
 				pane[i] = strings.Repeat(" ", m.treeW)
 			}

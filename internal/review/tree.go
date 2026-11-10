@@ -18,10 +18,11 @@ import (
 	"sort"
 	"strings"
 
-	"charm.land/lipgloss/v2"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
-	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
+	"neuroplast.io/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surftea"
 )
 
 // treeEntry is one row of the file-tree pane: either a directory header
@@ -357,76 +358,127 @@ func (m *model) handlePaneKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// treeID is the tree pane's pane (D22): the review's markdown files as a
-// tree of folders.
+// treeID is the tree pane's surface name: the review's markdown files as a
+// tree of folders (filetree.surf).
 const treeID = "tree"
 
-// treePane is the tree pane, rows tall, as the model has it: the files, the
-// one focused (the tree's selection), and the open one marked ▸. Each file
-// carries its reviewed/total once it has marks. margin keeps the focus and
-// the keys; a click on a file focuses it (treeClicked). Folders start open,
-// and stay as the reviewer folds them.
-func (m *model) treePane(rows int) *pane {
-	var open []any
-	for _, e := range m.tree {
-		if e.isDir {
-			open = append(open, e.rel+"/")
-		}
+// Filetree is the tree pane's state (filetree.surf lays it out): the rows that
+// show, the one selected, and how tall the list is. margin keeps what is
+// folded, the selection and the keys; a click on a file selects it, and on a
+// folder folds it.
+type Filetree struct {
+	Nodes  []FileNode
+	At     string
+	Height int
+
+	pick func(string)
+	fold func(string)
+}
+
+// FileNode is a row of the tree: a folder or a markdown file.
+type FileNode struct {
+	Path     string
+	Name     string
+	Depth    int
+	Dir      bool
+	Open     bool
+	Current  bool
+	Progress string
+}
+
+// Pick is a click on a file, Fold a click on a folder or its chevron.
+func (f *Filetree) Pick(path string) {
+	if strings.HasSuffix(path, "/") {
+		f.Fold(path) // a folder's click folds it
+		return
 	}
-	p := m.panes().pane(treeID, map[string]any{"items": []any{}, "sel": "", "open": open})
-	p.define(obj("id", "root", "component", "HottyTree", "catalogId", hottycat.ID,
-		"items", bind("/items"), "selected", bind("/sel"), "expanded", bind("/open"),
-		"height", max(rows, 1)))
-	p.put("/items", m.treeNodes())
+	if f.pick != nil {
+		f.pick(path)
+	}
+}
+func (f *Filetree) Fold(path string) {
+	if f.fold != nil {
+		f.fold(path)
+	}
+}
+
+// treeHost is the tree pane, rows tall, as the model has it: the files that
+// show, the one focused (the tree's selection), and the open one current.
+// Each file carries its reviewed/total once it has marks. Folders start
+// open, and stay as the reviewer folds them.
+func (m *model) treeHost(rows int) *surftea.Host {
+	if m.treeSurf != nil && m.treeKeys && !m.treeFocus {
+		m.dropTree()
+	}
+	if m.treeSurf == nil {
+		st := &Filetree{}
+		st.pick = func(path string) { m.treeClicked(path) }
+		st.fold = func(path string) {
+			if m.treeClosed == nil {
+				m.treeClosed = map[string]bool{}
+			}
+			m.treeClosed[path] = !m.treeClosed[path]
+		}
+		m.treeSurf = newSurfHost("margin-"+treeID, surflive.New(surfInterpFiletree(st)), nil)
+		m.treeState = st
+	}
+	st := m.treeState
+	st.Height = max(rows, 1)
+	st.At = ""
 	if m.treeAt >= 0 && m.treeAt < len(m.tree) {
-		p.put("/sel", m.tree[m.treeAt].rel)
+		st.At = m.tree[m.treeAt].rel
 	}
-	return p
-}
-
-// treeNodes is the tree as HottyTree's nodes: a folder's value is its path
-// and a slash, a file's its path.
-func (m *model) treeNodes() []any {
-	nodes, _ := m.treeLevel(0, -1)
-	return nodes
-}
-
-// treeLevel is the nodes of m.tree from i on that are deeper than depth,
-// and the index of the row after them.
-func (m *model) treeLevel(i, depth int) ([]any, int) {
-	nodes := []any{}
-	for i < len(m.tree) && m.tree[i].depth > depth {
-		e := m.tree[i]
+	st.Nodes = st.Nodes[:0]
+	hidden := -1 // the depth of the closed folder whose rows are being skipped
+	for _, e := range m.tree {
+		if hidden >= 0 {
+			if e.depth > hidden {
+				continue
+			}
+			hidden = -1
+		}
+		n := FileNode{Path: e.rel, Name: e.name, Depth: e.depth, Dir: e.isDir, Progress: m.fileProgress(e)}
 		if e.isDir {
-			kids, next := m.treeLevel(i+1, e.depth)
-			nodes = append(nodes, obj("label", e.name, "value", e.rel+"/", "children", kids))
-			i = next
-			continue
+			n.Path = e.rel + "/"
+			n.Open = !m.treeClosed[n.Path]
+			if !n.Open {
+				hidden = e.depth
+			}
+		} else {
+			n.Current = m.store != nil && e.rel == m.store.docPath
 		}
-		label := e.name
-		if m.store != nil && e.rel == m.store.docPath {
-			label = "▸ " + label
-		}
-		if prog := m.fileProgress(e); prog != "" {
-			label += "  " + prog
-		}
-		nodes = append(nodes, obj("label", label, "value", e.rel))
-		i++
+		st.Nodes = append(st.Nodes, n)
 	}
-	return nodes, i
+	// The selection is bright while the list has the keyboard, and quiet while
+	// another pane has it: the list has it when margin's focus is the pane's.
+	// The surface takes the keyboard (Focus) but cannot be told to give it
+	// back, so a pane that loses margin's focus is a new surface.
+	if m.treeFocus {
+		m.treeSurf.Focus("tree")
+	}
+	m.treeKeys = m.treeFocus
+	return m.treeSurf
 }
 
 // treeClicked takes the file a click in the tree pane selected: the pane has
-// the keyboard from then on, as a click on its row always gave it.
-func (m *model) treeClicked(p *pane) {
-	sel := p.text("/sel")
+// the keyboard from then on, as a click on its row always gave it. A folder
+// path is not a file: the click folded it (Filetree.Fold).
+func (m *model) treeClicked(path string) {
 	for i, e := range m.tree {
-		if !e.isDir && e.rel == sel {
+		if !e.isDir && e.rel == path {
 			m.treeAt = i
 			m.treeFocus = true
 			return
 		}
 	}
+}
+
+// dropTree forgets the tree pane's surface, and the host's.
+func (m *model) dropTree() {
+	if m.treeSurf != nil && m.hot != nil {
+		m.hot.s.Delete(m.treeSurf.Name())
+	}
+	m.treeSurf, m.treeState, m.treeKeys = nil, nil, false
 }
 
 // renderTree returns the pane's rows for one viewport, each padded to treeW
@@ -436,7 +488,7 @@ func (m *model) renderTree(viewport int) []string {
 	if len(m.tree) == 0 {
 		return rows
 	}
-	lines := m.treePane(viewport).lines(m.treeW)
+	lines := m.treeHost(viewport).Lines(m.treeW, viewport)
 	for i := range rows {
 		l := ""
 		if i < len(lines) {

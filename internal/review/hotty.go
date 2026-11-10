@@ -696,8 +696,6 @@ func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
 	switch {
 	case p.id == searchID && m.searchOpen:
 		m.searchDrafted(p.text("/draft"))
-	case p.id == treeID && m.tree != nil:
-		m.treeClicked(p)
 	}
 	return nil
 }
