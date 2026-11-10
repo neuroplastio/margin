@@ -92,9 +92,15 @@ neuroplast.io/hotty-go/hottytest v0.7.2 h1:xYX1s7hgy256dLCValDrki3KGP9Cy9ab/e15U
 neuroplast.io/hotty-go/hottytest v0.7.2/go.mod h1:7klEaIM08O1iGpKf80wdECNV2Fg6V1Z51zOyYrKXeAY=
 neuroplast.io/hotty-surf v0.5.1 h1:ViC10iru/kmMiX01KhGm9XycgIyqaniXRYqEQBBRrP0=
 neuroplast.io/hotty-surf v0.5.1/go.mod h1:WLUoAaXt4cHyx7n9T31V7NneL/6U/SxvssT33i3qzs8=
+neuroplast.io/hotty-surf v0.5.2 h1:sK21Kl0WzLGHlOTIKnC7oLBS2JfyHDcEDtnDp0DUPO0=
+neuroplast.io/hotty-surf v0.5.2/go.mod h1:WLUoAaXt4cHyx7n9T31V7NneL/6U/SxvssT33i3qzs8=
 neuroplast.io/hotty-surf/surfmd v0.5.1 h1:A84EK2VZ3a9Bvi6QZc2XgO8RvEu0LVLv+IoZM+2Lm9o=
 neuroplast.io/hotty-surf/surfmd v0.5.1/go.mod h1:DFdD/9hc5PC710BG6JTPGo4jrGm6VETAITppBVljFcY=
+neuroplast.io/hotty-surf/surfmd v0.5.2 h1:rWSomRU+xK3F2BMbxkuReMyle/0W7oIkuXRwPVz5YJk=
+neuroplast.io/hotty-surf/surfmd v0.5.2/go.mod h1:M4/EFgcDyHPhI5X7quZ+jXWDBHtWQcifICG2jF7NZDs=
 neuroplast.io/hotty-surf/surftea v0.5.1 h1:KaPU65Q0gylc5Aa7lbYdwvUIQ/G1v8ol+W40591AHrg=
 neuroplast.io/hotty-surf/surftea v0.5.1/go.mod h1:/XBrNVDKFnF+aXn2kVaqA4cokD6fljURPfoMevM7xag=
+neuroplast.io/hotty-surf/surftea v0.5.2 h1:zcnvA9D6B67uyTLHbZ/HTD4pKRQQhCGAcKe5F8bw7jA=
+neuroplast.io/hotty-surf/surftea v0.5.2/go.mod h1:AyoTQqMxjukOLSmsRL/uWupvd0BVRLKO3Pe7q9SDFow=
 neuroplast.io/myelin/myelinkey v0.2.0 h1:RE+jhCWkbMoqIWxga2QaDODUU9RxD9nzxCmxTsFHQWI=
 neuroplast.io/myelin/myelinkey v0.2.0/go.mod h1:PWXpdoPkJBOoZUsngEvtMu8n+qTfiDxVXuhWY5lxGD4=

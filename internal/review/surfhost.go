@@ -33,13 +33,9 @@ func newSurfHost(name string, m surfrun.Model, keys []string) *surftea.Host {
 
 // surfRows is how many rows a surface takes on a host, cols wide: hotty-surf's
 // estimate from the host's cell until the host has measured it (a fit event),
-// then the host's. A surface that is not shown yet has no tree to count, so
-// it is shown once first; the Layout shows it again, and sends that frame.
+// then the host's.
 func surfRows(h *surftea.Host, cols int, caps hotty.Caps) int {
 	s := h.Surf()
-	if s.Tree() == nil {
-		s.Show()
-	}
 	s.Size(cols, surfui.Metrics{CellW: caps.CellCSS.W, CellH: caps.CellCSS.H})
 	rows, _ := s.Rows()
 	return rows

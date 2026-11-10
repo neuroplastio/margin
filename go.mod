@@ -22,9 +22,9 @@ require (
 	neuroplast.io/hotty-go v0.7.2
 	neuroplast.io/hotty-go/hottytea v0.7.2
 	neuroplast.io/hotty-go/hottytest v0.7.2
-	neuroplast.io/hotty-surf v0.5.1
-	neuroplast.io/hotty-surf/surfmd v0.5.1
-	neuroplast.io/hotty-surf/surftea v0.5.1
+	neuroplast.io/hotty-surf v0.5.2
+	neuroplast.io/hotty-surf/surfmd v0.5.2
+	neuroplast.io/hotty-surf/surftea v0.5.2
 )
 
 require (

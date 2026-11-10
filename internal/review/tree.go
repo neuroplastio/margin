@@ -407,9 +407,6 @@ func (f *Filetree) Fold(path string) {
 // Each file carries its reviewed/total once it has marks. Folders start
 // open, and stay as the reviewer folds them.
 func (m *model) treeHost(rows int) *surftea.Host {
-	if m.treeSurf != nil && m.treeKeys && !m.treeFocus {
-		m.dropTree()
-	}
 	if m.treeSurf == nil {
 		st := &Filetree{}
 		st.pick = func(path string) { m.treeClicked(path) }
@@ -451,10 +448,10 @@ func (m *model) treeHost(rows int) *surftea.Host {
 	}
 	// The selection is bright while the list has the keyboard, and quiet while
 	// another pane has it: the list has it when margin's focus is the pane's.
-	// The surface takes the keyboard (Focus) but cannot be told to give it
-	// back, so a pane that loses margin's focus is a new surface.
 	if m.treeFocus {
 		m.treeSurf.Focus("tree")
+	} else if m.treeKeys {
+		m.treeSurf.CellsBlur()
 	}
 	m.treeKeys = m.treeFocus
 	return m.treeSurf
