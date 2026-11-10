@@ -973,9 +973,10 @@ document, regardless of the order the tree-view work itself lands in.
   stylesheet per Session, selects and menus as surfaces, `CellsClick`). Then
   leg 6, the composer on `<field rows="3..8">` (`trap`, `caret="end"`,
   `@height`; surfui.Rows and Fit for the height `paletteHostHeight` guesses).
-- Then legs 6–9 (composer, threads view, tree pane, open thread), each
-  blocked on its hotty-surf gap (G1, G5, G2, G3; none started), and leg 10,
-  the cleanup that drops hotty-a2ui.
+- Then legs 6–9 (composer, threads view, tree pane, open thread), in that
+  order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
+  hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops
+  hotty-a2ui.
 
 ## Backlog — M4 (round two)
 

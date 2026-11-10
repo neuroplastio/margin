@@ -73,9 +73,9 @@ func (o surfFooter) Field(i int) cellite.Value {
 	return cellite.NullValue()
 }
 
-func (o surfFooter) Shape() *surf.Shape { return &surfShapeFooter }
-
 func (o surfFooter) Unwrap() any { return o.p }
+
+func (o surfFooter) Shape() *surf.Shape { return &surfShapeFooter }
 
 func (o surfFooter) Call(m int, args []cellite.Value) cellite.Value {
 	switch m {
@@ -130,9 +130,9 @@ func (o surfPalette) Field(i int) cellite.Value {
 	return cellite.NullValue()
 }
 
-func (o surfPalette) Shape() *surf.Shape { return &surfShapePalette }
-
 func (o surfPalette) Unwrap() any { return o.p }
+
+func (o surfPalette) Shape() *surf.Shape { return &surfShapePalette }
 
 func (o surfPalette) Call(m int, args []cellite.Value) cellite.Value {
 	switch m {
@@ -186,9 +186,9 @@ func (o surfSearch) Field(i int) cellite.Value {
 	return cellite.NullValue()
 }
 
-func (o surfSearch) Shape() *surf.Shape { return &surfShapeSearch }
-
 func (o surfSearch) Unwrap() any { return o.p }
+
+func (o surfSearch) Shape() *surf.Shape { return &surfShapeSearch }
 
 func (o surfSearch) Call(m int, args []cellite.Value) cellite.Value {
 	switch m {
@@ -235,6 +235,8 @@ func (o surfFooterHint) Field(i int) cellite.Value {
 	return cellite.NullValue()
 }
 
+func (o surfFooterHint) Unwrap() any { return o.p }
+
 // surfShapePaletteRow is PaletteRow's shape, a struct.
 var surfShapePaletteRow = surf.Shape{Name: "PaletteRow", Component: false,
 	Fields: []surf.Field{{Name: "k", Type: cellite.String}, {Name: "id", Type: cellite.String}, {Name: "title", Type: cellite.String}, {Name: "keys", Type: cellite.String}},
@@ -272,6 +274,8 @@ func (o surfPaletteRow) Field(i int) cellite.Value {
 	}
 	return cellite.NullValue()
 }
+
+func (o surfPaletteRow) Unwrap() any { return o.p }
 
 // surfRenderFooter draws footer.surf for Footer.
 func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fill) []*surfui.Node {
