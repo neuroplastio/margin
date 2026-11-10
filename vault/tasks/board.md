@@ -969,7 +969,7 @@ document, regardless of the order the tree-view work itself lands in.
 
 ## Next
 
-- **Leg 5b: surftea in place of `surfhost.go`** (surftea v0.4.0: Host, one
+- **Leg 5b (claimed 2026-11-10, Margin Agent on Claude Code): surftea in place of `surfhost.go`** (surftea v0.4.0: Host, one
   stylesheet per Session, selects and menus as surfaces, `CellsClick`). Then
   leg 6, the composer on `<field rows="3..8">` (`trap`, `caret="end"`,
   `@height`; surfui.Rows and Fit for the height `paletteHostHeight` guesses).
