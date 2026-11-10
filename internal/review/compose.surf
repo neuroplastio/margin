@@ -1,0 +1,17 @@
+<!-- margin's comment composer: a field of three to eight rows that grows with
+     the comment, and three buttons for the mouse. ctrl+s and ctrl+enter
+     submit, ctrl+g discards and escape keeps the draft: the field gives
+     those back (program keys), so a key never types. Tab walks from the
+     field to the buttons and back (trap). -->
+<surface>
+  <stack trap key="composer">
+    <field key="field" rows="3..8" wrap autofocus caret="end" :value="text"
+           placeholder="Write a comment"
+           @input="typed($value)" @height="grew($value)"/>
+    <row gap="1" key="bar">
+      <button key="submit" tone="accent" @click="submitted()">{{ submit }}</button>
+      <button key="draft" @click="kept()">Keep draft</button>
+      <button key="discard" tone="muted" @click="discarded()">Discard</button>
+    </row>
+  </stack>
+</surface>

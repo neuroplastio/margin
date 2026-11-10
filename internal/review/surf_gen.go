@@ -16,7 +16,7 @@ import (
 
 // The templates, embedded.
 //
-//go:embed footer.surf palette.surf search.surf
+//go:embed compose.surf footer.surf palette.surf search.surf
 var surfFiles embed.FS
 
 // surfSet is the templates, loaded at its first call.
@@ -31,7 +31,75 @@ var (
 )
 
 // surfShapes are what the templates name of the package's types.
-var surfShapes = []*surf.Shape{&surfShapeFooter, &surfShapePalette, &surfShapeSearch, &surfShapeFooterHint, &surfShapePaletteRow}
+var surfShapes = []*surf.Shape{&surfShapeCompose, &surfShapeFooter, &surfShapePalette, &surfShapeSearch, &surfShapeFooterHint, &surfShapePaletteRow}
+
+// surfShapeCompose is Compose's shape, a component.
+var surfShapeCompose = surf.Shape{Name: "Compose", Component: true,
+	Fields: []surf.Field{{Name: "text", Type: cellite.String}, {Name: "submit", Type: cellite.String}, {Name: "grown", Type: cellite.Int}},
+	Methods: []surf.Method{
+		{Name: "discarded"},
+		{Name: "grew", Args: []cellite.Type{cellite.Int}},
+		{Name: "kept"},
+		{Name: "submitted"},
+		{Name: "typed", Args: []cellite.Type{cellite.String}},
+	},
+}
+
+// surfCompose is a *Compose as its templates read it.
+type surfCompose struct{ p *Compose }
+
+// surfComposeValue is p as a value: null for nil.
+func surfComposeValue(p *Compose) cellite.Value {
+	if p == nil {
+		return cellite.NullValue()
+	}
+	return cellite.ObjectValue("Compose", surfCompose{p})
+}
+
+// surfComposeOf is a value's *Compose: nil for any other.
+func surfComposeOf(v cellite.Value) *Compose {
+	if o, ok := v.Object().(surfCompose); ok {
+		return o.p
+	}
+	return nil
+}
+
+func (o surfCompose) Field(i int) cellite.Value {
+	switch i {
+	case 0:
+		return cellite.StringValue(string(o.p.Text))
+	case 1:
+		return cellite.StringValue(string(o.p.Submit))
+	case 2:
+		return cellite.IntValue(int64(o.p.Grown))
+	}
+	return cellite.NullValue()
+}
+
+func (o surfCompose) Unwrap() any { return o.p }
+
+func (o surfCompose) Shape() *surf.Shape { return &surfShapeCompose }
+
+func (o surfCompose) Call(m int, args []cellite.Value) cellite.Value {
+	switch m {
+	case 0:
+		o.p.Discarded()
+	case 1:
+		o.p.Grew(int(args[0].Int()))
+	case 2:
+		o.p.Kept()
+	case 3:
+		o.p.Submitted()
+	case 4:
+		o.p.Typed(string(args[0].String()))
+	}
+	return cellite.NullValue()
+}
+
+// surfInterpCompose is c drawn by its template, interpreted.
+func surfInterpCompose(c *Compose) surflive.Component {
+	return surf.Component(surfSet(), surfCompose{c})
+}
 
 // surfShapeFooter is Footer's shape, a component.
 var surfShapeFooter = surf.Shape{Name: "Footer", Component: true,
@@ -276,6 +344,77 @@ func (o surfPaletteRow) Field(i int) cellite.Value {
 }
 
 func (o surfPaletteRow) Unwrap() any { return o.p }
+
+// surfRenderCompose draws compose.surf for Compose.
+func surfRenderCompose(e *surf.Errs, out []*surfui.Node, c *Compose, fill surf.Fill) []*surfui.Node {
+	// compose.surf:6:1 <surface>
+	if e.Enter("compose.surf", 6, 1) {
+		var k1 []*surfui.Node
+		// compose.surf:7:3 <stack>
+		if e.Enter("compose.surf", 7, 3) {
+			var k2 []*surfui.Node
+			// compose.surf:8:5 <field>
+			if e.Enter("compose.surf", 8, 5) {
+				n3 := surfui.Field()
+				surf.ModKey(n3, "field")
+				surf.ModWrap(n3, true)
+				surf.ModValue(n3, c.Text)
+				surf.ModPlaceholder(n3, "Write a comment")
+				surf.ModRows(n3, "3..8")
+				surf.ModCaret(n3, "end")
+				surf.ModAutofocus(n3, true)
+				n3.On("input", func(ev surfrun.Event) { c.Typed(ev.Value) })
+				n3.On("height", func(ev surfrun.Event) { c.Grew(int(ev.Rows)) })
+				k2 = append(k2, n3)
+				e.Leave()
+			}
+			// compose.surf:11:5 <row>
+			if e.Enter("compose.surf", 11, 5) {
+				var k4 []*surfui.Node
+				// compose.surf:12:7 <button>
+				if e.Enter("compose.surf", 12, 7) {
+					n5 := surfui.Button(c.Submit)
+					surf.ModKey(n5, "submit")
+					surf.ModTone(n5, "accent")
+					n5.On("click", func() { c.Submitted() })
+					k4 = append(k4, n5)
+					e.Leave()
+				}
+				// compose.surf:13:7 <button>
+				if e.Enter("compose.surf", 13, 7) {
+					n6 := surfui.Button("Keep draft")
+					surf.ModKey(n6, "draft")
+					n6.On("click", func() { c.Kept() })
+					k4 = append(k4, n6)
+					e.Leave()
+				}
+				// compose.surf:14:7 <button>
+				if e.Enter("compose.surf", 14, 7) {
+					n7 := surfui.Button("Discard")
+					surf.ModKey(n7, "discard")
+					surf.ModTone(n7, "muted")
+					n7.On("click", func() { c.Discarded() })
+					k4 = append(k4, n7)
+					e.Leave()
+				}
+				n4 := surfui.Row(k4...)
+				surf.ModKey(n4, "bar")
+				surf.ModGap(n4, 1)
+				k2 = append(k2, n4)
+				e.Leave()
+			}
+			n2 := surfui.Stack(k2...)
+			surf.ModKey(n2, "composer")
+			surf.ModTrap(n2, true)
+			k1 = append(k1, n2)
+			e.Leave()
+		}
+		n1 := surf.NewSurface(k1...)
+		out = append(out, n1)
+		e.Leave()
+	}
+	return out
+}
 
 // surfRenderFooter draws footer.surf for Footer.
 func surfRenderFooter(e *surf.Errs, out []*surfui.Node, c *Footer, fill surf.Fill) []*surfui.Node {
@@ -579,6 +718,11 @@ func surfRenderSearch(e *surf.Errs, out []*surfui.Node, c *Search, fill surf.Fil
 		e.Leave()
 	}
 	return out
+}
+
+// surfCompiledCompose is c drawn by its templates compiled into Go.
+func surfCompiledCompose(c *Compose) surflive.Component {
+	return surf.Compiled(c, "compose.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderCompose(e, nil, c, nil) })
 }
 
 // surfCompiledFooter is c drawn by its templates compiled into Go.

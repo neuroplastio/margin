@@ -7,6 +7,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"neuroplast.io/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surfui"
+	"neuroplast.io/hotty-surf/surftea"
 )
 
 // outcome is how the composer was dismissed.
@@ -31,73 +35,79 @@ const (
 	keyDiscard   = "ctrl+g"
 )
 
-// composerKeys gives the field's keys margin answers to the program on a
-// host (SPEC §10.2), so they reach margin as keys while the field has the
-// host's keyboard. escape always does.
-const composerKeys = keySubmit + "=program " + keySubmitAlt + "=program " + keyDiscard + "=program"
+// composerFieldKeys are the keys the composer answers itself, given to the
+// program by the surface's field (surfrun.Surface.Program), so they reach
+// margin as keys while the field has the keyboard. escape always does.
+var composerFieldKeys = []string{keySubmit, keySubmitAlt, keyDiscard}
 
-// composer is one comment being written: an A2UI longText field in its own
-// pane (D22), with the comment's text and nothing else in it, and a row of
-// buttons for the mouse. It is made when a comment is opened and dropped
-// when it is dismissed, so a resumed draft starts with the cursor after its
-// text, as a new field's does.
+// Compose is the composer's state (compose.surf lays it out): the text
+// the field holds, the label of its first button, and the field's height in
+// rows as the cells wrap it. margin keeps the rest in composer.
+type Compose struct {
+	Text   string
+	Submit string
+	// Grown is the field's rows, as @height last said.
+	Grown int
+
+	typed func(string)
+	ask   func(outcome)
+}
+
+// Typed is the field's input: text is the whole of what it holds.
+func (c *Compose) Typed(text string) {
+	c.Text = text
+	if c.typed != nil {
+		c.typed(text)
+	}
+}
+
+// Grew is the field's height in rows, which the program places the surface
+// by.
+func (c *Compose) Grew(rows int) { c.Grown = rows }
+
+// Submitted, Kept and Discarded are the buttons.
+func (c *Compose) Submitted() { c.asks(outcomeSubmit) }
+func (c *Compose) Kept()      { c.asks(outcomeDraft) }
+func (c *Compose) Discarded() { c.asks(outcomeDiscard) }
+
+func (c *Compose) asks(o outcome) {
+	if c.ask != nil {
+		c.ask(o)
+	}
+}
+
+// composer is one comment being written: a hotty-surf surface in the
+// document column (D22, composer.surf), with the comment's text and nothing
+// else in it, and a row of buttons for the mouse. It is made when a comment
+// is opened and dropped when it is dismissed, so a resumed draft starts with
+// the cursor after its text, as a new field's does.
 type composer struct {
-	p      *pane
+	host   *surftea.Host
+	st     *Compose
 	anchor string
 	target int // newCommentSlot, or the index of the posted comment being edited
+	// asked are the outcomes the buttons asked for since margin last looked.
+	asked []outcome
 }
 
 // newComposer opens a composer on seed.
-func newComposer(k *kit, anchor string, target int, seed string) *composer {
-	p := k.pane(composerID, map[string]any{"text": seed})
+func newComposer(anchor string, target int, seed string) *composer {
 	submit := "Submit"
 	if target != newCommentSlot {
 		submit = "Save"
 	}
-	comps := []map[string]any{
-		obj("id", "root", "component", "Column", "children", []any{"field", "bar"}),
-		obj("id", "field", "component", "TextField", "label", "", "value", bind("/text"),
-			"variant", "longText", "placeholder", "Write a comment",
-			"metadata", obj("extensions", obj("io_neuroplast_hotty", obj("keys", composerKeys)))),
-		obj("id", "bar", "component", "Row", "children", []any{"submit", "draft", "discard"}),
-	}
-	comps = append(comps, button("submit", submit, "primary")...)
-	comps = append(comps, button("draft", "Keep draft", "")...)
-	comps = append(comps, button("discard", "Discard", "borderless")...)
-	p.define(comps...)
-	p.focus(p.c.FindComponent("field", rootScope))
-	return &composer{p: p, anchor: anchor, target: target}
-}
-
-// button is a pane's button and its label, the button sending the action
-// named id.
-func button(id, label, variant string) []map[string]any {
-	b := obj("id", id, "component", "Button", "child", id+"_t", "action", obj("event", obj("name", id)))
-	if variant != "" {
-		b["variant"] = variant
-	}
-	return []map[string]any{b, obj("id", id+"_t", "component", "Text", "text", label)}
+	c := &composer{anchor: anchor, target: target}
+	c.st = &Compose{Text: seed, Submit: submit, ask: func(o outcome) { c.asked = append(c.asked, o) }}
+	c.host = newSurfHost("margin-"+composerID, surflive.New(surfInterpCompose(c.st)), composerFieldKeys)
+	return c
 }
 
 // body returns what the reviewer wrote.
-func (c *composer) body() string { return parseComment(c.p.text("/text")) }
+func (c *composer) body() string { return parseComment(c.st.Text) }
 
 // parseComment trims what the field holds: it holds only what the reviewer
 // typed.
 func parseComment(raw string) string { return strings.TrimSpace(raw) }
-
-// actionOutcome is the outcome a composer button's action asks for.
-func actionOutcome(name string) (outcome, bool) {
-	switch name {
-	case "submit":
-		return outcomeSubmit, true
-	case "draft":
-		return outcomeDraft, true
-	case "discard":
-		return outcomeDiscard, true
-	}
-	return 0, false
-}
 
 // keyOutcome is the outcome a key asks of the composer, if it is one of
 // the composer's own.
@@ -161,4 +171,53 @@ func clearDraft(anchor string, target int) error {
 		return err
 	}
 	return nil
+}
+
+// dropComposer closes the composer, and on a host its surface: a composer
+// made again is a new document there.
+func (m *model) dropComposer() {
+	if m.comp == nil {
+		return
+	}
+	if m.hot != nil {
+		m.hot.s.Delete(m.comp.host.Name())
+	}
+	m.comp.host.Close()
+	m.comp = nil
+}
+
+// composerRows is the composer's height in rows, w cells wide. On a host it
+// is the host's measure once it has said (a fit event), and before that
+// hotty-surf's estimate from the host's cell; in cells it is the field's
+// rows as the cells wrap it, and the buttons under them.
+func (m *model) composerRows(w int) int {
+	c := m.comp
+	if m.hot.native() && !m.hot.deaf {
+		cell := m.hot.caps.CellCSS
+		c.host.Surf().Size(w, surfui.Metrics{CellW: cell.W, CellH: cell.H})
+		if rows, _ := c.host.Surf().Rows(); rows > 0 {
+			return rows
+		}
+	}
+	return composerCellRows(c, w)
+}
+
+// composerCellRows is the composer's rows in cells: one drawing of it says
+// how tall the field wraps (@height), and the bar goes under it.
+func composerCellRows(c *composer, w int) int {
+	c.host.Lines(w, composerMostRows)
+	return max(c.st.Grown, composerLeastField) + composerBarRows
+}
+
+// The field grows between three rows and eight (compose.surf), and the
+// buttons are the row under it.
+const (
+	composerLeastField = 3
+	composerBarRows    = 1
+	composerMostRows   = 8 + composerBarRows
+)
+
+// composerLines is the composer drawn in cells, w wide.
+func (m *model) composerLines(w int) []string {
+	return m.comp.host.Lines(w, m.composerRows(w))
 }

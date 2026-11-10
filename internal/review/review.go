@@ -1577,7 +1577,7 @@ func (m *model) openComposer(anchor string, target int) tea.Cmd {
 		seed = t.posted[target].body
 	}
 
-	m.comp = newComposer(m.panes(), anchor, target, seed)
+	m.comp = newComposer(anchor, target, seed)
 	m.status = ""
 	// Focus follows the composer so scrolling keeps the pane on screen.
 	for i, e := range m.entries {
@@ -1669,8 +1669,7 @@ func (m *model) dismiss(out outcome) tea.Cmd {
 		m.status = "discarded"
 	}
 
-	m.dropPane(composerID)
-	m.comp = nil
+	m.dropComposer()
 
 	// Cancelling before committing must not leave an empty thread behind
 	// (feedback 2026-08-09): a thread ensureThread created for this open, and
@@ -1713,8 +1712,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.PasteMsg:
-		if m.comp != nil {
-			m.comp.p.paste(msg.Content)
+		if m.comp != nil && !m.hot.native() {
+			m.comp.host.CellsPaste(msg.Content)
 		}
 		return m, nil
 
@@ -2078,31 +2077,18 @@ func (m *model) composerKey(msg tea.KeyPressMsg) tea.Cmd {
 	if out, ok := keyOutcome(name); ok {
 		return m.dismiss(out)
 	}
-	p := m.comp.p
-	if m.hot.native() && p.hr != nil {
+	h := m.comp.host
+	if m.hot.native() && !m.hot.deaf {
 		// On a host the field is the host's: what reaches margin is a key
-		// the field left, which the pane's buttons may take.
-		cmds, _, err := p.hr.Key(name)
-		if err != nil {
-			m.hot.tracef("composer key %q: %v", name, err)
-		}
-		m.hot.s.Send(cmds...)
-		p.dirty = true
+		// the field left, which the surface's buttons may take.
+		h.Key(m.hot.s, name)
 		return m.composerActs()
 	}
+	// In cells the surface's trap keeps Tab inside the composer.
 	if name == "" && k.Text != "" {
-		p.paste(k.Text) // text no key names: an IME's, a compose sequence's
+		h.CellsPaste(k.Text) // text no key names: an IME's, a compose sequence's
 	} else {
-		p.key(name)
-	}
-	if !p.c.St.Keyboard {
-		// Tab past the last button, or shift+tab before the field: round
-		// again, so the keyboard never leaves the composer for nothing.
-		if name == "shift+tab" {
-			p.focus(p.c.FindComponent("discard", rootScope))
-		} else {
-			p.focus(p.c.FindComponent("field", rootScope))
-		}
+		h.CellsKey(name)
 	}
 	return m.composerActs()
 }
@@ -2134,15 +2120,12 @@ func fieldKeyName(k tea.Key) string {
 
 // composerActs applies what the composer's buttons asked for.
 func (m *model) composerActs() tea.Cmd {
-	for _, a := range m.panes().take() {
-		if m.comp == nil || a.SurfaceID != composerID {
-			continue
-		}
-		if out, ok := actionOutcome(a.Name); ok {
-			return m.dismiss(out)
-		}
+	if m.comp == nil || len(m.comp.asked) == 0 {
+		return nil
 	}
-	return nil
+	out := m.comp.asked[0]
+	m.comp.asked = nil
+	return m.dismiss(out)
 }
 
 // handleClick routes a click. Inside a live composer it positions the cursor;
@@ -2164,7 +2147,7 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	}
 
 	if relX, relY, ok := m.inComposer(mo.X, line); ok {
-		m.comp.p.click(relX, relY)
+		m.comp.host.CellsClick(relX, relY)
 		return m.composerActs()
 	}
 
@@ -2273,11 +2256,8 @@ func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 	return nil
 }
 
-// handleWheel scrolls the document, or passes the wheel event to an open
-// composer if the pointer is over it. Focus is explicitly left alone.
+// handleWheel scrolls the document. Focus is explicitly left alone.
 func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
-	line := mo.Y + m.scroll
-
 	// The threads view scrolls its own table, like the pane.
 	if m.inbox {
 		dy := max(m.wheelSpeed, 1)
@@ -2290,15 +2270,8 @@ func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
 		return nil
 	}
 
-	if relX, relY, ok := m.inComposer(mo.X, line); ok {
-		dy := 1
-		if mo.Button == uv.MouseWheelUp {
-			dy = -1
-		}
-		m.comp.p.cr.Wheel(relX, relY, 0, dy)
-		m.comp.p.dirty = true
-		return nil
-	}
+	// surftea has no wheel for the cells yet (told to hotty): over the
+	// composer the wheel scrolls the document, as it does elsewhere.
 
 	delta := m.wheelSpeed
 	if delta < 1 {
@@ -3058,7 +3031,7 @@ func (m *model) threadLines(i int, t *thread, w, base int) []string {
 			}
 		}
 		m.paneLead = len(lead)
-		pane := m.comp.p.lines(w - 2*borderW)
+		pane := m.composerLines(w - 2*borderW)
 		if m.hot.native() && !m.hot.deaf {
 			// On a host the composer is a surface over these rows (view).
 			for j := range pane {
@@ -3183,7 +3156,7 @@ func (m *model) view() tea.View {
 	if m.comp != nil && m.at.entry < len(m.spans) {
 		m.paneTop = m.spans[m.at.entry].start + borderW + m.paneLead
 		m.paneW = m.contentWidth() - 2*borderW
-		m.paneH = m.comp.p.draw(m.paneW).Rows
+		m.paneH = m.composerRows(m.paneW)
 	}
 	if m.hot != nil {
 		m.hot.panes = m.hot.panes[:0]
@@ -3295,18 +3268,15 @@ func (m *model) view() tea.View {
 		// On a host the composer is a surface, the field's caret the host's.
 		top := m.paneTop - m.scroll
 		at := hottytea.Rect{X: m.docX() + gutterW + borderW, Y: top, W: m.paneW, H: m.paneH}
-		if m.hot.place(m.comp.p, at, hottytea.Rect{W: m.w, H: viewport}) {
+		if m.hot.placeSurf(m.comp.host, at, hottytea.Rect{W: m.w, H: viewport}) {
 			return v
 		}
 	}
 	if m.comp != nil && m.paneTop >= 0 {
-		if cx, cy, ok := m.comp.p.cursor(m.paneW); ok {
-			if y := m.paneTop + cy - m.scroll; y >= 0 && y < viewport {
-				c := tea.NewCursor(m.docX()+gutterW+borderW+cx, y)
+		if cc, ok := m.comp.host.Caret(); ok {
+			if y := m.paneTop + cc.Y - m.scroll; y >= 0 && y < viewport {
+				c := tea.NewCursor(m.docX()+gutterW+borderW+cc.X, y)
 				c.Shape, c.Blink = tea.CursorBar, false
-				if m.comp.p.draw(m.paneW).BlockCursor() {
-					c.Shape = tea.CursorBlock
-				}
 				v.Cursor = c
 			}
 		}

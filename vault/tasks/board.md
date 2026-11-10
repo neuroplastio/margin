@@ -4,6 +4,11 @@ Last updated: 2026-11-10 (leg 5b, surftea.Host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (leg 6, composer) the comment composer is a hotty-surf field now — whether
+  it looks right in the document column (shaded field, no label row, three
+  buttons), whether it grows to eight rows and scrolls without the document
+  jumping, whether Tab/Escape/ctrl+g/ctrl+s behave, on a host and in cells —
+  journal 2026-11-10.3
 - (leg 5b, surftea.Host) the footer, palette and search prompt on a host now
   take surftea's stylesheet — whether they look as after leg 5, whether the
   palette keeps its height when the pane is resized, whether a reloaded pane
@@ -975,9 +980,9 @@ document, regardless of the order the tree-view work itself lands in.
 
 - *(Leg 5b, surftea in place of `surfhost.go` — landed 2026-11-10, journal
   2026-11-10.2.)*
-- **Leg 6, the composer** on `<field rows="3..8">` (`trap`, `caret="end"`,
-  `@height`), and B11: `surfui.Rows` and `Fit` for the height
-  `paletteHostHeight` guesses.
+- *(Leg 6, the composer on a hotty-surf field — landed 2026-11-10, journal
+  2026-11-10.3.)*
+- **B11:** `surfui.Rows` and `Fit` for the height `paletteHostHeight` guesses.
 - Then legs 7–9 (threads view, tree pane, open thread), in that
   order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
   hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops

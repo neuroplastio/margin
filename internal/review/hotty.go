@@ -318,6 +318,12 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		return nil, true
 	case hottytea.EventMsg:
 		if msg.Event.Kind == hotty.EventFit {
+			if sp := m.hotSurfOf(msg.Event.Surface); sp != nil {
+				// A surface's own: its model hears the rows (@height), and
+				// the frame is placed again at them.
+				sp.Event(h.s, msg.Event)
+				return h.relayoutSoon(), false
+			}
 			if m.hotFit(msg.Event) {
 				return h.relayoutSoon(), false
 			}
@@ -328,6 +334,9 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 		}
 		if sp := m.hotSurfOf(msg.Event.Surface); sp != nil {
 			sp.Event(h.s, msg.Event)
+			if m.comp != nil && sp == m.comp.host {
+				return m.composerActs(), true
+			}
 			return nil, true
 		}
 		return m.hotEvent(msg.Event), true
@@ -646,7 +655,11 @@ func (m *model) hotPaneSurfaces() []hottytea.Surface {
 func (m *model) hotSurfSurfaces() []hottytea.Surface {
 	var out []hottytea.Surface
 	for _, hs := range m.hot.surfs {
-		out = append(out, hs.p.Surface(m.hot.s, hs.rect, hs.clip))
+		sf := hs.p.Surface(m.hot.s, hs.rect, hs.clip)
+		// The composer grows with its text, so the host says its rows
+		// (SPEC §5.2); the other surfaces' heights are margin's.
+		sf.Fit = m.comp != nil && hs.p == m.comp.host
+		out = append(out, sf)
 	}
 	return out
 }
@@ -678,14 +691,6 @@ func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
 		m.hot.tracef("pane %s: %v", p.id, err)
 	}
 	p.dirty = true
-	if m.comp != nil && p == m.comp.p {
-		if !p.c.St.Keyboard {
-			// Tab past the last button, or before the field: the host gave
-			// the keyboard back. The composer keeps it, as in cells.
-			p.focus(p.c.FindComponent("field", rootScope))
-		}
-		return m.composerActs()
-	}
 	switch {
 	case p.id == searchID && m.searchOpen:
 		m.searchDrafted(p.text("/draft"))

@@ -831,7 +831,7 @@ func TestHottyComposerEscapeAndDiscard(t *testing.T) {
 		var s *hottytest.Surface
 		h.Type("c")
 		waitFor(t, "the composer's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
-		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == "field" })
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == composerFieldID })
 		return s
 	}
 	gone := func(h *hottytest.Host) bool { s := h.Surface(name); return s == nil || !s.Placed() }
@@ -839,7 +839,7 @@ func TestHottyComposerEscapeAndDiscard(t *testing.T) {
 		surfaceWith(t, h, "A paragraph with bold")
 		h.Type("j")
 		open(h)
-		if err := h.Fill(name, "field", "kept for later"); err != nil {
+		if err := h.Fill(name, composerFieldID, "kept for later"); err != nil {
 			t.Fatal(err)
 		}
 		h.Key("escape")
@@ -847,10 +847,10 @@ func TestHottyComposerEscapeAndDiscard(t *testing.T) {
 
 		h.Type("jj") // the list's first item
 		open(h)
-		if err := h.Fill(name, "field", "never mind"); err != nil {
+		if err := h.Fill(name, composerFieldID, "never mind"); err != nil {
 			t.Fatal(err)
 		}
-		if err := h.Click(name, "discard"); err != nil {
+		if err := h.Click(name, composerDiscardID); err != nil {
 			t.Fatal(err)
 		}
 		waitFor(t, "Discard closing the composer", func() bool { return gone(h) })
@@ -865,6 +865,13 @@ func TestHottyComposerEscapeAndDiscard(t *testing.T) {
 		t.Errorf("drafts %q, want the one esc kept and not the discarded one", drafts)
 	}
 }
+
+// composerFieldID and composerDiscardID are the composer's field and its
+// Discard button as surf names them, from their keys.
+const (
+	composerFieldID   = "r.kcomposer.kfield"
+	composerDiscardID = "r.kcomposer.kbar.kdiscard"
+)
 
 // paletteFieldID is the palette's field as surf names it, from its keys.
 const paletteFieldID = "r.kpalette.kquery.kfield"
