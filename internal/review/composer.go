@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"neuroplast.io/hotty-surf/surflive"
-	"neuroplast.io/hotty-surf/surfui"
 	"neuroplast.io/hotty-surf/surftea"
 )
 
@@ -193,9 +192,7 @@ func (m *model) dropComposer() {
 func (m *model) composerRows(w int) int {
 	c := m.comp
 	if m.hot.native() && !m.hot.deaf {
-		cell := m.hot.caps.CellCSS
-		c.host.Surf().Size(w, surfui.Metrics{CellW: cell.W, CellH: cell.H})
-		if rows, _ := c.host.Surf().Rows(); rows > 0 {
+		if rows := surfRows(c.host, w, m.hot.caps); rows > 0 {
 			return rows
 		}
 	}

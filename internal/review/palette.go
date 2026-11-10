@@ -20,7 +20,6 @@ package review
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -282,17 +281,12 @@ func (m *model) paletteHeight() int {
 
 // paletteHostHeight is the palette's height in rows on a host. Compact's
 // rows are a cell and a little air (an item's padding, a rule's margin, in
-// CSS pixels), so the commands need more than one row each: the rows
-// counted from the host's cell size (hottytea.ReadyMsg's Caps.CellCSS),
-// whole, with the field under them.
+// CSS pixels), so the commands need more than one row each: hotty-surf
+// counts them (Surface.Rows) from the host's cell size (hottytea.ReadyMsg's
+// Caps.CellCSS), and once the host has measured the document (the palette
+// is placed with fit) it is the host's number.
 func (m *model) paletteHostHeight() int {
-	cell := 20.0
-	if m.hot != nil && m.hot.caps.CellCSS.H > 0 {
-		cell = m.hot.caps.CellCSS.H
-	}
-	n := max(min(len(paletteRows(m, commands, m.paletteQuery)), paletteShown), 1)
-	const rule, item = 9, 8 // a rule's margin and hairline, an item's padding
-	return int(math.Ceil((rule + float64(n)*(cell+item) + cell) / cell))
+	return max(surfRows(m.paletteHost(), m.w, m.hot.caps), 2)
 }
 
 // paletteHost is the palette as the model has it, its state brought up to

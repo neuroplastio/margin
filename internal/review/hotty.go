@@ -656,9 +656,10 @@ func (m *model) hotSurfSurfaces() []hottytea.Surface {
 	var out []hottytea.Surface
 	for _, hs := range m.hot.surfs {
 		sf := hs.p.Surface(m.hot.s, hs.rect, hs.clip)
-		// The composer grows with its text, so the host says its rows
-		// (SPEC §5.2); the other surfaces' heights are margin's.
-		sf.Fit = m.comp != nil && hs.p == m.comp.host
+		// The composer grows with its text and the palette with its
+		// matches, so the host says their rows (SPEC §5.2); the other
+		// surfaces' heights are margin's.
+		sf.Fit = m.comp != nil && hs.p == m.comp.host || m.paletteOpen && hs.p == m.palette
 		out = append(out, sf)
 	}
 	return out

@@ -204,3 +204,52 @@ func TestHottyComposerKeepsWordsOnEveryKey(t *testing.T) {
 		})
 	}
 }
+
+// The palette is placed with fit too (B11): its rows are hotty-surf's
+// estimate at first, from the host's cell (TestPaletteRowsAreEstimated), and
+// the host's measure after.
+func TestHottyPaletteFitsItsRows(t *testing.T) {
+	name := "margin-" + paletteID
+	hotRun(t, hotDocSrc, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		h.Type(":")
+		var s *hottytest.Surface
+		waitFor(t, "the palette's surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
+		waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == paletteFieldID })
+		if !s.Fit() {
+			t.Fatal("the palette is not placed with fit")
+		}
+		rows := s.Placement().Rows
+		for stable := 0; stable < 5; {
+			time.Sleep(60 * time.Millisecond)
+			if r := s.Placement().Rows; r == rows {
+				stable++
+			} else {
+				rows, stable = r, 0
+			}
+		}
+		if err := h.Emit(name, hotty.EventFit, "", map[string]int{"r": rows + 2}); err != nil {
+			t.Fatal(err)
+		}
+		waitFor(t, "the palette placed at the rows the host measured", func() bool { return s.Placement().Rows == rows+2 })
+		h.Key("escape")
+		waitFor(t, "the palette gone", func() bool { s := h.Surface(name); return s == nil || !s.Placed() })
+	})
+}
+
+// Before a host has measured the palette its rows are hotty-surf's estimate
+// from the host's cell: with a 20 px cell the rule, seven commands and the
+// field are the rows the hand-counted formula (a rule's 9 px, an item's cell
+// and 8 px of padding, the field's cell) gave, 12. Nothing here is a host's.
+func TestPaletteRowsAreEstimated(t *testing.T) {
+	m := newTestModel(t)
+	m.paletteOpen = true
+	caps := hotty.Caps{}
+	caps.CellCSS.W, caps.CellCSS.H = 10, 20
+	if got := surfRows(m.paletteHost(), 100, caps); got != 12 {
+		t.Errorf("the palette is estimated at %d rows with a 20 px cell, want 12", got)
+	}
+	if got := m.paletteHeight(); got != 9 {
+		t.Errorf("the palette is %d rows in cells, want 9", got)
+	}
+}

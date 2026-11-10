@@ -4,6 +4,10 @@ Last updated: 2026-11-10 (leg 5b, surftea.Host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (B11, palette height) on a host the palette's rows come from hotty-surf's
+  estimate and then the host's measure — whether the height is right at 897
+  and 1796 px, and whether it shrinks with the query without the document
+  jumping — journal 2026-11-10.4
 - (leg 6, composer) the comment composer is a hotty-surf field now — whether
   it looks right in the document column (shaded field, no label row, three
   buttons), whether it grows to eight rows and scrolls without the document
@@ -982,7 +986,7 @@ document, regardless of the order the tree-view work itself lands in.
   2026-11-10.2.)*
 - *(Leg 6, the composer on a hotty-surf field — landed 2026-11-10, journal
   2026-11-10.3.)*
-- **B11:** `surfui.Rows` and `Fit` for the height `paletteHostHeight` guesses.
+- *(B11, the palette's host height from `Rows` and `Fit` — landed 2026-11-10, journal 2026-11-10.4.)*
 - Then legs 7–9 (threads view, tree pane, open thread), in that
   order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
   hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops
