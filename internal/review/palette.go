@@ -28,6 +28,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"neuroplast.io/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surftea"
 )
 
 //go:generate go run neuroplast.io/hotty-surf/cmd/surfgen
@@ -297,7 +298,7 @@ func (m *model) paletteHostHeight() int {
 // paletteHost is the palette as the model has it, its state brought up to
 // date: a new one when the palette opens, so it opens on its own query with
 // the cursor after it.
-func (m *model) paletteHost() *surfHost {
+func (m *model) paletteHost() *surftea.Host {
 	rows := paletteRows(m, commands, m.paletteQuery)
 	m.paletteSelected = max(min(m.paletteSelected, len(rows)-1), 0)
 	if m.paletteSelected < m.paletteTop {
@@ -310,7 +311,7 @@ func (m *model) paletteHost() *surfHost {
 	if m.palette == nil {
 		p := &Palette{Query: m.paletteQuery, typed: m.paletteQueried}
 		p.click = func(i int) { m.paletteSelected = m.paletteTop + i }
-		m.palette = newSurfHost("margin-"+paletteID, surflive.New(surfInterpPalette(p)), nil, paletteFieldKeys)
+		m.palette = newSurfHost("margin-"+paletteID, surflive.New(surfInterpPalette(p)), paletteFieldKeys)
 		m.paletteState = p
 	}
 	p := m.paletteState
@@ -345,7 +346,7 @@ func (m *model) closePalette() {
 // dropPalette forgets the palette's surface, and the host's.
 func (m *model) dropPalette() {
 	if m.palette != nil && m.hot != nil {
-		m.hot.s.Delete(m.palette.name)
+		m.hot.s.Delete(m.palette.Name())
 	}
 	m.palette, m.paletteState = nil, nil
 }
@@ -357,9 +358,9 @@ func (m *model) paletteTyped(k tea.Key) {
 	h := m.paletteHost()
 	switch name := fieldKeyName(k); {
 	case name == "" && k.Text != "":
-		h.cellsPaste(k.Text)
+		h.CellsPaste(k.Text)
 	case name != "":
-		h.cellsKey(name)
+		h.CellsKey(name)
 	}
 }
 
@@ -374,5 +375,5 @@ func (m *model) paletteQueried(q string) {
 
 // renderPalette is the palette drawn w wide in cells.
 func (m *model) renderPalette(w int) string {
-	return strings.Join(m.paletteHost().lines(w, m.paletteHeight()), "\n")
+	return strings.Join(m.paletteHost().Lines(w, m.paletteHeight()), "\n")
 }

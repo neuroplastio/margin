@@ -9,6 +9,7 @@ import (
 	"neuroplast.io/hotty-go/hottytea"
 	"neuroplast.io/hotty-go/hottytest"
 	"neuroplast.io/hotty-surf/surfrun"
+	"neuroplast.io/hotty-surf/surftea"
 	"neuroplast.io/hotty-surf/surfui"
 )
 
@@ -32,7 +33,7 @@ func (c *seamCount) Do(act surfui.Action, _ surfrun.Event) {
 // whose Session places one hotty-surf surface, and routes its events.
 type seamProgram struct {
 	h    *hotState
-	pane *surfHost
+	pane *surftea.Host
 }
 
 func (m *seamProgram) Init() tea.Cmd { return m.h.s.Detect() }
@@ -41,23 +42,23 @@ func (m *seamProgram) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	msg, cmd := m.h.s.Update(msg)
 	switch msg := msg.(type) {
 	case hottytea.EventMsg:
-		if msg.Surface == m.pane.name {
-			m.pane.event(m.h, msg.Event)
+		if msg.Surface == m.pane.Name() {
+			m.pane.Event(m.h.s, msg.Event)
 		}
 	case hottytea.ReadyMsg:
 		if msg.Mode == hottytea.Native {
-			m.pane.ready(msg.Caps)
+			m.pane.Ready(msg.Caps)
 		}
-	case surfPostMsg:
-		msg.p.posted(m.h, msg.f)
+	case surftea.PostMsg:
+		msg.Host.Posted(m.h.s, msg)
 	case tea.KeyPressMsg:
 		if msg.String() == "q" {
 			return m, tea.Sequence(m.h.s.Close(), tea.Quit)
 		}
 	}
 	if m.h.s.Mode == hottytea.Native {
-		m.h.s.Layout([]hottytea.Surface{m.pane.surface(m.h, hottytea.Rect{X: 0, Y: 1, W: 20, H: 3}, hottytea.Rect{W: 40, H: 10})})
-		m.pane.sendFirst(m.h)
+		m.h.s.Layout([]hottytea.Surface{m.pane.Surface(m.h.s, hottytea.Rect{X: 0, Y: 1, W: 20, H: 3}, hottytea.Rect{W: 40, H: 10})})
+		m.pane.AfterLayout(m.h.s)
 		return m, tea.Batch(cmd, m.h.s.Flush())
 	}
 	return m, cmd
@@ -79,7 +80,8 @@ func TestSurfSeam(t *testing.T) {
 		tea.WithWindowSize(40, 10), tea.WithoutSignalHandler(),
 		tea.WithEnvironment([]string{"TERM=xterm-256color"}))
 	m.h.s.Attach(p.Send)
-	m.pane = newSurfHost("margin-seam", &seamCount{}, p.Send, nil)
+	m.pane = newSurfHost("margin-seam", &seamCount{}, nil)
+	m.pane.Attach(p.Send)
 	done := make(chan error, 1)
 	go func() { _, err := p.Run(); done <- err }()
 

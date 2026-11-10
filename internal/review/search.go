@@ -25,6 +25,7 @@ import (
 	"unicode/utf8"
 
 	"neuroplast.io/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surftea"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -313,9 +314,9 @@ func (m *model) handleSearchKey(msg tea.KeyPressMsg) tea.Cmd {
 	k := msg.Key()
 	switch name := fieldKeyName(k); {
 	case name == "" && k.Text != "":
-		h.cellsPaste(k.Text)
+		h.CellsPaste(k.Text)
 	case name != "":
-		h.cellsKey(name)
+		h.CellsKey(name)
 	}
 	return nil
 }
@@ -346,10 +347,10 @@ func (s *Search) Typed(draft string) {
 
 // searchHost is the search prompt as the model has it, its state brought up
 // to date: a new one when the prompt opens, so it opens empty.
-func (m *model) searchHost() *surfHost {
+func (m *model) searchHost() *surftea.Host {
 	if m.search == nil {
 		s := &Search{Draft: m.searchDraft, typed: m.searchDrafted}
-		m.search = newSurfHost("margin-"+searchID, surflive.New(surfInterpSearch(s)), nil, searchFieldKeys)
+		m.search = newSurfHost("margin-"+searchID, surflive.New(surfInterpSearch(s)), searchFieldKeys)
 		m.searchState = s
 	}
 	m.searchState.Count = m.searchPosition()
@@ -390,5 +391,5 @@ func (m *model) searchPosition() string {
 // rule to separate it from the document, then the draft's field and the
 // match count.
 func (m *model) renderSearchPrompt(w int) string {
-	return strings.Join(m.searchHost().lines(w, searchRows), "\n")
+	return strings.Join(m.searchHost().Lines(w, searchRows), "\n")
 }

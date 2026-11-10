@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"neuroplast.io/hotty-go"
 	"neuroplast.io/hotty-go/hottytea"
+	"neuroplast.io/hotty-surf/surftea"
 
 	"github.com/neuroplastio/margin/internal/mermaidsvg"
 )
@@ -44,8 +45,6 @@ type hotState struct {
 
 	docs hotDocs
 
-	// surfCSS: hotty-surf's stylesheet went to the host (surfhost.go).
-	surfCSS bool
 	// caps is what the host said about itself: how a key reads, and a cell's
 	// size in CSS pixels, which Compact's rows are counted in.
 	caps hotty.Caps
@@ -141,14 +140,14 @@ type hotPane struct {
 
 // hotSurf is a hotty-surf surface placed: where, and what shows it.
 type hotSurf struct {
-	p    *surfHost
+	p    *surftea.Host
 	rect hottytea.Rect
 	clip hottytea.Rect
 }
 
 // placeSurf puts a hotty-surf surface at r for this frame, as place does a
 // pane, and reports whether it did.
-func (h *hotState) placeSurf(p *surfHost, r, clip hottytea.Rect) bool {
+func (h *hotState) placeSurf(p *surftea.Host, r, clip hottytea.Rect) bool {
 	if !h.native() || h.deaf {
 		return false
 	}
@@ -328,7 +327,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 			return m.hotPaneEvent(p, msg.Event), true
 		}
 		if sp := m.hotSurfOf(msg.Event.Surface); sp != nil {
-			sp.event(h, msg.Event)
+			sp.Event(h.s, msg.Event)
 			return nil, true
 		}
 		return m.hotEvent(msg.Event), true
@@ -337,6 +336,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 			// The frame's Layout sends the lost documents again, after the
 			// resources they refer to.
 			h.tracef("lost: the host lost documents; resources again")
+			surftea.Relayout(h.s, msg) // hotty-surf's stylesheet too
 			h.s.Send(hotty.Res(hotCSSID, "text/css", []byte(hotCSS)))
 			h.docs.lost()
 			h.attachN = 0 // the next frame places it again
@@ -570,8 +570,8 @@ func (m *model) hotFrame() tea.Cmd {
 	// A surf surface's first frame goes after its placement, and what the
 	// review changed since goes as ops.
 	for _, hs := range h.surfs {
-		hs.p.sendFirst(h)
-		hs.p.sync(h)
+		hs.p.AfterLayout(h.s)
+		hs.p.Sync(h.s)
 	}
 	m.hotResend()
 	measuring := m.hotMeasure()
@@ -646,15 +646,15 @@ func (m *model) hotPaneSurfaces() []hottytea.Surface {
 func (m *model) hotSurfSurfaces() []hottytea.Surface {
 	var out []hottytea.Surface
 	for _, hs := range m.hot.surfs {
-		out = append(out, hs.p.surface(m.hot, hs.rect, hs.clip))
+		out = append(out, hs.p.Surface(m.hot.s, hs.rect, hs.clip))
 	}
 	return out
 }
 
 // hotSurfOf is the hotty-surf surface a host's surface is, if any.
-func (m *model) hotSurfOf(surface string) *surfHost {
+func (m *model) hotSurfOf(surface string) *surftea.Host {
 	for _, hs := range m.hot.surfs {
-		if hs.p.name == surface {
+		if hs.p.Mine(surface) {
 			return hs.p
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"neuroplast.io/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surftea"
 )
 
 //go:generate go run neuroplast.io/hotty-surf/cmd/surfgen
@@ -94,7 +95,7 @@ type FooterHint struct {
 // footerHost is the footer as a surface, and its cells.
 type footerHost struct {
 	f    *Footer
-	host *surfHost
+	host *surftea.Host
 }
 
 // footer is the footer as the model has it now, its state brought up to
@@ -102,7 +103,7 @@ type footerHost struct {
 func (m *model) footer() *footerHost {
 	if m.foot == nil {
 		f := &Footer{}
-		m.foot = &footerHost{f: f, host: newSurfHost("margin-"+footerID, surflive.New(surfInterpFooter(f)), nil, nil)}
+		m.foot = &footerHost{f: f, host: newSurfHost("margin-"+footerID, surflive.New(surfInterpFooter(f)), nil)}
 	}
 	mode, rest, hints, progress := m.footerState()
 	f := m.foot.f
@@ -116,7 +117,7 @@ func (m *model) footer() *footerHost {
 
 // renderFooter is the footer's line in cells, w wide.
 func (m *model) renderFooter(w int) string {
-	if l := m.footer().host.lines(w, 1); len(l) > 0 {
+	if l := m.footer().host.Lines(w, 1); len(l) > 0 {
 		return l[0]
 	}
 	return ""

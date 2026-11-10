@@ -30,6 +30,7 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"neuroplast.io/hotty-go/hottytea"
+	"neuroplast.io/hotty-surf/surftea"
 )
 
 const (
@@ -90,9 +91,9 @@ type cursor struct {
 }
 
 type model struct {
-	foot         *footerHost // the footer, a hotty-surf component
-	search       *surfHost   // the search prompt, a hotty-surf component
-	palette      *surfHost   // the palette, a hotty-surf component
+	foot         *footerHost   // the footer, a hotty-surf component
+	search       *surftea.Host // the search prompt, a hotty-surf component
+	palette      *surftea.Host // the palette, a hotty-surf component
 	paletteState *Palette
 	paletteTop   int // the first command in view
 	searchState  *Search
@@ -3319,11 +3320,12 @@ func (m *model) view() tea.View {
 		} else if !m.searchOpen {
 			prompt = nil
 		}
-		if prompt != nil && prompt.caret.Visible {
-			c := prompt.caret
-			cur := tea.NewCursor(c.X, viewport+1+c.Y)
-			cur.Shape, cur.Blink = tea.CursorBar, false
-			v.Cursor = cur
+		if prompt != nil {
+			if c, ok := prompt.Caret(); ok {
+				cur := tea.NewCursor(c.X, viewport+1+c.Y)
+				cur.Shape, cur.Blink = tea.CursorBar, false
+				v.Cursor = cur
+			}
 		}
 	}
 	return v
