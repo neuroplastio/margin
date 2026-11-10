@@ -16,7 +16,7 @@ import (
 
 // The templates, embedded.
 //
-//go:embed compose.surf footer.surf palette.surf search.surf
+//go:embed compose.surf footer.surf palette.surf search.surf threads.surf
 var surfFiles embed.FS
 
 // surfSet is the templates, loaded at its first call.
@@ -31,7 +31,7 @@ var (
 )
 
 // surfShapes are what the templates name of the package's types.
-var surfShapes = []*surf.Shape{&surfShapeCompose, &surfShapeFooter, &surfShapePalette, &surfShapeSearch, &surfShapeFooterHint, &surfShapePaletteRow}
+var surfShapes = []*surf.Shape{&surfShapeCompose, &surfShapeFooter, &surfShapePalette, &surfShapeSearch, &surfShapeThreads, &surfShapeFooterHint, &surfShapePaletteRow, &surfShapeThreadRow}
 
 // surfShapeCompose is Compose's shape, a component.
 var surfShapeCompose = surf.Shape{Name: "Compose", Component: true,
@@ -269,6 +269,76 @@ func (o surfSearch) Call(m int, args []cellite.Value) cellite.Value {
 // surfInterpSearch is c drawn by its template, interpreted.
 func surfInterpSearch(c *Search) surflive.Component { return surf.Component(surfSet(), surfSearch{c}) }
 
+// surfShapeThreads is Threads's shape, a component.
+var surfShapeThreads = surf.Shape{Name: "Threads", Component: true,
+	Fields: []surf.Field{{Name: "rows", Type: cellite.ListOf(cellite.StructOf("ThreadRow"))}, {Name: "sel", Type: cellite.Int}, {Name: "tree", Type: cellite.Bool}, {Name: "height", Type: cellite.Int}},
+	Methods: []surf.Method{
+		{Name: "first"},
+		{Name: "last"},
+		{Name: "move", Args: []cellite.Type{cellite.Int}},
+		{Name: "open", Args: []cellite.Type{cellite.Int}},
+		{Name: "pick", Args: []cellite.Type{cellite.Int}},
+	},
+}
+
+// surfThreads is a *Threads as its templates read it.
+type surfThreads struct{ p *Threads }
+
+// surfThreadsValue is p as a value: null for nil.
+func surfThreadsValue(p *Threads) cellite.Value {
+	if p == nil {
+		return cellite.NullValue()
+	}
+	return cellite.ObjectValue("Threads", surfThreads{p})
+}
+
+// surfThreadsOf is a value's *Threads: nil for any other.
+func surfThreadsOf(v cellite.Value) *Threads {
+	if o, ok := v.Object().(surfThreads); ok {
+		return o.p
+	}
+	return nil
+}
+
+func (o surfThreads) Field(i int) cellite.Value {
+	switch i {
+	case 0:
+		return cellite.ListValue(surfList3(o.p.Rows))
+	case 1:
+		return cellite.IntValue(int64(o.p.Sel))
+	case 2:
+		return cellite.BoolValue(bool(o.p.Tree))
+	case 3:
+		return cellite.IntValue(int64(o.p.Height))
+	}
+	return cellite.NullValue()
+}
+
+func (o surfThreads) Unwrap() any { return o.p }
+
+func (o surfThreads) Shape() *surf.Shape { return &surfShapeThreads }
+
+func (o surfThreads) Call(m int, args []cellite.Value) cellite.Value {
+	switch m {
+	case 0:
+		o.p.First()
+	case 1:
+		o.p.Last()
+	case 2:
+		o.p.Move(int(args[0].Int()))
+	case 3:
+		o.p.Open(int(args[0].Int()))
+	case 4:
+		o.p.Pick(int(args[0].Int()))
+	}
+	return cellite.NullValue()
+}
+
+// surfInterpThreads is c drawn by its template, interpreted.
+func surfInterpThreads(c *Threads) surflive.Component {
+	return surf.Component(surfSet(), surfThreads{c})
+}
+
 // surfShapeFooterHint is FooterHint's shape, a struct.
 var surfShapeFooterHint = surf.Shape{Name: "FooterHint", Component: false,
 	Fields: []surf.Field{{Name: "key", Type: cellite.String}, {Name: "label", Type: cellite.String}},
@@ -344,6 +414,50 @@ func (o surfPaletteRow) Field(i int) cellite.Value {
 }
 
 func (o surfPaletteRow) Unwrap() any { return o.p }
+
+// surfShapeThreadRow is ThreadRow's shape, a struct.
+var surfShapeThreadRow = surf.Shape{Name: "ThreadRow", Component: false,
+	Fields: []surf.Field{{Name: "k", Type: cellite.String}, {Name: "state", Type: cellite.String}, {Name: "doc", Type: cellite.String}, {Name: "summary", Type: cellite.String}, {Name: "gone", Type: cellite.String}, {Name: "resolved", Type: cellite.Bool}},
+}
+
+// surfThreadRow is a *ThreadRow as its templates read it.
+type surfThreadRow struct{ p *ThreadRow }
+
+// surfThreadRowValue is p as a value: null for nil.
+func surfThreadRowValue(p *ThreadRow) cellite.Value {
+	if p == nil {
+		return cellite.NullValue()
+	}
+	return cellite.ObjectValue("ThreadRow", surfThreadRow{p})
+}
+
+// surfThreadRowOf is a value's *ThreadRow: nil for any other.
+func surfThreadRowOf(v cellite.Value) *ThreadRow {
+	if o, ok := v.Object().(surfThreadRow); ok {
+		return o.p
+	}
+	return nil
+}
+
+func (o surfThreadRow) Field(i int) cellite.Value {
+	switch i {
+	case 0:
+		return cellite.StringValue(string(o.p.K))
+	case 1:
+		return cellite.StringValue(string(o.p.State))
+	case 2:
+		return cellite.StringValue(string(o.p.Doc))
+	case 3:
+		return cellite.StringValue(string(o.p.Summary))
+	case 4:
+		return cellite.StringValue(string(o.p.Gone))
+	case 5:
+		return cellite.BoolValue(bool(o.p.Resolved))
+	}
+	return cellite.NullValue()
+}
+
+func (o surfThreadRow) Unwrap() any { return o.p }
 
 // surfRenderCompose draws compose.surf for Compose.
 func surfRenderCompose(e *surf.Errs, out []*surfui.Node, c *Compose, fill surf.Fill) []*surfui.Node {
@@ -720,6 +834,149 @@ func surfRenderSearch(e *surf.Errs, out []*surfui.Node, c *Search, fill surf.Fil
 	return out
 }
 
+// surfRenderThreads draws threads.surf for Threads.
+func surfRenderThreads(e *surf.Errs, out []*surfui.Node, c *Threads, fill surf.Fill) []*surfui.Node {
+	// threads.surf:6:1 <surface>
+	if e.Enter("threads.surf", 6, 1) {
+		var k1 []*surfui.Node
+		// threads.surf:7:3 <table>
+		if e.Enter("threads.surf", 7, 3) {
+			var k2 []*surfui.Node
+			var b2 []surfui.Binding
+			{
+				a3 := int(int64(1))
+				b2 = append(b2, surfui.Binding{Key: "j", Title: "", Act: func() { c.Move(a3) }})
+			}
+			{
+				a4 := int(int64(1))
+				b2 = append(b2, surfui.Binding{Key: "arrow_down", Title: "", Act: func() { c.Move(a4) }})
+			}
+			{
+				a5 := int(int64(-1))
+				b2 = append(b2, surfui.Binding{Key: "k", Title: "", Act: func() { c.Move(a5) }})
+			}
+			{
+				a6 := int(int64(-1))
+				b2 = append(b2, surfui.Binding{Key: "arrow_up", Title: "", Act: func() { c.Move(a6) }})
+			}
+			b2 = append(b2, surfui.Binding{Key: "g", Title: "", Act: func() { c.First() }})
+			b2 = append(b2, surfui.Binding{Key: "shift+g", Title: "", Act: func() { c.Last() }})
+			// threads.surf:14:5 <col>
+			if e.Enter("threads.surf", 14, 5) {
+				n7 := surfui.Col("")
+				surf.ModColWidth(n7, "2")
+				surf.ModKey(n7, "state")
+				k2 = append(k2, n7)
+				e.Leave()
+			}
+			// threads.surf:15:5 <col>
+			if e.Enter("threads.surf", 15, 5) {
+				n8 := surfui.Col("document")
+				surf.ModColWidth(n8, "auto")
+				surf.ModColMax(n8, "40%")
+				surf.ModColShow(n8, c.Tree)
+				surf.ModKey(n8, "doc")
+				k2 = append(k2, n8)
+				e.Leave()
+			}
+			// threads.surf:16:5 <col>
+			if e.Enter("threads.surf", 16, 5) {
+				n9 := surfui.Col("thread")
+				surf.ModColFill(n9, true)
+				surf.ModKey(n9, "thread")
+				k2 = append(k2, n9)
+				e.Leave()
+			}
+			{
+				l10 := c.Rows
+				for i10 := range l10 {
+					// threads.surf:17:5 <item>
+					if e.Enter("threads.surf", 17, 5) {
+						var k11 []*surfui.Node
+						// threads.surf:19:7 <glyph>
+						if e.Enter("threads.surf", 19, 7) {
+							n12 := surfui.Glyph((&l10[i10]).State)
+							surf.ModTone(n12, "ok")
+							k11 = append(k11, n12)
+							e.Leave()
+						}
+						// threads.surf:20:7 <text>
+						if e.Enter("threads.surf", 20, 7) {
+							n13 := surfui.Text((&l10[i10]).Doc)
+							k11 = append(k11, n13)
+							e.Leave()
+						}
+						// threads.surf:21:7 <line>
+						if e.Enter("threads.surf", 21, 7) {
+							var k14 []*surfui.Node
+							// threads.surf:22:9 <text>
+							if e.Enter("threads.surf", 22, 9) {
+								n15 := surfui.Text((&l10[i10]).Summary)
+								k14 = append(k14, n15)
+								e.Leave()
+							}
+							if (&l10[i10]).Gone != "" {
+								// threads.surf:23:9 <chip>
+								if e.Enter("threads.surf", 23, 9) {
+									n16 := surfui.Chip((&l10[i10]).Gone)
+									surf.ModFill(n16, "warn")
+									k14 = append(k14, n16)
+									e.Leave()
+								}
+							}
+							n14 := surfui.Line(k14...)
+							k11 = append(k11, n14)
+							e.Leave()
+						}
+						n11 := surfui.Item(k11...)
+						surf.ModKey(n11, (&l10[i10]).K)
+						surf.ModMuted(n11, (&l10[i10]).Resolved)
+						surf.ModSelected(n11, (int64(i10) == int64(c.Sel)))
+						{
+							a17 := int(int64(i10))
+							n11.On("click", func() { c.Pick(a17) })
+						}
+						{
+							a18 := int(int64(i10))
+							n11.On("activate", func() { c.Open(a18) })
+						}
+						k2 = append(k2, n11)
+						e.Leave()
+					}
+				}
+			}
+			// threads.surf:26:5 <empty>
+			if e.Enter("threads.surf", 26, 5) {
+				var k19 []*surfui.Node
+				// threads.surf:26:12 <text>
+				if e.Enter("threads.surf", 26, 12) {
+					n20 := surfui.Text("no threads yet — comment on any block to start one")
+					surf.ModMuted(n20, true)
+					k19 = append(k19, n20)
+					e.Leave()
+				}
+				n19 := surfui.Empty(k19...)
+				k2 = append(k2, n19)
+				e.Leave()
+			}
+			n2 := surfui.Table(k2...)
+			surf.ModKey(n2, "table")
+			surf.ModHeight(n2, int64(c.Height))
+			surf.ModScroll(n2, true)
+			surf.ModAutofocus(n2, true)
+			for _, kb := range b2 {
+				n2.AddBinding(kb)
+			}
+			k1 = append(k1, n2)
+			e.Leave()
+		}
+		n1 := surf.NewSurface(k1...)
+		out = append(out, n1)
+		e.Leave()
+	}
+	return out
+}
+
 // surfCompiledCompose is c drawn by its templates compiled into Go.
 func surfCompiledCompose(c *Compose) surflive.Component {
 	return surf.Compiled(c, "compose.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderCompose(e, nil, c, nil) })
@@ -738,6 +995,11 @@ func surfCompiledPalette(c *Palette) surflive.Component {
 // surfCompiledSearch is c drawn by its templates compiled into Go.
 func surfCompiledSearch(c *Search) surflive.Component {
 	return surf.Compiled(c, "search.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderSearch(e, nil, c, nil) })
+}
+
+// surfCompiledThreads is c drawn by its templates compiled into Go.
+func surfCompiledThreads(c *Threads) surflive.Component {
+	return surf.Compiled(c, "threads.surf", func(e *surf.Errs) []*surfui.Node { return surfRenderThreads(e, nil, c, nil) })
 }
 
 // surfList1 is a []FooterHint as a list.
@@ -774,6 +1036,25 @@ func surfList2Of(v cellite.Value) []PaletteRow {
 	out := make([]PaletteRow, l.Len())
 	for i := range out {
 		out[i] = surf.Deref(surfPaletteRowOf(l.At(i)))
+	}
+	return out
+}
+
+// surfList3 is a []ThreadRow as a list.
+type surfList3 []ThreadRow
+
+func (l surfList3) Len() int               { return len(l) }
+func (l surfList3) At(i int) cellite.Value { return surfThreadRowValue(&l[i]) }
+
+// surfList3Of is a list's value as a []ThreadRow.
+func surfList3Of(v cellite.Value) []ThreadRow {
+	l := v.List()
+	if l == nil {
+		return nil
+	}
+	out := make([]ThreadRow, l.Len())
+	for i := range out {
+		out[i] = surf.Deref(surfThreadRowOf(l.At(i)))
 	}
 	return out
 }

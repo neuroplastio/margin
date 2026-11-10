@@ -1,0 +1,28 @@
+<!-- margin's threads view: one row per thread under review, newest first. The
+     columns are the state mark, the document (in a tree review only), and the
+     thread's summary with a note where its block or document is gone. The
+     selection is the model's (j/k, the arrows, g and G move it); a click selects, and a click on the
+     selected row, or enter, opens it. -->
+<surface>
+  <table scroll autofocus :height="height" key="table">
+    <bind key="j" do="move(1)"/>
+    <bind key="arrow_down" do="move(1)"/>
+    <bind key="k" do="move(-1)"/>
+    <bind key="arrow_up" do="move(-1)"/>
+    <bind key="g" do="first()"/>
+    <bind key="shift+g" do="last()"/>
+    <col key="state" width="2"/>
+    <col key="doc" :if="tree" width="auto" max="40%">document</col>
+    <col key="thread" fill>thread</col>
+    <item :each="(i, t) in rows" :key="t.k" :selected="i == sel" :muted="t.resolved"
+          @click="pick(i)" @activate="open(i)">
+      <glyph tone="ok">{{ t.state }}</glyph>
+      <text>{{ t.doc }}</text>
+      <line>
+        <text>{{ t.summary }}</text>
+        <chip :if="t.gone != ''" fill="warn">{{ t.gone }}</chip>
+      </line>
+    </item>
+    <empty><text muted>no threads yet — comment on any block to start one</text></empty>
+  </table>
+</surface>

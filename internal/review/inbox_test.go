@@ -263,8 +263,8 @@ func TestRenderInboxMarksFocusAndResolved(t *testing.T) {
 		t.Fatalf("renderInbox returned %d rows, want 20", len(rows))
 	}
 	// The table's header and its rule come first, then a row a thread.
-	if !strings.Contains(rows[2], "\x1b[0;7") {
-		t.Errorf("focused row is not shown selected (reversed):\n%q", rows[2])
+	if !strings.Contains(rows[2], "\x1b[0;100;35m▎") {
+		t.Errorf("focused row is not shown selected (the bar on the selection's ground):\n%q", rows[2])
 	}
 	if !strings.Contains(rows[2], "docs/spec.md") {
 		t.Errorf("focused row does not name its document:\n%q", rows[2])
@@ -334,8 +334,8 @@ func TestSingleDocumentThreadsView(t *testing.T) {
 
 	m.w, m.h = 100, 30
 	rows := m.renderInbox(10)
-	if !strings.Contains(rows[2], "[block gone]") {
-		t.Errorf("orphaned row does not say [block gone]:\n%q", rows[2])
+	if !strings.Contains(rows[2], "block gone") {
+		t.Errorf("orphaned row does not say block gone:\n%q", rows[2])
 	}
 	if strings.Contains(rows[3], "document.md") {
 		t.Errorf("single-doc row repeats the document name:\n%q", rows[3])

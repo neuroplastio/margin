@@ -152,6 +152,11 @@ type model struct {
 	inbox      bool
 	inboxAt    int
 	inboxItems []inboxItem
+	// inboxHost is the table's surface and inboxState what it shows;
+	// inboxOpen says it asked to open the focused row.
+	inboxHost  *surftea.Host
+	inboxState *Threads
+	inboxOpen  bool
 
 	// raw switches the view to the document's verbatim markdown source — the
 	// 2026-08-09 navigation-feature-requests "rich/raw mode toggle". Rendered
@@ -2155,9 +2160,8 @@ func (m *model) handleClick(mo tea.Mouse) tea.Cmd {
 	// there focuses the row it lands on. Clicks in the pane column above
 	// already handled the tree.
 	if m.inbox {
-		p := m.inboxPane(m.h - footerRows)
-		p.click(mo.X-m.docX(), mo.Y)
-		m.inboxClicked(p)
+		m.threadsHost(m.h-footerRows).CellsClick(mo.X-m.docX(), mo.Y)
+		m.inboxActs()
 		return nil
 	}
 
@@ -2258,20 +2262,25 @@ func (m *model) handleMotion(mo tea.Mouse) tea.Cmd {
 
 // handleWheel scrolls the document. Focus is explicitly left alone.
 func (m *model) handleWheel(mo tea.Mouse) tea.Cmd {
+	line := mo.Y + m.scroll
+	notches := max(m.wheelSpeed, 1)
+	if mo.Button == uv.MouseWheelUp {
+		notches = -notches
+	}
+
 	// The threads view scrolls its own table, like the pane.
 	if m.inbox {
-		dy := max(m.wheelSpeed, 1)
-		if mo.Button == uv.MouseWheelUp {
-			dy = -dy
-		}
-		p := m.inboxPane(m.h - footerRows)
-		p.cr.Wheel(mo.X-m.docX(), mo.Y, 0, dy)
-		p.dirty = true
+		m.threadsHost(m.h-footerRows).CellsWheel(mo.X-m.docX(), mo.Y, notches)
 		return nil
 	}
 
-	// surftea has no wheel for the cells yet (told to hotty): over the
-	// composer the wheel scrolls the document, as it does elsewhere.
+	// Over the composer the wheel scrolls its field, while its rows can move,
+	// and then the document, as it does elsewhere.
+	if relX, relY, ok := m.inComposer(mo.X, line); ok && !m.hot.native() {
+		if m.comp.host.CellsWheel(relX, relY, notches) {
+			return nil
+		}
+	}
 
 	delta := m.wheelSpeed
 	if delta < 1 {
@@ -3192,7 +3201,7 @@ func (m *model) view() tea.View {
 		// the document's offset is left untouched for when it returns.
 		visible = m.renderInbox(viewport)
 		at := hottytea.Rect{X: m.docX(), Y: 0, W: m.w - m.docX(), H: viewport}
-		if m.hot != nil && m.hot.place(m.inboxPane(viewport), at, hottytea.Rect{W: m.w, H: viewport}) {
+		if m.hot != nil && m.hot.placeSurf(m.threadsHost(viewport), at, hottytea.Rect{W: m.w, H: viewport}) {
 			for i := range visible {
 				visible[i] = ""
 			}

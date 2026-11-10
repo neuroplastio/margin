@@ -337,6 +337,7 @@ func (m *model) hotUpdate(msg tea.Msg) (cmd tea.Cmd, redraw bool) {
 			if m.comp != nil && sp == m.comp.host {
 				return m.composerActs(), true
 			}
+			m.inboxActs()
 			return nil, true
 		}
 		return m.hotEvent(msg.Event), true
@@ -695,8 +696,6 @@ func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
 	switch {
 	case p.id == searchID && m.searchOpen:
 		m.searchDrafted(p.text("/draft"))
-	case p.id == inboxID && m.inbox:
-		m.inboxClicked(p)
 	case p.id == treeID && m.tree != nil:
 		m.treeClicked(p)
 	}

@@ -27,8 +27,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-
-	hottycat "github.com/neuroplastio/hotty-a2ui/catalog/hotty"
+	"neuroplast.io/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surftea"
 )
 
 // inboxItem is one row of the inbox: a thread, where it lives, and whether
@@ -143,7 +143,7 @@ func (m *model) toggleInbox() {
 	}
 	m.inboxItems = items
 	m.inboxAt = 0
-	m.dropPane(inboxID) // a fresh table, scrolled to the top
+	m.dropInbox() // a fresh table, scrolled to the top
 	m.inbox = true
 	m.raw = false
 	m.visual = false
@@ -160,21 +160,18 @@ func (m *model) toggleInbox() {
 // document, q quits. Everything else is inert.
 func (m *model) handleInboxKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
-	case "j", "down":
-		if m.inboxAt+1 < len(m.inboxItems) {
-			m.inboxAt++
+	case "j", "down", "k", "up", "g", "G":
+		// The table's own: its binds move the selection (threads.surf).
+		h, name := m.threadsHost(m.h-footerRows), fieldKeyName(msg.Key())
+		if m.hot.native() && !m.hot.deaf {
+			h.Key(m.hot.s, name) // a key the host left to margin
+		} else {
+			h.CellsKey(name)
 		}
-	case "k", "up":
-		if m.inboxAt > 0 {
-			m.inboxAt--
-		}
-	case "g":
-		m.inboxAt = 0
-	case "G":
-		if len(m.inboxItems) > 0 {
-			m.inboxAt = len(m.inboxItems) - 1
-		}
+		m.inboxActs()
 	case "enter", "l", "right":
+		// Enter on a host reaches margin as a key the table does not act
+		// on, and the selection is margin's: it opens the focused row.
 		m.openInboxItem(m.inboxAt)
 	case "esc", "h", "left", "tab":
 		m.inbox = false
@@ -293,55 +290,57 @@ func (m *model) openInboxItem(i int) {
 	m.status = fmt.Sprintf("threads: %s — the thread's block is gone", item.doc)
 }
 
-// inboxID is the threads view's pane (D22): a table of the threads under
-// review, one row each.
+// inboxID is the threads view's surface name: a table of the threads under
+// review, one row each (threads.surf).
 const inboxID = "threads"
 
-// inboxPane is the threads view's pane, rows tall, as the model has it: the
-// threads, and the one focused. margin keeps the focus and the keys; a click
-// on a row focuses it (inboxClicked).
-func (m *model) inboxPane(rows int) *pane {
-	p := m.panes().pane(inboxID, map[string]any{"rows": []any{}, "sel": ""})
-	if len(m.inboxItems) == 0 {
-		p.define(obj("id", "root", "component", "Text", "variant", "caption",
-			"text", "no threads yet — comment on any block to start one"))
-		return p
+// threadsHost is the threads view as the model has it, rows tall, its state
+// brought up to date: the threads, and the one focused. margin keeps the
+// focus and the keys; a click on a row focuses it, and Enter or a click on
+// the focused one opens it (inboxActs).
+func (m *model) threadsHost(rows int) *surftea.Host {
+	if m.inboxHost == nil {
+		st := &Threads{}
+		st.click = func(i int) { m.inboxAt = i }
+		st.open = func(i int) { m.inboxAt, m.inboxOpen = i, true }
+		m.inboxHost = newSurfHost("margin-"+inboxID, surflive.New(surfInterpThreads(st)), nil)
+		m.inboxState = st
 	}
-	cols := []any{obj("key", "state", "header", "")}
-	if m.tree != nil {
-		// In a tree review each row names its document — the threads span
-		// the tree, so a row without its home is unplaceable. In a
-		// single-document review every row is the same document, so the
-		// column would be a wall of identical noise.
-		cols = append(cols, obj("key", "doc", "header", "document"))
-	}
-	cols = append(cols, obj("key", "thread", "header", "thread"))
-	p.define(obj("id", "root", "component", "HottyTable", "catalogId", hottycat.ID,
-		"rows", bind("/rows"), "rowKey", "k", "selected", bind("/sel"),
-		"height", max(rows-2, 1), "columns", cols))
-	table := make([]any, len(m.inboxItems))
+	st := m.inboxState
+	st.Tree = m.tree != nil
+	st.Height = max(rows, 1)
+	st.Sel = m.inboxAt
+	st.Rows = st.Rows[:0]
 	for i, item := range m.inboxItems {
-		state := ""
+		r := ThreadRow{K: strconv.Itoa(i), Doc: item.doc, Summary: item.thread.summary(false), Resolved: item.thread.resolved}
 		if item.thread.resolved {
-			state = "✓"
+			r.State = "✓"
 		}
-		txt := item.thread.summary(false)
 		if !item.inTree {
-			txt += "  [doc not in tree]"
+			r.Gone = "doc not in tree"
 		} else if item.thread.orphaned {
-			txt += "  [block gone]"
+			r.Gone = "block gone"
 		}
-		table[i] = obj("k", strconv.Itoa(i), "state", state, "doc", item.doc, "thread", txt)
+		st.Rows = append(st.Rows, r)
 	}
-	p.put("/rows", table)
-	p.put("/sel", strconv.Itoa(m.inboxAt))
-	return p
+	return m.inboxHost
 }
 
-// inboxClicked takes the row a click in the threads view selected.
-func (m *model) inboxClicked(p *pane) {
-	if i, err := strconv.Atoi(p.text("/sel")); err == nil && i >= 0 && i < len(m.inboxItems) {
-		m.inboxAt = i
+// dropInbox forgets the threads view's surface, and the host's: the next
+// one is a fresh table, scrolled to the top.
+func (m *model) dropInbox() {
+	if m.inboxHost != nil && m.hot != nil {
+		m.hot.s.Delete(m.inboxHost.Name())
+	}
+	m.inboxHost, m.inboxState, m.inboxOpen = nil, nil, false
+}
+
+// inboxActs opens the row the surface asked to open (Enter on the focused
+// row, or a click on it).
+func (m *model) inboxActs() {
+	if m.inbox && m.inboxOpen {
+		m.inboxOpen = false
+		m.openInboxItem(m.inboxAt)
 	}
 }
 
@@ -350,8 +349,60 @@ func (m *model) inboxClicked(p *pane) {
 // left alone, so closing the view returns the reader to exactly where they
 // were.
 func (m *model) renderInbox(viewport int) []string {
-	lines := m.inboxPane(viewport).lines(m.w - m.docX())
+	lines := m.threadsHost(viewport).Lines(m.w-m.docX(), viewport)
 	rows := make([]string, viewport)
 	copy(rows, lines)
 	return rows
+}
+
+// Threads is the threads view's state (threads.surf lays it out): a row a
+// thread, the one selected, and how tall the table is. margin keeps the
+// selection and the keys; the surface shows it, and a click or Enter on a
+// row asks margin to select or open it.
+type Threads struct {
+	Rows   []ThreadRow
+	Sel    int
+	Tree   bool
+	Height int
+
+	click func(int)
+	open  func(int)
+}
+
+// ThreadRow is a thread in the table: its state mark, its document, what it
+// says, and what is gone.
+type ThreadRow struct {
+	K        string
+	State    string
+	Doc      string
+	Summary  string
+	Gone     string
+	Resolved bool
+}
+
+// Move, First and Last are the keys that move the selection.
+func (t *Threads) Move(d int) { t.sel(t.Sel + d) }
+func (t *Threads) First()     { t.sel(0) }
+func (t *Threads) Last()      { t.sel(len(t.Rows) - 1) }
+
+func (t *Threads) sel(i int) {
+	if len(t.Rows) == 0 {
+		return
+	}
+	t.Sel = max(min(i, len(t.Rows)-1), 0)
+	t.Pick(t.Sel)
+}
+
+// Pick is a click on the row i.
+func (t *Threads) Pick(i int) {
+	if t.click != nil {
+		t.click(i)
+	}
+}
+
+// Open is Enter on the selected row, or a click on it.
+func (t *Threads) Open(i int) {
+	if t.open != nil {
+		t.open(i)
+	}
 }

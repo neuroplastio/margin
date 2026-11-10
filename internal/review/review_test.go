@@ -750,12 +750,11 @@ func TestClickInsidePaneDoesNotBlur(t *testing.T) {
 	if m.comp == nil {
 		t.Fatal("a click inside the pane closed the editor")
 	}
-	// hotty-surf v0.5.0's cells do not place a field's caret from a click
-	// (told to hotty), so what is pinned is that the click does not lose
-	// the editor or its words: typing still lands in the field.
+	// The click put the cursor near the start of the field's first line:
+	// typing lands there, not at the end.
 	typeText(m, "X")
-	if got := composed(m); !strings.Contains(got, "X") || !strings.Contains(got, "contradicts") {
-		t.Fatalf("field = %q, want the words kept and the X typed", got)
+	if got := composed(m); strings.HasSuffix(got, "X") || !strings.Contains(got, "X") {
+		t.Fatalf("field = %q, want the X typed where the click put the cursor", got)
 	}
 }
 

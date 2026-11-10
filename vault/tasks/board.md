@@ -4,6 +4,10 @@ Last updated: 2026-11-10 (leg 5b, surftea.Host)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (leg 7, threads view) the threads view is a hotty-surf table now — whether it
+  reads as a table, the selection is clear, j/k/g/G keep the row in view, the
+  table fills the column and scrolls inside it, on a host and in cells —
+  journal 2026-11-10.5
 - (B11, palette height) on a host the palette's rows come from hotty-surf's
   estimate and then the host's measure — whether the height is right at 897
   and 1796 px, and whether it shrinks with the query without the document
@@ -986,10 +990,9 @@ document, regardless of the order the tree-view work itself lands in.
   2026-11-10.2.)*
 - *(Leg 6, the composer on a hotty-surf field — landed 2026-11-10, journal
   2026-11-10.3.)*
-- **After hotty-surf v0.5.1** (caret on a click in a field, `CellsWheel`): bump, restore
-  `TestClickInsidePaneDoesNotBlur`'s caret assertion, wheel over the composer.
+- *(Leg 7, the threads view on a hotty-surf table; hotty-surf v0.5.1 — landed 2026-11-10, journal 2026-11-10.5.)*
 - *(B11, the palette's host height from `Rows` and `Fit` — landed 2026-11-10, journal 2026-11-10.4.)*
-- Then legs 7–9 (threads view, tree pane, open thread), in that
+- Then legs 8–9 (tree pane, open thread), in that
   order (the maintainer). Every gap they were blocked on (G1, G5, G2, G3) is in
   hotty-surf v0.5.0, which margin is on. Then leg 10, the cleanup that drops
   hotty-a2ui.

@@ -23,8 +23,8 @@ require (
 	neuroplast.io/hotty-go v0.7.2
 	neuroplast.io/hotty-go/hottytea v0.7.2
 	neuroplast.io/hotty-go/hottytest v0.7.2
-	neuroplast.io/hotty-surf v0.5.0
-	neuroplast.io/hotty-surf/surftea v0.5.0
+	neuroplast.io/hotty-surf v0.5.1
+	neuroplast.io/hotty-surf/surftea v0.5.1
 )
 
 require (
@@ -55,7 +55,7 @@ require (
 	golang.org/x/tools v0.52.0 // indirect
 	neuroplast.io/hotty-go/hottyedit v0.7.2 // indirect
 	neuroplast.io/hotty-go/hottyterm v0.7.2 // indirect
-	neuroplast.io/hotty-surf/surfmd v0.5.0 // indirect
+	neuroplast.io/hotty-surf/surfmd v0.5.1 // indirect
 	neuroplast.io/myelin/myelinkey v0.2.0 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )

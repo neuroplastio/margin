@@ -37,6 +37,12 @@ const hotDocSrc = "# Title\n\n" +
 // returns; then it quits, and hotRun returns the model and the host.
 func hotRun(t *testing.T, src string, play func(h *hottytest.Host, m *model), opts ...hottytest.Option) (*model, *hottytest.Host) {
 	t.Helper()
+	return hotRunWith(t, src, nil, play, opts...)
+}
+
+// hotRunWith is hotRun with setup run on the model before the program starts.
+func hotRunWith(t *testing.T, src string, setup func(m *model), play func(h *hottytest.Host, m *model), opts ...hottytest.Option) (*model, *hottytest.Host) {
+	t.Helper()
 	isolateDrafts(t)
 	dir := t.TempDir()
 	writePNG(t, filepath.Join(dir, "pic.png"), 40, 20)
@@ -53,6 +59,9 @@ func hotRun(t *testing.T, src string, play func(h *hottytest.Host, m *model), op
 	m.hot = newHotState()
 	m.hot.mermaid = fakeMermaid
 	m.hotOpen()
+	if setup != nil {
+		setup(m)
+	}
 
 	h := hottytest.New(t, opts...)
 	p := tea.NewProgram(m, tea.WithInput(h), tea.WithOutput(m.hotWatch(h)),

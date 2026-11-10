@@ -260,3 +260,70 @@ func TestPaletteRowsAreEstimated(t *testing.T) {
 		t.Errorf("the palette is %d rows in cells, want 9", got)
 	}
 }
+
+// threadsTableID is the threads view's table as surf names it, from its keys.
+const threadsTableID = "r.ktable"
+
+// On a host the threads view is a surface: a table of the threads, its
+// selection the model's, the surface's keys moving it, and Enter (the row's
+// @activate) opening the thread's block.
+func TestHottyThreadsViewIsASurface(t *testing.T) {
+	name := "margin-" + inboxID
+	m, _ := hotRunWith(t, hotDocSrc, func(m *model) {
+		m.store = &threadStore{root: t.TempDir(), docPath: "doc.md"}
+	}, func(h *hottytest.Host, m *model) {
+		surfaceWith(t, h, "A paragraph with bold")
+		for _, c := range []struct{ after, say string }{{"j", "first thing"}, {"jj", "second thing"}} {
+			h.Type(c.after)
+			h.Type("c")
+			var s *hottytest.Surface
+			waitFor(t, "the composer's surface", func() bool { s = h.Surface("margin-" + composerID); return s != nil && s.Placed() })
+			waitFor(t, "its field with the keyboard", func() bool { return s.Focused() == composerFieldID })
+			if err := h.Fill("margin-"+composerID, composerFieldID, c.say); err != nil {
+				t.Fatal(err)
+			}
+			h.Key("ctrl+s")
+			waitFor(t, "the composer gone", func() bool { s := h.Surface("margin-" + composerID); return s == nil || !s.Placed() })
+		}
+		h.Type("i")
+		var s *hottytest.Surface
+		waitFor(t, "the threads surface", func() bool { s = h.Surface(name); return s != nil && s.Placed() })
+		waitFor(t, "both threads in it", func() bool {
+			return strings.Contains(s.Text(), "first thing") && strings.Contains(s.Text(), "second thing")
+		})
+		h.Type("j") // the second row
+		h.Key("enter")
+		waitFor(t, "the threads view closed by Enter", func() bool { s := h.Surface(name); return s == nil || !s.Placed() })
+	})
+	if m.inbox {
+		t.Error("Enter left the threads view open")
+	}
+	if !strings.HasPrefix(m.status, "threads: doc.md") {
+		t.Errorf("status %q, want the landing on a thread's block", m.status)
+	}
+}
+
+// Over a composer whose text is taller than its field, the wheel scrolls the
+// field, not the document (in cells).
+func TestComposerWheelScrollsItsField(t *testing.T) {
+	m := newTestModel(t)
+	open(t, m, freshAnchor, newCommentSlot, "")
+	m.View()
+	var lines []string
+	for i := 0; i < 20; i++ {
+		lines = append(lines, "line "+string(rune('a'+i)))
+	}
+	m.update(tea.PasteMsg{Content: strings.Join(lines, "\n")})
+	m.View()
+	before, scroll := composerPlain(m)[0], m.scroll
+	x := m.docX() + gutterW + borderW + 2
+	y := m.paneTop - m.scroll
+	m.handleWheel(tea.Mouse{X: x, Y: y, Button: tea.MouseWheelUp}) // the caret is at the end: the rows above are what can move
+	m.View()
+	if after := composerPlain(m)[0]; after == before {
+		t.Errorf("the field's first row is still %q after a wheel over it", before)
+	}
+	if m.scroll != scroll {
+		t.Errorf("the document scrolled from %d to %d under a wheel over the composer", scroll, m.scroll)
+	}
+}
