@@ -4,11 +4,11 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/neuroplastio/hotty-go"
-	"github.com/neuroplastio/hotty-go/hottytea"
-	"github.com/neuroplastio/hotty-surf/pkg/cells"
-	"github.com/neuroplastio/hotty-surf/surfrun"
-	"github.com/neuroplastio/hotty-surf/surfui"
+	"neuroplast.io/hotty-go"
+	"neuroplast.io/hotty-go/hottytea"
+	"neuroplast.io/hotty-surf/pkg/cells"
+	"neuroplast.io/hotty-surf/surfrun"
+	"neuroplast.io/hotty-surf/surfui"
 )
 
 // margin's hotty-surf seam: a hotty-surf model shown as one of margin's
@@ -148,7 +148,7 @@ func (p *surfHost) key(h *hotState, name string) bool {
 // (surfrun.WriteFrame). A Select's list is not written: no pane uses one.
 func (p *surfHost) frame(f surfrun.Frame) []string {
 	var b strings.Builder
-	surfrun.WriteFrame(&b, p.name, f, nil)
+	surfrun.WriteFrame(&b, p.name, f, nil, nil)
 	if b.Len() == 0 {
 		return nil
 	}

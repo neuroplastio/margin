@@ -251,7 +251,7 @@ margin --version         # 26.10.03 for a release, 26.10.02-dev.0d7c52f for a de
 ```
 
 `--version` also says which version of [hotty](https://github.com/neuroplastio/hotty)
-margin speaks: `margin 26.11.02 (<commit>) · hotty 0.5`.
+margin speaks: `margin 26.11.02 (<commit>) · hotty 0.7`.
 
 `margin update` replaces the file you ran (through any symlink), so install it
 somewhere you can write, such as `~/.local/bin`. A margin you built yourself

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neuroplastio/hotty-go"
+	"neuroplast.io/hotty-go"
 	"github.com/neuroplastio/margin/internal/review"
 )
 

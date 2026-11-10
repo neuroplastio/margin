@@ -27,10 +27,10 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/neuroplastio/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surflive"
 )
 
-//go:generate go run github.com/neuroplastio/hotty-surf/cmd/surfgen
+//go:generate go run neuroplast.io/hotty-surf/cmd/surfgen
 
 // matchCommands ranks cmds against query and returns the matches, best
 // first. An empty query returns every command in registry order, unranked —

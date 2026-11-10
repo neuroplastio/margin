@@ -13,7 +13,7 @@ import (
 	"github.com/neuroplastio/hotty-a2ui/rendition/html"
 	"github.com/neuroplastio/hotty-a2ui/rendition/theme"
 	"github.com/neuroplastio/hotty-a2ui/view"
-	"github.com/neuroplastio/hotty-go/hottytea"
+	"neuroplast.io/hotty-go/hottytea"
 )
 
 // margin's panes (D22): every part of the review screen besides the

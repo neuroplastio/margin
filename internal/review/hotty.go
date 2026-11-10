@@ -11,8 +11,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/neuroplastio/hotty-go"
-	"github.com/neuroplastio/hotty-go/hottytea"
+	"neuroplast.io/hotty-go"
+	"neuroplast.io/hotty-go/hottytea"
 
 	"github.com/neuroplastio/margin/internal/mermaidsvg"
 )
@@ -674,7 +674,7 @@ func (m *model) hotPaneOf(surface string) *pane {
 // hotPaneEvent is what the user did in a pane on the host: its HTML
 // rendition takes it, and margin hears the actions it sent.
 func (m *model) hotPaneEvent(p *pane, ev hotty.Event) tea.Cmd {
-	if err := p.html(hotPaneName(p)).Event(ev); err != nil {
+	if err := p.html(hotPaneName(p)).Event(oldEvent(ev)); err != nil {
 		m.hot.tracef("pane %s: %v", p.id, err)
 	}
 	p.dirty = true

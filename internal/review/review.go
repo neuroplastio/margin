@@ -29,7 +29,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/neuroplastio/hotty-go/hottytea"
+	"neuroplast.io/hotty-go/hottytea"
 )
 
 const (

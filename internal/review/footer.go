@@ -3,10 +3,10 @@ package review
 import (
 	"fmt"
 
-	"github.com/neuroplastio/hotty-surf/surflive"
+	"neuroplast.io/hotty-surf/surflive"
 )
 
-//go:generate go run github.com/neuroplastio/hotty-surf/cmd/surfgen
+//go:generate go run neuroplast.io/hotty-surf/cmd/surfgen
 
 // The footer (D22, amended by the hotty-surf port): the mode margin is in,
 // the keys it takes there as a help line, the review's progress, and the

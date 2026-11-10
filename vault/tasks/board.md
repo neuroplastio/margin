@@ -4,6 +4,10 @@ Last updated: 2026-11-09 (the hotty-surf port re-planned)
 
 **Active milestone:** M4 — Round two
 **Needs a look:**
+- (stack bump) margin runs on hotty-go v0.7.2 and hotty-surf v0.4.0 — whether
+  the footer, palette and search prompt look as they did (lowercase caps),
+  whether the palette's height is right at 897 and 1796 px, whether `j move
+  c comment` wants a gap or a tone — journal 2026-11-09.2
 - (footer in cells) a narrow footer drops whole hints from the end, where it
   cut every hint mid-word — whether `[Shift+Y] copy review` and `[Q] quit` going
   first at 897 with a status is right, and whether five hints (not six) before the
@@ -965,14 +969,10 @@ document, regardless of the order the tree-view work itself lands in.
 
 ## Next
 
-- **Leg 5: the stack bump [felt]** (claimed 2026-11-09, margin-surf) (vault/knowledge/hotty-surf-port.md, revised
-  2026-11-09). Move to hotty-go v0.7.1, hotty-surf v0.3.0 and cel-lite v0.2.0
-  at `neuroplast.io/...`. Add a temporary `a2uibridge.go` (new `hotty.Event` →
-  old) for the four panes still on the archived hotty-a2ui, with the old
-  hotty-go path pinned at 23af564. `WriteFrame` takes a menu writer. Bring
-  over `kit-730ae32-wip` (c202f02; 730ae32 is in v0.3.0) and delete the
-  branch. Reshoot the footer, search and palette (lowercase keycaps, scaled
-  text), and check `paletteHostHeight`.
+- **Leg 5b: surftea in place of `surfhost.go`** (surftea v0.4.0: Host, one
+  stylesheet per Session, selects and menus as surfaces, `CellsClick`). Then
+  leg 6, the composer on `<field rows="3..8">` (`trap`, `caret="end"`,
+  `@height`; surfui.Rows and Fit for the height `paletteHostHeight` guesses).
 - Then legs 6–9 (composer, threads view, tree pane, open thread), each
   blocked on its hotty-surf gap (G1, G5, G2, G3; none started), and leg 10,
   the cleanup that drops hotty-a2ui.

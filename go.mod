@@ -11,18 +11,19 @@ require (
 	github.com/mattn/go-runewidth v0.0.24
 	github.com/neuroplastio/engram v0.0.0-20260924064618-eab89b44c5ec
 	github.com/neuroplastio/engram/enlaunch v0.0.0-20261002194446-da71f3ba774d
-	github.com/neuroplastio/hotty-go v0.6.1-0.20261105162053-23af564543c8
-	github.com/neuroplastio/hotty-go/hottytea v0.6.1-0.20261105162053-23af564543c8
-	github.com/neuroplastio/hotty-go/hottytest v0.6.1-0.20261105162053-23af564543c8
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.12.1-0.20260928190838-e234f6fe6ecd // at or after 424d3ca (wazero#2535), see internal/mermaidsvg
 	github.com/yuin/goldmark v1.8.6
 )
 
 require (
-	github.com/neuroplastio/cel-lite v0.1.1
 	github.com/neuroplastio/hotty-a2ui v0.0.0-20261022101910-b1f6b54a9bd5
-	github.com/neuroplastio/hotty-surf v0.1.2-0.20261105154522-305925397451
+	github.com/neuroplastio/hotty-go v0.6.1-0.20261105162053-23af564543c8
+	neuroplast.io/cel-lite v0.2.0
+	neuroplast.io/hotty-go v0.7.2
+	neuroplast.io/hotty-go/hottytea v0.7.2
+	neuroplast.io/hotty-go/hottytest v0.7.2
+	neuroplast.io/hotty-surf v0.4.0
 )
 
 require (
@@ -38,8 +39,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/neuroplastio/hotty-go/hottyedit v0.6.0 // indirect
-	github.com/neuroplastio/hotty-go/hottyterm v0.6.0 // indirect
+	github.com/neuroplastio/hotty-go/hottyedit v0.6.1-0.20261105162053-23af564543c8 // indirect
 	github.com/neuroplastio/myelin/myelinkey v0.1.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -47,10 +47,11 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/tools v0.52.0 // indirect
+	neuroplast.io/hotty-go/hottyedit v0.7.2 // indirect
+	neuroplast.io/hotty-go/hottyterm v0.7.2 // indirect
+	neuroplast.io/myelin/myelinkey v0.2.0 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )

@@ -5,11 +5,11 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/neuroplastio/hotty-go"
-	"github.com/neuroplastio/hotty-go/hottytea"
-	"github.com/neuroplastio/hotty-go/hottytest"
-	"github.com/neuroplastio/hotty-surf/surfrun"
-	"github.com/neuroplastio/hotty-surf/surfui"
+	"neuroplast.io/hotty-go"
+	"neuroplast.io/hotty-go/hottytea"
+	"neuroplast.io/hotty-go/hottytest"
+	"neuroplast.io/hotty-surf/surfrun"
+	"neuroplast.io/hotty-surf/surfui"
 )
 
 // seamCount is a hotty-surf model that counts a button's clicks.

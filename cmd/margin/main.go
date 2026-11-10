@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/neuroplastio/hotty-go"
+	"neuroplast.io/hotty-go"
 	"github.com/neuroplastio/margin/internal/review"
 	"github.com/neuroplastio/margin/internal/update"
 	"github.com/neuroplastio/margin/internal/version"
